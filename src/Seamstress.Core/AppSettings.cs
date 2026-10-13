@@ -20,6 +20,9 @@ public sealed class AppSettings
     /// <summary>Texture size in pixels assumed when reporting texel density.</summary>
     public int TextureResolution { get; set; } = 2048;
 
+    /// <summary>"metric" or "imperial". Only changes what the interface shows; files and exports stay metric.</summary>
+    public string Units { get; set; } = "metric";
+
     public string Author { get; set; } = "";
     public List<string> RecentFiles { get; set; } = new();
 

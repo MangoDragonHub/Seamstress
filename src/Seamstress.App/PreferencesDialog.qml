@@ -3,7 +3,8 @@ import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
 
-// Preferences: where MakeHuman lives, how the 3D viewport renders, and the texture size used for density readouts.
+// Preferences: where MakeHuman lives, how the 3D viewport renders, the units shown, and the texture size used for
+// density readouts.
 Dialog {
     id: root
     title: "Preferences"
@@ -19,11 +20,13 @@ Dialog {
         author.text = App.settingAuthor
         renderer.currentIndex = Math.max(0, ["auto", "gpu", "cpu"].indexOf(App.settingRenderer))
         resolution.currentIndex = Math.max(0, resolution.model.indexOf(App.settingTextureResolution))
+        units.currentIndex = App.settingUnits === "imperial" ? 1 : 0
     }
 
     onAboutToShow: load()
     onAccepted: App.savePreferences(userFolder.text, baseMesh.text, command.text,
-                                    ["auto", "gpu", "cpu"][renderer.currentIndex], resolution.model[resolution.currentIndex], author.text)
+                                    ["auto", "gpu", "cpu"][renderer.currentIndex], resolution.model[resolution.currentIndex], author.text,
+                                    units.currentIndex === 1 ? "imperial" : "metric")
 
     ColumnLayout {
         anchors.fill: parent
@@ -105,6 +108,31 @@ Dialog {
                     opacity: 0.6
                     font.pixelSize: 11
                     text: "A renderer change takes effect the next time Seamstress starts."
+                }
+            }
+        }
+
+        GroupBox {
+            title: "Units"
+            Layout.fillWidth: true
+            GridLayout {
+                anchors.fill: parent
+                columns: 2
+                columnSpacing: 8
+                rowSpacing: 8
+                Label { text: "Measurements" }
+                ComboBox {
+                    id: units
+                    Layout.fillWidth: true
+                    model: ["Metric (cm, m, g/m²)", "Imperial (in, oz/yd²)"]
+                }
+                Label {
+                    Layout.columnSpan: 2
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.6
+                    font.pixelSize: 11
+                    text: "Changes the units shown and typed in the interface. Garment files and exports are not affected."
                 }
             }
         }

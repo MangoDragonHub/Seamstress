@@ -88,9 +88,9 @@ Item {
             backgroundMode: SceneEnvironment.Color
             antialiasingMode: SceneEnvironment.MSAA
             antialiasingQuality: SceneEnvironment.High
-            // Ground: a 10 cm grid that fades with distance.
+            // Ground: a 10 cm grid (4 in with imperial units) that fades with distance.
             InfiniteGrid {
-                gridInterval: 0.1
+                gridInterval: App.imperial ? 0.1016 : 0.1
                 gridAxes: false
             }
         }

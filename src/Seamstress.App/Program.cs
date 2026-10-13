@@ -19,6 +19,7 @@ internal sealed class StartupOptions
     public bool Smoke { get; set; }
     public bool Quads { get; set; }
     public float? Gender { get; set; }
+    public string? Units { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
     public string? SelectPiece { get; set; }
@@ -110,6 +111,7 @@ public static class Program
                 case "--view": options.View = Next(); break;
                 case "--avatar": options.Avatar = Next(); break;
                 case "--quads": options.Quads = true; break;
+                case "--units": options.Units = Next(); break;
                 case "--gender":
                     if (float.TryParse(Next(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float g))
                         options.Gender = g;

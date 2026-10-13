@@ -15,6 +15,14 @@ Dialog {
 
     property var shape: ({ gender: 0.5, age: 0.5, muscle: 0.5, weight: 0.5, height: 0.5, proportions: 0.5, heightCm: 0, shaped: true, loading: false })
     function refresh() { shape = JSON.parse(App.avatarShape()) }
+    // "165.9 cm", or feet and inches with imperial units.
+    function heightText(cm) {
+        if (!App.imperial)
+            return cm.toFixed(1) + " cm"
+        const tenths = Math.round(cm / 2.54 * 10)
+        const feet = Math.floor(tenths / 120)
+        return feet + " ft " + ((tenths - feet * 120) / 10).toFixed(1) + " in"
+    }
     onAboutToShow: refresh()
     Connections {
         target: App
@@ -62,7 +70,7 @@ Dialog {
                 Layout.fillWidth: true
                 opacity: 0.75
                 text: root.shape.loading ? "Rebuilding the avatar…"
-                    : root.shape.heightCm > 0 ? "Height: " + root.shape.heightCm.toFixed(1) + " cm" : ""
+                    : root.shape.heightCm > 0 ? "Height: " + root.heightText(root.shape.heightCm) : ""
             }
             Button { text: "Reset to Neutral"; onClicked: App.resetAvatarShape() }
         }

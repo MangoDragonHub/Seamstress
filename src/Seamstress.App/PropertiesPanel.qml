@@ -12,6 +12,14 @@ Pane {
     signal pickColor(string current)
     signal pickTexture()
 
+    // Values are stored metric; with imperial units they are converted for display and converted back when edited.
+    readonly property bool imperial: App.imperial
+    readonly property real cmUnit: imperial ? 2.54 : 1            // centimetres per displayed length unit
+    readonly property real mUnit: imperial ? 0.0254 : 1           // metres per displayed position unit
+    readonly property real mmUnit: imperial ? 25.4 : 1            // millimetres per displayed thickness unit
+    readonly property real gsmUnit: imperial ? 33.9057 : 1        // g/m² per displayed fabric weight unit (oz/yd²)
+    readonly property string lengthName: imperial ? "in" : "cm"
+
     function refresh() { sel = JSON.parse(App.selection()) }
     Component.onCompleted: refresh()
     Connections {
@@ -98,6 +106,7 @@ Pane {
         property real stepSize: 1
         property int decimals: 0
         property string suffix: ""
+        property int valueWidth: 54
         signal edited(real value)
         Layout.fillWidth: true
         spacing: 6
@@ -113,7 +122,7 @@ Pane {
         }
         Label {
             text: slider.value.toFixed(sliderRow.decimals) + sliderRow.suffix
-            Layout.preferredWidth: 54
+            Layout.preferredWidth: sliderRow.valueWidth
             horizontalAlignment: Text.AlignRight
             opacity: 0.8
         }
@@ -163,9 +172,10 @@ Pane {
                 visible: !!root.sel.garment
                 SliderRow {
                     label: "Particle distance"
-                    from: 0.5; to: 6; stepSize: 0.1; decimals: 1; suffix: " cm"
-                    value: root.sel.garment ? root.sel.garment.particleDistance : 2
-                    onEdited: (v) => App.setParticleDistance(v)
+                    from: root.imperial ? 0.2 : 0.5; to: root.imperial ? 2.4 : 6
+                    stepSize: root.imperial ? 0.05 : 0.1; decimals: root.imperial ? 2 : 1; suffix: " " + root.lengthName
+                    value: (root.sel.garment ? root.sel.garment.particleDistance : 2) / root.cmUnit
+                    onEdited: (v) => App.setParticleDistance(v * root.cmUnit)
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -199,15 +209,15 @@ Pane {
                 NumberRow {
                     visible: root.sel.kind === "pieces"
                     label: "Piece override"
-                    decimals: 1; step: 0.1; suffix: "cm"
-                    value: root.sel.piece ? root.sel.piece.particleDistance : 0
-                    onEdited: (v) => App.setPieceValue("particleDistance", v)
+                    decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.05 : 0.1; suffix: root.lengthName
+                    value: (root.sel.piece ? root.sel.piece.particleDistance : 0) / root.cmUnit
+                    onEdited: (v) => App.setPieceValue("particleDistance", v * root.cmUnit)
                 }
                 InfoRow {
                     visible: root.sel.kind === "pieces"
                     label: "Selected"
                     value: root.sel.piece ? root.sel.piece.faces.toLocaleString(Qt.locale(), "f", 0) + " faces  ·  "
-                         + root.sel.piece.area.toFixed(0) + " cm²" : ""
+                         + (root.sel.piece.area / (root.cmUnit * root.cmUnit)).toFixed(0) + " " + root.lengthName + "²" : ""
                 }
                 Label {
                     visible: root.sel.kind === "pieces"
@@ -226,7 +236,8 @@ Pane {
                 InfoRow { label: "To"; value: root.sel.seam ? root.sel.seam.b : "" }
                 InfoRow {
                     label: "Lengths"
-                    value: root.sel.seam ? root.sel.seam.lengthA.toFixed(1) + " cm  ↔  " + root.sel.seam.lengthB.toFixed(1) + " cm" : ""
+                    value: root.sel.seam ? (root.sel.seam.lengthA / root.cmUnit).toFixed(root.imperial ? 2 : 1) + " " + root.lengthName + "  ↔  "
+                         + (root.sel.seam.lengthB / root.cmUnit).toFixed(root.imperial ? 2 : 1) + " " + root.lengthName : ""
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -245,9 +256,9 @@ Pane {
             Section {
                 title: "3D Arrangement"
                 visible: root.sel.kind === "pieces"
-                NumberRow { label: "Position X"; suffix: "m"; step: 0.01; value: root.sel.piece ? root.sel.piece.posX : 0; onEdited: (v) => App.setPieceValue("posX", v) }
-                NumberRow { label: "Position Y"; suffix: "m"; step: 0.01; value: root.sel.piece ? root.sel.piece.posY : 0; onEdited: (v) => App.setPieceValue("posY", v) }
-                NumberRow { label: "Position Z"; suffix: "m"; step: 0.01; value: root.sel.piece ? root.sel.piece.posZ : 0; onEdited: (v) => App.setPieceValue("posZ", v) }
+                NumberRow { label: "Position X"; suffix: root.imperial ? "in" : "m"; decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01; value: (root.sel.piece ? root.sel.piece.posX : 0) / root.mUnit; onEdited: (v) => App.setPieceValue("posX", v * root.mUnit) }
+                NumberRow { label: "Position Y"; suffix: root.imperial ? "in" : "m"; decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01; value: (root.sel.piece ? root.sel.piece.posY : 0) / root.mUnit; onEdited: (v) => App.setPieceValue("posY", v * root.mUnit) }
+                NumberRow { label: "Position Z"; suffix: root.imperial ? "in" : "m"; decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01; value: (root.sel.piece ? root.sel.piece.posZ : 0) / root.mUnit; onEdited: (v) => App.setPieceValue("posZ", v * root.mUnit) }
                 NumberRow { label: "Rotation X"; suffix: "°"; decimals: 1; step: 5; value: root.sel.piece ? root.sel.piece.rotX : 0; onEdited: (v) => App.setPieceValue("rotX", v) }
                 NumberRow { label: "Rotation Y"; suffix: "°"; decimals: 1; step: 5; value: root.sel.piece ? root.sel.piece.rotY : 0; onEdited: (v) => App.setPieceValue("rotY", v) }
                 NumberRow { label: "Rotation Z"; suffix: "°"; decimals: 1; step: 5; value: root.sel.piece ? root.sel.piece.rotZ : 0; onEdited: (v) => App.setPieceValue("rotZ", v) }
@@ -283,13 +294,26 @@ Pane {
                         onActivated: if (root.sel.presets.indexOf(currentText) >= 0) App.setPreset(currentText)
                     }
                 }
-                SliderRow { label: "Weight"; from: 20; to: 1000; stepSize: 5; suffix: " g/m²"; value: root.sel.physics ? root.sel.physics.density : 150; onEdited: (v) => App.setPieceValue("density", v) }
+                SliderRow {
+                    label: "Weight"
+                    from: root.imperial ? 0.6 : 20; to: root.imperial ? 29.5 : 1000
+                    stepSize: root.imperial ? 0.1 : 5; decimals: root.imperial ? 1 : 0
+                    suffix: root.imperial ? " oz/yd²" : " g/m²"; valueWidth: root.imperial ? 70 : 54
+                    value: (root.sel.physics ? root.sel.physics.density : 150) / root.gsmUnit
+                    onEdited: (v) => App.setPieceValue("density", v * root.gsmUnit)
+                }
                 SliderRow { label: "Stretch"; value: root.sel.physics ? root.sel.physics.stretch : 0; onEdited: (v) => App.setPieceValue("stretch", v) }
                 SliderRow { label: "Shear"; value: root.sel.physics ? root.sel.physics.shear : 0; onEdited: (v) => App.setPieceValue("shear", v) }
                 SliderRow { label: "Bend"; value: root.sel.physics ? root.sel.physics.bend : 0; onEdited: (v) => App.setPieceValue("bend", v) }
                 SliderRow { label: "Damping"; value: root.sel.physics ? root.sel.physics.damping : 0; onEdited: (v) => App.setPieceValue("damping", v) }
                 SliderRow { label: "Friction"; value: root.sel.physics ? root.sel.physics.friction : 0; onEdited: (v) => App.setPieceValue("friction", v) }
-                SliderRow { label: "Thickness"; from: 0.5; to: 15; stepSize: 0.5; decimals: 1; suffix: " mm"; value: root.sel.physics ? root.sel.physics.thickness : 3; onEdited: (v) => App.setPieceValue("thickness", v) }
+                SliderRow {
+                    label: "Thickness"
+                    from: root.imperial ? 0.02 : 0.5; to: root.imperial ? 0.6 : 15
+                    stepSize: root.imperial ? 0.02 : 0.5; decimals: root.imperial ? 2 : 1; suffix: root.imperial ? " in" : " mm"
+                    value: (root.sel.physics ? root.sel.physics.thickness : 3) / root.mmUnit
+                    onEdited: (v) => App.setPieceValue("thickness", v * root.mmUnit)
+                }
             }
 
             // ---- Material ------------------------------------------------------------
@@ -377,7 +401,7 @@ Pane {
                 visible: root.sel.kind === "pieces"
                 InfoRow {
                     label: "Texel density"
-                    value: root.sel.piece ? root.sel.piece.texelDensity.toFixed(2) + " px/cm  @ " + root.sel.piece.textureResolution + " px" : ""
+                    value: root.sel.piece ? (root.sel.piece.texelDensity * root.cmUnit).toFixed(root.imperial ? 1 : 2) + " px/" + root.lengthName + "  @ " + root.sel.piece.textureResolution + " px" : ""
                 }
                 SliderRow { label: "UV scale"; from: 0.1; to: 4; stepSize: 0.05; decimals: 2; suffix: "×"; value: root.sel.piece ? root.sel.piece.uvScale : 1; onEdited: (v) => App.setPieceValue("uvScale", v) }
                 SliderRow { label: "UV rotation"; from: -180; to: 180; stepSize: 5; suffix: "°"; value: root.sel.piece ? root.sel.piece.uvRotation : 0; onEdited: (v) => App.setPieceValue("uvRotation", v) }

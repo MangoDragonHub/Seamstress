@@ -248,6 +248,8 @@ appimage() {
     install -m644 src/Seamstress.App/icons/seamstress.svg "$appdir/$APP_ID.svg"
     install -m644 src/Seamstress.App/icons/seamstress.svg "$appdir/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
     # --appimage-extract-and-run lets the tool work where FUSE is unavailable (containers, CI).
+    # A copy that is still running cannot be written over, but it can be replaced.
+    rm -f "$DIST/Seamstress-x86_64.AppImage"
     ARCH=x86_64 "$tool" --appimage-extract-and-run --no-appstream "$appdir" "$DIST/Seamstress-x86_64.AppImage"
     rm -rf "$appdir"
     echo "    $(du -h "$DIST/Seamstress-x86_64.AppImage" | cut -f1)  dist/Seamstress-x86_64.AppImage"

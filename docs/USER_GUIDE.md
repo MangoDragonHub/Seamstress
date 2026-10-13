@@ -145,7 +145,8 @@ maps what you already know to where it lives here.
   last clicked is the *active* garment, shown highlighted in Layers, and Simulate only affects that one.
 - **A seam joins a whole edge to a whole edge.** To sew part of an edge, split it first by double-clicking
   it with the Edit Points tool; each part is then its own edge.
-- **Units.** Patterns are in centimetres; 3D positions are in metres.
+- **Units.** Patterns are in centimetres; 3D positions are in metres. To work in inches instead, switch
+  **Measurements** to Imperial in [Preferences](#preferences).
 - **Not available yet:** internal lines and darts, pins, seam allowance, linked symmetric patterns, trims
   (buttons, zippers), pressure and wind, animation, and avatar posing or measurement editing.
 
@@ -580,6 +581,7 @@ MakeHuman's body.
 | **Author name** | Written into exported MakeHuman assets. |
 | **Detect Automatically** | Looks for MakeHuman in the usual places and fills in the two paths. |
 | **Renderer** | *Automatic* uses the GPU and falls back to CPU rendering when no GPU driver is found or the GPU failed to start last time. *GPU* and *CPU* force one or the other. Takes effect on the next start. |
+| **Measurements** | *Metric* shows centimetres, metres, millimetres and g/m². *Imperial* shows inches, oz/yd² and feet and inches for the avatar height, and the grids change to 4 in squares with a stronger line every foot. Applies immediately. Only the interface changes: garment files and exports are the same either way. |
 | **Texture size for texel density** | The texture resolution assumed by the texel density read-outs. |
 
 The renderer in use is shown in the bottom-right corner of the 3D view. You can also force it for one run by

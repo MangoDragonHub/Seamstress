@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Controls
 
 // 2D viewport: draws the pattern pieces (or their UV layout) and forwards pointer input to the editor.
-// World coordinates are centimetres with Y up; in UV mode they are texture units.
+// World coordinates are centimetres with Y up; in UV mode they are texture units. With imperial units only the
+// grid spacing and the read-outs change.
 Item {
     id: root
     clip: true
@@ -55,6 +56,7 @@ Item {
     Connections {
         target: App
         function onSceneRevisionChanged() { Qt.callLater(root.refresh) }
+        function onImperialChanged() { canvas.requestPaint() }
     }
 
     Canvas {
@@ -114,17 +116,23 @@ Item {
                 ctx.lineWidth = 1
                 ctx.strokeRect(root.sx(0), root.sy(1), root.zoom, root.zoom)
             } else {
-                // Grid every 10 cm, with a stronger line every metre and at the origin.
-                const step = root.zoom * 10 >= 14 ? 10 : 100
-                const x0 = Math.floor(root.wx(0) / step) * step, x1 = root.wx(width)
-                const y0 = Math.floor(root.wy(height) / step) * step, y1 = root.wy(0)
+                // Grid every 10 cm, with a stronger line every metre and at the origin. In imperial units the lines
+                // are 4 in apart with a stronger one every foot; zoomed out, a line per foot and a stronger one per yard.
+                const imperial = App.imperial
+                let step = imperial ? 4 * 2.54 : 10, perMajor = imperial ? 3 : 10
+                if (root.zoom * step < 14) {
+                    step = imperial ? 12 * 2.54 : 100
+                    perMajor = imperial ? 3 : 1
+                }
                 ctx.lineWidth = 1
-                for (let x = x0; x <= x1; x += step) {
-                    ctx.strokeStyle = x === 0 ? "#6a6f78" : (x % 100 === 0 ? "#484c53" : "#383b41")
+                for (let i = Math.floor(root.wx(0) / step); i * step <= root.wx(width); i++) {
+                    const x = i * step
+                    ctx.strokeStyle = i === 0 ? "#6a6f78" : (i % perMajor === 0 ? "#484c53" : "#383b41")
                     ctx.beginPath(); ctx.moveTo(Math.round(root.sx(x)) + 0.5, 0); ctx.lineTo(Math.round(root.sx(x)) + 0.5, height); ctx.stroke()
                 }
-                for (let y = y0; y <= y1; y += step) {
-                    ctx.strokeStyle = y === 0 ? "#6a6f78" : (y % 100 === 0 ? "#484c53" : "#383b41")
+                for (let i = Math.floor(root.wy(height) / step); i * step <= root.wy(0); i++) {
+                    const y = i * step
+                    ctx.strokeStyle = i === 0 ? "#6a6f78" : (i % perMajor === 0 ? "#484c53" : "#383b41")
                     ctx.beginPath(); ctx.moveTo(0, Math.round(root.sy(y)) + 0.5); ctx.lineTo(width, Math.round(root.sy(y)) + 0.5); ctx.stroke()
                 }
             }
@@ -185,7 +193,7 @@ Item {
                 ctx.fillStyle = p.active ? "#f4f5f7" : "#a9adb5"
                 ctx.font = (p.selected ? "bold " : "") + "12px sans-serif"
                 ctx.textAlign = "center"
-                const label = root.uv ? p.name + "  ·  " + p.density.toFixed(1) + " px/cm" : p.name
+                const label = root.uv ? p.name + "  ·  " + (App.imperial ? (p.density * 2.54).toFixed(1) + " px/in" : p.density.toFixed(1) + " px/cm") : p.name
                 ctx.fillText(label, root.sx(p.label[0]), root.sy(p.label[1]) + 4)
             }
 
@@ -240,6 +248,7 @@ Item {
             }
             coords.text = root.uv
                 ? "U " + root.wx(e.x).toFixed(3) + "   V " + root.wy(e.y).toFixed(3)
+                : App.imperial ? (root.wx(e.x) / 2.54).toFixed(2) + ", " + (root.wy(e.y) / 2.54).toFixed(2) + " in"
                 : root.wx(e.x).toFixed(1) + ", " + root.wy(e.y).toFixed(1) + " cm"
         }
         onReleased: (e) => {

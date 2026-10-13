@@ -767,8 +767,12 @@ public partial class AppController : INotifyPropertyChanged
     public string SettingRenderer => _settings.Renderer;
     public int SettingTextureResolution => _settings.TextureResolution;
     public string SettingAuthor => _settings.Author;
+    public string SettingUnits => _settings.Units;
 
-    public void SavePreferences(string userFolder, string baseMesh, string command, string renderer, int textureResolution, string author)
+    /// <summary>True when lengths are shown in inches. "--units" overrides the saved preference for one run.</summary>
+    public bool Imperial => (Startup.Units ?? _settings.Units) == "imperial";
+
+    public void SavePreferences(string userFolder, string baseMesh, string command, string renderer, int textureResolution, string author, string units)
     {
         bool baseChanged = _settings.MakeHumanBaseMesh != LocalPath(baseMesh.Trim());
         _settings.MakeHumanUserFolder = LocalPath(userFolder.Trim());
@@ -777,6 +781,8 @@ public partial class AppController : INotifyPropertyChanged
         _settings.Renderer = renderer is "gpu" or "cpu" ? renderer : "auto";
         _settings.TextureResolution = Math.Clamp(textureResolution, 64, 16384);
         _settings.Author = author.Trim();
+        _settings.Units = units == "imperial" ? "imperial" : "metric";
+        Startup.Units = null;
         TrySaveSettings();
         NotifySettings();
         if (baseChanged)
@@ -809,6 +815,8 @@ public partial class AppController : INotifyPropertyChanged
         Notify(nameof(SettingRenderer));
         Notify(nameof(SettingTextureResolution));
         Notify(nameof(SettingAuthor));
+        Notify(nameof(SettingUnits));
+        Notify(nameof(Imperial));
         Notify(nameof(MakeHumanLinked));
     }
 
