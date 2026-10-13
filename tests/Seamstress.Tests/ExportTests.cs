@@ -33,6 +33,7 @@ public class ExportTests : IDisposable
         // Close the seams (without an avatar the pieces simply meet in the middle) so welding has something to merge.
         var sim = new SimulationController(_ws, () => null);
         _ws.Document.Simulation.Gravity = 0;
+        _ws.Document.Simulation.SelfCollision = false; // keeps this fixture quick; collision has its own tests
         sim.Start(true);
         sim.RunFrames(90);
         sim.Stop();

@@ -12,6 +12,11 @@ Item {
 
     property string displayMode: "shaded"   // "shaded" or "checker"
     property bool wireframe: false
+    onWireframeChanged: App.showWire = wireframe
+    property string wireSource: ""
+    property bool hasGizmo: false
+    property vector3d gizmoOrigin: Qt.vector3d(0, 0, 0)
+    property bool showGizmo: true
     property bool showAvatar: true
     property bool showThreads: true
     property string avatarSource: ""
@@ -28,6 +33,10 @@ Item {
         const data = JSON.parse(App.viewportModels())
         avatarSource = data.avatar
         threadSource = data.seams
+        wireSource = data.wire
+        hasGizmo = data.gizmo !== undefined
+        if (hasGizmo)
+            gizmoOrigin = Qt.vector3d(data.gizmo[0], data.gizmo[1], data.gizmo[2])
         const wanted = data.models
         // Update rows in place so unchanged pieces keep their GPU buffers.
         for (let i = pieceModel.count - 1; i >= 0; i--) {
@@ -77,7 +86,6 @@ Item {
             backgroundMode: SceneEnvironment.Color
             antialiasingMode: SceneEnvironment.MSAA
             antialiasingQuality: SceneEnvironment.High
-            debugSettings: DebugSettings { wireframeEnabled: root.wireframe }
             // Ground: a 10 cm grid that fades with distance.
             InfiniteGrid {
                 gridInterval: 0.1
@@ -149,6 +157,13 @@ Item {
             }
         }
 
+        // Topology overlay: the outline of every face.
+        Model {
+            visible: root.wireframe && root.wireSource !== ""
+            source: root.wireSource
+            materials: PrincipledMaterial { baseColor: "#14161a"; lighting: PrincipledMaterial.NoLighting }
+        }
+
         // Threads between stitched edges that have not been pulled together yet.
         Model {
             visible: root.showThreads && root.threadSource !== ""
@@ -157,24 +172,114 @@ Item {
         }
     }
 
+    // Move/rotate handles for the selected pieces, drawn in their own layer so the garment never hides them.
+    View3D {
+        id: gizmoView
+        anchors.fill: parent
+        camera: gizmoCamera
+        visible: root.hasGizmo && root.showGizmo && !App.simulating
+        environment: SceneEnvironment { backgroundMode: SceneEnvironment.Transparent; antialiasingMode: SceneEnvironment.MSAA }
+
+        Node {
+            position: root.target
+            eulerRotation: Qt.vector3d(root.pitch, root.yaw, 0)
+            PerspectiveCamera { id: gizmoCamera; z: root.distance; clipNear: 0.02; clipFar: 80; fieldOfView: 35 }
+        }
+
+        component Handle: Model {
+            property string part: ""
+            property color tint: "white"
+            pickable: true
+            materials: PrincipledMaterial {
+                baseColor: mouse.activePart === part ? "#ffe066" : tint
+                lighting: PrincipledMaterial.NoLighting
+            }
+        }
+
+        Node {
+            position: root.gizmoOrigin
+            // Keeps the handles the same size on screen whatever the zoom.
+            scale: Qt.vector3d(root.distance * 0.085, root.distance * 0.085, root.distance * 0.085)
+            Handle { part: "tx"; tint: "#e5484d"; source: App.gizmoArrow; eulerRotation.z: -90 }
+            Handle { part: "ty"; tint: "#46a758"; source: App.gizmoArrow }
+            Handle { part: "tz"; tint: "#3e7bdc"; source: App.gizmoArrow; eulerRotation.x: 90 }
+            Handle { part: "rx"; tint: "#e5484d"; source: App.gizmoRing; eulerRotation.z: -90 }
+            Handle { part: "ry"; tint: "#46a758"; source: App.gizmoRing }
+            Handle { part: "rz"; tint: "#3e7bdc"; source: App.gizmoRing; eulerRotation.x: 90 }
+        }
+    }
+
     MouseArea {
+        id: mouse
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
         property real lastX: 0
         property real lastY: 0
         property real travelled: 0
-        property int mode: 0   // 1 orbit, 2 pan
+        property int mode: 0   // 1 orbit, 2 pan, 3 dragging a handle
+        property string activePart: ""
+        property real pressX: 0
+        property real pressY: 0
+        property real startAngle: 0
+        property real turned: 0
+        property real lastAngle: 0
+
+        function axisOf(part) {
+            const a = part.charAt(1)
+            return a === "x" ? Qt.vector3d(1, 0, 0) : a === "y" ? Qt.vector3d(0, 1, 0) : Qt.vector3d(0, 0, 1)
+        }
+
+        function dragHandle(x, y) {
+            const axis = axisOf(activePart)
+            const origin = gizmoView.mapFrom3DScene(dragOrigin)
+            if (activePart.charAt(0) === "t") {
+                // Slide along the axis by as much as the cursor moved along the axis as it appears on screen.
+                const tip = gizmoView.mapFrom3DScene(dragOrigin.plus(axis))
+                const sx = tip.x - origin.x, sy = tip.y - origin.y
+                const length2 = sx * sx + sy * sy
+                if (length2 < 1e-6)
+                    return
+                const amount = ((x - pressX) * sx + (y - pressY) * sy) / length2
+                App.gizmoMove(axis.x * amount, axis.y * amount, axis.z * amount)
+            } else {
+                // Turn by the angle the cursor sweeps around the handle centre, counting past half turns.
+                const angle = Math.atan2(y - origin.y, x - origin.x)
+                let step = angle - lastAngle
+                if (step > Math.PI) step -= 2 * Math.PI
+                if (step < -Math.PI) step += 2 * Math.PI
+                turned += step
+                lastAngle = angle
+                const facing = axis.dotProduct(gizmoCamera.forward) > 0 ? 1 : -1
+                App.gizmoRotate(activePart.charAt(1), turned * facing * 180 / Math.PI)
+            }
+        }
+        property vector3d dragOrigin: Qt.vector3d(0, 0, 0)
 
         onPressed: (e) => {
             root.forceActiveFocus()
             lastX = e.x; lastY = e.y; travelled = 0
+            pressX = e.x; pressY = e.y
+            if (e.button === Qt.LeftButton && gizmoView.visible) {
+                const hit = gizmoView.pick(e.x, e.y)
+                if (hit.objectHit && hit.objectHit.part && App.gizmoBegin()) {
+                    activePart = hit.objectHit.part
+                    dragOrigin = root.gizmoOrigin
+                    const origin = gizmoView.mapFrom3DScene(dragOrigin)
+                    lastAngle = Math.atan2(e.y - origin.y, e.x - origin.x)
+                    turned = 0
+                    mode = 3
+                    return
+                }
+            }
             mode = (e.button === Qt.LeftButton && !(e.modifiers & Qt.ShiftModifier)) ? 1 : 2
         }
         onPositionChanged: (e) => {
             const dx = e.x - lastX, dy = e.y - lastY
             lastX = e.x; lastY = e.y
             travelled += Math.abs(dx) + Math.abs(dy)
-            if (mode === 1) {
+            if (mode === 3) {
+                dragHandle(e.x, e.y)
+            } else if (mode === 1) {
                 root.yaw -= dx * 0.4
                 root.pitch = Math.max(-89, Math.min(89, root.pitch - dy * 0.4))
             } else if (mode === 2) {
@@ -187,12 +292,20 @@ Item {
             }
         }
         onReleased: (e) => {
-            // A click without dragging selects the piece under the cursor.
-            if (travelled < 4 && e.button === Qt.LeftButton) {
+            if (mode === 3) {
+                App.gizmoEnd()
+                activePart = ""
+            } else if (travelled < 4 && e.button === Qt.LeftButton) {
+                // A click without dragging selects the piece under the cursor.
                 const hit = view.pick(e.x, e.y)
                 const additive = (e.modifiers & Qt.ControlModifier) !== 0 || (e.modifiers & Qt.ShiftModifier) !== 0
                 App.selectIn3D(hit.objectHit && hit.objectHit.pid ? hit.objectHit.pid : "", additive)
             }
+            mode = 0
+        }
+        onCanceled: {
+            if (mode === 3) App.gizmoEnd()
+            activePart = ""
             mode = 0
         }
         onWheel: (e) => { root.distance = Math.max(0.25, Math.min(25, root.distance * Math.pow(0.999, e.angleDelta.y))) }
@@ -234,6 +347,14 @@ Item {
             ToolTip.text: "Show the mesh topology"
         }
         ViewButton {
+            text: "Gizmo"
+            checkable: true
+            checked: root.showGizmo
+            onToggled: root.showGizmo = checked
+            ToolTip.visible: hovered
+            ToolTip.text: "Show handles to move (arrows) and rotate (rings) the selected pieces"
+        }
+        ViewButton {
             text: "Avatar"
             checkable: true
             checked: root.showAvatar
@@ -245,7 +366,7 @@ Item {
         anchors { left: parent.left; bottom: parent.bottom; margins: 8 }
         opacity: 0.55
         font.pixelSize: 11
-        text: "Drag: orbit   ·   Shift/Middle drag: pan   ·   Wheel: zoom   ·   Click: select"
+        text: "Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Handles: move / rotate"
     }
     Label {
         anchors { right: parent.right; bottom: parent.bottom; margins: 8 }

@@ -149,6 +149,22 @@ public partial class AppController : INotifyPropertyChanged
     }
 
     public string CheckerTexture => _viewport.CheckerUrl;
+    public string GizmoArrow => _viewport.ArrowUrl;
+    public string GizmoRing => _viewport.RingUrl;
+
+    /// <summary>Topology overlay in the 3D view: draws the outline of every face.</summary>
+    public bool ShowWire
+    {
+        get => _viewport.ShowWire;
+        set
+        {
+            if (_viewport.ShowWire == value)
+                return;
+            _viewport.ShowWire = value;
+            Notify();
+            ViewportRevision++;
+        }
+    }
     public string Renderer => Startup.RendererDescription;
     public string StartupScreenshot => Startup.Screenshot ?? "";
     public string StartupView => Startup.View;
@@ -216,6 +232,25 @@ public partial class AppController : INotifyPropertyChanged
         else
             _workspace.SelectPiece(pieceId, additive);
     }
+
+    // Move/rotate handles in the 3D view. Offsets and angles are totals since the drag began.
+    public bool GizmoBegin()
+    {
+        if (_simulation.IsRunning)
+            StopSimulation();
+        return _workspace.BeginPlacementEdit();
+    }
+
+    public void GizmoMove(double x, double y, double z)
+        => _workspace.ApplyPlacementEdit(new Vector3((float)x, (float)y, (float)z), Quaternion.Identity);
+
+    public void GizmoRotate(string axis, double degrees)
+    {
+        var direction = axis == "x" ? Vector3.UnitX : axis == "y" ? Vector3.UnitY : Vector3.UnitZ;
+        _workspace.ApplyPlacementEdit(Vector3.Zero, Quaternion.CreateFromAxisAngle(direction, (float)(degrees * Math.PI / 180)));
+    }
+
+    public void GizmoEnd() => _workspace.EndPlacementEdit();
 
     /// <summary>Called by a UI timer: applies the newest simulation frame and finishes background avatar loading.</summary>
     public void Tick()
@@ -384,6 +419,12 @@ public partial class AppController : INotifyPropertyChanged
     }
 
     public void SetSimulateWithOthers(string garmentId, bool value) => _workspace.SetSimulateWithOthers(garmentId, value);
+
+    public void SetTopology(string topology)
+    {
+        if (_workspace.ActiveGarment is { } garment)
+            _workspace.SetTopology(garment.Id, topology == "Quads" ? MeshTopology.Quads : MeshTopology.Triangles);
+    }
     public void SetSimulationValue(string key, double value) => _workspace.SetSimulationValue(key, (float)value);
     public void SetMaterialValue(string key, double value) => _workspace.SetMaterialValue(key, (float)value);
     public void SetMaterialColor(string color) => _workspace.SetMaterialColor(color.Length > 7 ? "#" + color[^6..] : color);
@@ -546,7 +587,7 @@ public partial class AppController : INotifyPropertyChanged
                 default:
                     throw new InvalidOperationException($"Unknown export format '{format}'.");
             }
-            int faces = scene.Meshes.Sum(m => m.TriangleCount);
+            int faces = scene.Meshes.Sum(m => format == "gltf" ? m.TriangleCount : m.FaceCount);
             StatusText = $"Exported {scene.Meshes.Count} garment(s), {faces:N0} faces to {path}";
             return true;
         }
@@ -674,6 +715,15 @@ public partial class AppController : INotifyPropertyChanged
     }
 
     public string RecentFiles() => string.Join("|", _settings.RecentFiles.Where(File.Exists));
+
+    /// <summary>File name without folders, whichever path separator the platform uses.</summary>
+    public string FileName(string path) => Path.GetFileName(LocalPath(path));
+
+    /// <summary>Converts a file URL from a dialog into an ordinary path.</summary>
+    public string PathFromUrl(string url) => LocalPath(url);
+
+    /// <summary>Folder the automated check writes its files into.</summary>
+    public string StartupFolderUrl => Startup.Screenshot == null ? "" : ViewportSync.ToUrl(Path.GetDirectoryName(Startup.Screenshot)!);
 
     /// <summary>Called when the window closes.</summary>
     public void Shutdown()

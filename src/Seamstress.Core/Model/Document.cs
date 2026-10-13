@@ -77,6 +77,9 @@ public sealed class Garment
     /// <summary>Target edge length of the simulation mesh in centimetres. Smaller means more faces.</summary>
     public float ParticleDistance { get; set; } = 2.0f;
 
+    /// <summary>Whether the garment is meshed with triangles or mostly with quads.</summary>
+    public MeshTopology Topology { get; set; } = MeshTopology.Triangles;
+
     public List<LayerGroup> Groups { get; set; } = new();
     public List<PatternPiece> Pieces { get; set; } = new();
     public List<Seam> Seams { get; set; } = new();
@@ -89,6 +92,7 @@ public sealed class Garment
         Expanded = Expanded,
         SimulateWithOthers = SimulateWithOthers,
         ParticleDistance = ParticleDistance,
+        Topology = Topology,
         Groups = Groups.Select(g => g.Clone()).ToList(),
         Pieces = Pieces.Select(p => p.Clone()).ToList(),
         Seams = Seams.Select(s => s.Clone()).ToList(),
@@ -111,6 +115,15 @@ public sealed class Garment
         }
         return false;
     }
+}
+
+public enum MeshTopology
+{
+    /// <summary>Evenly sized, near-equilateral triangles.</summary>
+    Triangles,
+
+    /// <summary>A grid of quads along the grain, with triangles only where the outline requires them.</summary>
+    Quads,
 }
 
 /// <summary>A folder in the layers panel. Groups nest through <see cref="ParentId"/>.</summary>
@@ -321,8 +334,8 @@ public sealed class SimulationSettings
     public int Substeps { get; set; } = 12;
     public float TimeScale { get; set; } = 1f;
 
-    /// <summary>Keeps cloth layers from passing through each other (slower).</summary>
-    public bool SelfCollision { get; set; }
+    /// <summary>Keeps cloth from passing through itself and through other garments.</summary>
+    public bool SelfCollision { get; set; } = true;
 
     public bool GroundPlane { get; set; } = true;
 

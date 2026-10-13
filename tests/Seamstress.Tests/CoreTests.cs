@@ -127,6 +127,89 @@ public class MeshTests
     }
 }
 
+public class QuadTests
+{
+    [Theory]
+    [InlineData("T-Shirt")]
+    [InlineData("Skirt")]
+    public void QuadTopologyIsMostlyQuadsAndCoversTheSameSurface(string template)
+    {
+        var doc = new Document();
+        var garment = Templates.Create(template, doc);
+        garment.Topology = MeshTopology.Quads;
+        var mesh = Mesher.Build(garment);
+        Assert.True(mesh.QuadCount > mesh.FaceCount * 0.75, $"{mesh.QuadCount} quads of {mesh.FaceCount} faces");
+        for (int i = 0; i < mesh.Pieces.Count; i++)
+        {
+            var piece = mesh.Pieces[i];
+            Assert.NotNull(piece.Polygons);
+            // Every triangle belongs to exactly one face, so faces and triangles describe the same surface.
+            Assert.Equal(piece.TriangleCount, piece.Polygons!.Sum(p => p.Length - 2));
+            double area = 0;
+            foreach (var face in piece.Polygons!)
+            {
+                Assert.InRange(face.Length, 3, 4);
+                Assert.Equal(face.Length, face.Distinct().Count());
+                double a = 0;
+                for (int k = 0; k < face.Length; k++)
+                {
+                    var p = piece.Points[face[k]];
+                    var q = piece.Points[face[(k + 1) % face.Length]];
+                    a += (double)p.X * q.Y - (double)q.X * p.Y;
+                }
+                Assert.True(a > 0, "faces are counter-clockwise");
+                area += a / 2;
+            }
+            Assert.InRange(area, Outline.Area(garment.Pieces[i]) * 0.97, Outline.Area(garment.Pieces[i]) * 1.03);
+        }
+        // Seams still pair up vertex for vertex.
+        Assert.NotEmpty(mesh.Stitches);
+
+        garment.Topology = MeshTopology.Triangles;
+        Assert.Equal(0, Mesher.Build(garment).QuadCount);
+    }
+
+    [Fact]
+    public void QuadsReachObjAndFbxButGltfStaysTriangles()
+    {
+        var ws = new Workspace();
+        var garment = ws.AddTemplate("Skirt");
+        ws.SetTopology(garment.Id, MeshTopology.Quads);
+        garment = ws.Document.Garments[0];
+        var mesh = ws.MeshFor(garment);
+        var scene = Seamstress.Core.IO.ExportScene.Build(ws.Document, ws.MeshFor, new Seamstress.Core.IO.ExportOptions());
+        Assert.Equal(mesh.FaceCount, scene.Meshes[0].FaceCount);
+        Assert.Equal(mesh.TriangleCount, scene.Meshes[0].TriangleCount);
+
+        string folder = Path.Combine(Path.GetTempPath(), "seamstress-quads-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            Seamstress.Core.IO.ObjExporter.Export(scene, Path.Combine(folder, "q.obj"));
+            var faces = File.ReadLines(Path.Combine(folder, "q.obj")).Where(l => l.StartsWith("f ")).ToList();
+            Assert.Equal(mesh.FaceCount, faces.Count);
+            Assert.Equal(mesh.QuadCount, faces.Count(f => f.Split(' ').Length == 5));
+            Seamstress.Core.IO.FbxExporter.Export(scene, Path.Combine(folder, "q.fbx"));
+            Seamstress.Core.IO.GltfExporter.Export(scene, Path.Combine(folder, "q.glb"));
+            Assert.True(new FileInfo(Path.Combine(folder, "q.fbx")).Length > 1000);
+            if (Environment.GetEnvironmentVariable("SEAMSTRESS_DUMP") is { } dump)
+            {
+                foreach (var f in Directory.GetFiles(folder))
+                    File.Copy(f, Path.Combine(dump, Path.GetFileName(f)), true);
+            }
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+
+        // Undo returns to triangles; the saved file remembers the choice.
+        Assert.Contains("\"topology\": \"quads\"", Seamstress.Core.IO.GarmentFile.Serialize(ws.Document));
+        ws.History.Undo();
+        Assert.Equal(MeshTopology.Triangles, ws.Document.Garments[0].Topology);
+    }
+}
+
 public class DocumentTests
 {
     [Fact]
@@ -338,5 +421,67 @@ public class DocumentTests
         Assert.Equal("Custom", ws.PrimaryPiece!.Physics.Preset);
         ws.History.Undo();
         Assert.Equal(30, ws.PrimaryPiece!.Physics.Bend);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0)]
+    [InlineData(30, -45, 120)]
+    [InlineData(-170, 60, -15)]
+    [InlineData(0, 180, 0)]
+    [InlineData(10, 90, 0)]
+    public void EulerAnglesSurviveARoundTrip(float x, float y, float z)
+    {
+        var matrix = Workspace.EulerMatrix(new Vector3(x, y, z));
+        var again = Workspace.EulerMatrix(Workspace.ToEuler(matrix));
+        foreach (var axis in new[] { Vector3.UnitX, Vector3.UnitY, Vector3.UnitZ })
+            Assert.True(Vector3.Distance(Vector3.Transform(axis, matrix), Vector3.Transform(axis, again)) < 1e-3f);
+    }
+
+    [Fact]
+    public void DraggingInThe3DViewMovesArrangementAndDrapeAsOneUndoStep()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("Skirt");
+        var garment = ws.Document.Garments[0];
+        var front = garment.Pieces[0];
+        var mesh = ws.MeshFor(garment).Pieces[0];
+        var flat = Mesher.Arrange(front, mesh);
+        front.Drape = flat.SelectMany(p => new[] { p.X, p.Y, p.Z }).ToArray();
+        front.DrapeKey = mesh.Key;
+        ws.SelectPiece(front.Id);
+        var centre = ws.SelectionCentre()!.Value;
+        var startPosition = front.Placement.Position;
+
+        // A click on a handle without dragging leaves no trace.
+        Assert.True(ws.BeginPlacementEdit());
+        ws.EndPlacementEdit();
+        Assert.Equal("Add Skirt", ws.History.UndoName);
+
+        Assert.True(ws.BeginPlacementEdit());
+        ws.ApplyPlacementEdit(new Vector3(0.05f, 0, 0), Quaternion.Identity);
+        ws.ApplyPlacementEdit(new Vector3(0.10f, 0.02f, 0), Quaternion.Identity);
+        ws.EndPlacementEdit();
+        front = ws.Document.FindPiece(front.Id)!;
+        Assert.Equal(startPosition + new Vector3(0.10f, 0.02f, 0), front.Placement.Position);
+        Assert.True(Vector3.Distance(ws.SelectionCentre()!.Value, centre + new Vector3(0.10f, 0.02f, 0)) < 1e-4f);
+        // The draped shape moved with it and is still valid for the mesh.
+        var draped = Mesher.CurrentPositions(front, mesh);
+        Assert.True(Vector3.Distance(draped[0], flat[0] + new Vector3(0.10f, 0.02f, 0)) < 1e-5f);
+
+        // Turning 90 degrees about the vertical axis: the arrangement and the drape agree afterwards.
+        Assert.True(ws.BeginPlacementEdit());
+        ws.ApplyPlacementEdit(Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2));
+        ws.EndPlacementEdit();
+        front = ws.Document.FindPiece(front.Id)!;
+        Assert.InRange(front.Placement.Rotation.Y, 89.9f, 90.1f);
+        var turned = Mesher.CurrentPositions(front, mesh);
+        var rearranged = Mesher.Arrange(front, mesh);
+        for (int i = 0; i < turned.Length; i += 37)
+            Assert.True(Vector3.Distance(turned[i], rearranged[i]) < 2e-3f, $"vertex {i}: {turned[i]} vs {rearranged[i]}");
+
+        Assert.Equal("Move piece in 3D", ws.History.UndoName);
+        ws.History.Undo();
+        ws.History.Undo();
+        Assert.Equal(startPosition, ws.Document.FindPiece(front.Id)!.Placement.Position);
     }
 }

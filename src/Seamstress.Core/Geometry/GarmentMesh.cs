@@ -19,11 +19,35 @@ public sealed class PieceMesh
 
     public required int BoundaryCount { get; init; }
 
+    /// <summary>
+    /// Faces as they are shown and exported: quads and triangles when the garment uses quad topology, otherwise null
+    /// (the faces are simply <see cref="Triangles"/>). Each quad is two triangles of the simulation mesh, so
+    /// both describe exactly the same surface.
+    /// </summary>
+    public int[][]? Polygons { get; init; }
+
     /// <summary>Fingerprint of the vertex layout; a stored drape is only valid for the same key.</summary>
     public required string Key { get; init; }
 
     public int VertexCount => Points.Length;
     public int TriangleCount => Triangles.Length / 3;
+
+    /// <summary>Number of faces in the exported topology.</summary>
+    public int FaceCount => Polygons?.Length ?? TriangleCount;
+    public int QuadCount => Polygons?.Count(p => p.Length == 4) ?? 0;
+
+    /// <summary>Every face of the exported topology as its vertex indices, counter-clockwise.</summary>
+    public IEnumerable<int[]> Faces()
+    {
+        if (Polygons != null)
+        {
+            foreach (var polygon in Polygons)
+                yield return polygon;
+            yield break;
+        }
+        for (int t = 0; t < Triangles.Length; t += 3)
+            yield return new[] { Triangles[t], Triangles[t + 1], Triangles[t + 2] };
+    }
 }
 
 /// <summary>A pair of mesh vertices joined by a seam.</summary>
@@ -37,6 +61,8 @@ public sealed class GarmentMesh
     public required List<Stitch> Stitches { get; init; }
 
     public int TriangleCount => Pieces.Sum(p => p.TriangleCount);
+    public int FaceCount => Pieces.Sum(p => p.FaceCount);
+    public int QuadCount => Pieces.Sum(p => p.QuadCount);
     public int VertexCount => Pieces.Sum(p => p.VertexCount);
 
     public PieceMesh? Find(string pieceId) => Pieces.FirstOrDefault(p => p.PieceId == pieceId);
@@ -106,7 +132,7 @@ public static class Mesher
         {
             var counts = new int[pieces[i].EdgeCount];
             Array.Copy(segments, edgeOffset[i], counts, 0, counts.Length);
-            meshes.Add(BuildPiece(pieces[i], counts, garment.EffectiveParticleDistance(pieces[i])));
+            meshes.Add(BuildPiece(pieces[i], counts, garment.EffectiveParticleDistance(pieces[i]), garment.Topology));
         }
 
         var stitches = new List<Stitch>();
@@ -130,8 +156,10 @@ public static class Mesher
     }
 
     /// <summary>Triangulates one piece with the given number of segments on each outline edge.</summary>
-    public static PieceMesh BuildPiece(PatternPiece piece, int[] edgeSegments, float particleDistance)
+    public static PieceMesh BuildPiece(PatternPiece piece, int[] edgeSegments, float particleDistance,
+        MeshTopology topology = MeshTopology.Triangles)
     {
+        bool quads = topology == MeshTopology.Quads;
         int edgeCount = piece.EdgeCount;
         var boundary = new List<Vector2>();
         var chains = new int[edgeCount][];
@@ -157,7 +185,8 @@ public static class Mesher
         float h = particleDistance;
         float orientation = Outline.SignedArea(boundary) >= 0 ? 1f : -1f;
 
-        // Hexagonal lattice of interior points, kept clear of the outline so boundary edges survive triangulation.
+        // Lattice of interior points, kept clear of the outline so boundary edges survive triangulation: staggered
+        // rows give near-equilateral triangles, a square grid gives cells that pair up into quads.
         var min = new Vector2(float.MaxValue);
         var max = new Vector2(float.MinValue);
         foreach (var p in boundary)
@@ -167,7 +196,7 @@ public static class Mesher
         }
         var points = new List<Vector2>(boundary);
         var centre = (min + max) / 2;
-        float rowHeight = h * 0.8660254f;
+        float rowHeight = quads ? h : h * 0.8660254f;
         int rows = (int)MathF.Ceiling((max.Y - min.Y) / rowHeight / 2) + 1;
         int cols = (int)MathF.Ceiling((max.X - min.X) / h / 2) + 1;
         float clearance = h * 0.55f;
@@ -176,7 +205,7 @@ public static class Mesher
             for (int r = -rows; r <= rows; r++)
             {
                 float y = centre.Y + r * rowHeight;
-                float shift = (r & 1) == 0 ? 0 : h * 0.5f;
+                float shift = quads || (r & 1) == 0 ? 0 : h * 0.5f;
                 for (int c = -cols; c <= cols; c++)
                 {
                     var p = new Vector2(centre.X + c * h + shift, y);
@@ -252,8 +281,70 @@ public static class Mesher
             Triangles = triangles.ToArray(),
             EdgeChains = chains,
             BoundaryCount = boundaryCount,
+            Polygons = quads ? PairIntoQuads(pointArray, triangles) : null,
             Key = Fingerprint(pointArray, triangles.Count),
         };
+    }
+
+    /// <summary>
+    /// Merges pairs of triangles into quads, best-shaped pairs first. Grid cells in the interior always pair up;
+    /// along curved or slanted outlines some triangles are left over.
+    /// </summary>
+    private static int[][] PairIntoQuads(Vector2[] points, List<int> triangles)
+    {
+        int count = triangles.Count / 3;
+        var owner = new Dictionary<long, int>();
+        var candidates = new List<(float Score, int A, int B, int[] Quad)>();
+        for (int t = 0; t < count; t++)
+        {
+            for (int k = 0; k < 3; k++)
+            {
+                int a = triangles[3 * t + k], b = triangles[3 * t + (k + 1) % 3], c = triangles[3 * t + (k + 2) % 3];
+                long key = a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a;
+                if (!owner.TryGetValue(key, out int other))
+                {
+                    owner[key] = t * 3 + k;
+                    continue;
+                }
+                // The neighbour holds this edge as (b, a); its third corner completes the quad a, d, b, c.
+                int otherTri = other / 3, otherK = other % 3;
+                int d = triangles[3 * otherTri + (otherK + 2) % 3];
+                var quad = new[] { a, d, b, c };
+                float worst = 0;
+                bool convex = true;
+                for (int i = 0; i < 4 && convex; i++)
+                {
+                    var p0 = points[quad[(i + 3) % 4]];
+                    var p1 = points[quad[i]];
+                    var p2 = points[quad[(i + 1) % 4]];
+                    var u = p0 - p1;
+                    var v = p2 - p1;
+                    float cross = v.X * u.Y - v.Y * u.X;
+                    convex = cross > 0;
+                    float angle = MathF.Atan2(cross, Vector2.Dot(u, v)) * 180f / MathF.PI;
+                    worst = MathF.Max(worst, MathF.Abs(angle - 90f));
+                }
+                if (convex && worst < 50f)
+                    candidates.Add((worst, otherTri, t, quad));
+            }
+        }
+
+        candidates.Sort((x, y) => x.Score.CompareTo(y.Score));
+        var used = new bool[count];
+        var polygons = new List<int[]>(count);
+        foreach (var (_, a, b, quad) in candidates)
+        {
+            if (used[a] || used[b])
+                continue;
+            used[a] = used[b] = true;
+            polygons.Add(quad);
+        }
+        for (int t = 0; t < count; t++)
+        {
+            if (!used[t])
+                polygons.Add(new[] { triangles[3 * t], triangles[3 * t + 1], triangles[3 * t + 2] });
+        }
+        return polygons.ToArray();
     }
 
     private static string Fingerprint(Vector2[] points, int indexCount)
@@ -281,9 +372,7 @@ public static class Mesher
         float width = MathF.Max((max.X - min.X) * 0.01f, 1e-4f);
         var placement = piece.Placement;
         float arc = placement.Curvature * MathF.PI / 180f;
-        var rotation = Matrix4x4.CreateRotationX(placement.Rotation.X * MathF.PI / 180f)
-                     * Matrix4x4.CreateRotationY(placement.Rotation.Y * MathF.PI / 180f)
-                     * Matrix4x4.CreateRotationZ(placement.Rotation.Z * MathF.PI / 180f);
+        var rotation = Editing.Workspace.EulerMatrix(placement.Rotation);
         var result = new Vector3[mesh.Points.Length];
         for (int i = 0; i < result.Length; i++)
         {

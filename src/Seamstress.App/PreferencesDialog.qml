@@ -125,12 +125,12 @@ Dialog {
     FolderDialog {
         id: folderDialog
         title: "MakeHuman User Data Folder"
-        onAccepted: userFolder.text = decodeURIComponent(selectedFolder.toString().replace(/^file:\/\//, ""))
+        onAccepted: userFolder.text = App.pathFromUrl(selectedFolder.toString())
     }
     FileDialog {
         id: meshDialog
         title: "MakeHuman Base Mesh (base.obj)"
         nameFilters: ["Wavefront OBJ (*.obj)"]
-        onAccepted: baseMesh.text = decodeURIComponent(selectedFile.toString().replace(/^file:\/\//, ""))
+        onAccepted: baseMesh.text = App.pathFromUrl(selectedFile.toString())
     }
 }

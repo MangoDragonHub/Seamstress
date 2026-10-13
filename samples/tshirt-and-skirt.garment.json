@@ -7,7 +7,7 @@
     "gravity": -9.81,
     "substeps": 12,
     "timeScale": 1,
-    "selfCollision": false,
+    "selfCollision": true,
     "groundPlane": true
   },
   "avatar": {
@@ -16,7 +16,7 @@
   },
   "materials": [
     {
-      "id": "339b70c9b3",
+      "id": "d91cda7058",
       "name": "Shirt fabric",
       "color": "#4F8FD9",
       "repeat": 1,
@@ -25,7 +25,7 @@
       "opacity": 1
     },
     {
-      "id": "838a70d929",
+      "id": "6845c175aa",
       "name": "Skirt fabric",
       "color": "#7A5FC2",
       "repeat": 1,
@@ -36,21 +36,22 @@
   ],
   "garments": [
     {
-      "id": "7dda118e26",
+      "id": "709d33ebc1",
       "name": "T-Shirt",
       "visible": true,
       "simulateWithOthers": false,
       "particleDistance": 2,
+      "topology": "triangles",
       "groups": [
         {
-          "id": "8ca929bc25",
+          "id": "a84ef929a0",
           "name": "Sleeves",
           "visible": true
         }
       ],
       "pieces": [
         {
-          "id": "b6cbcdfb80",
+          "id": "34e086c3fe",
           "name": "Front",
           "visible": true,
           "origin": [0, 0],
@@ -75,11 +76,11 @@
             "friction": 40,
             "thickness": 3
           },
-          "material": "339b70c9b3",
+          "material": "d91cda7058",
           "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
         },
         {
-          "id": "7b10856ec3",
+          "id": "520f5c3ba8",
           "name": "Back",
           "visible": true,
           "origin": [75, 0],
@@ -104,13 +105,13 @@
             "friction": 40,
             "thickness": 3
           },
-          "material": "339b70c9b3",
+          "material": "d91cda7058",
           "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
         },
         {
-          "id": "6a0952f721",
+          "id": "86a325ce44",
           "name": "Sleeve L",
-          "group": "8ca929bc25",
+          "group": "a84ef929a0",
           "visible": true,
           "origin": [150, 10],
           "points": [
@@ -131,13 +132,13 @@
             "friction": 40,
             "thickness": 3
           },
-          "material": "339b70c9b3",
+          "material": "d91cda7058",
           "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
         },
         {
-          "id": "fad3eda5b1",
+          "id": "07d8fa8e8e",
           "name": "Sleeve R",
-          "group": "8ca929bc25",
+          "group": "a84ef929a0",
           "visible": true,
           "origin": [205, 10],
           "points": [
@@ -158,33 +159,34 @@
             "friction": 40,
             "thickness": 3
           },
-          "material": "339b70c9b3",
+          "material": "d91cda7058",
           "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
         }
       ],
       "seams": [
-        { "id": "505327fe47", "from": { "piece": "b6cbcdfb80", "edge": 1 }, "to": { "piece": "7b10856ec3", "edge": 7 }, "reversed": false },
-        { "id": "5504e255d1", "from": { "piece": "b6cbcdfb80", "edge": 7 }, "to": { "piece": "7b10856ec3", "edge": 1 }, "reversed": false },
-        { "id": "d4c13fd505", "from": { "piece": "b6cbcdfb80", "edge": 3 }, "to": { "piece": "7b10856ec3", "edge": 5 }, "reversed": false },
-        { "id": "fda8c2f640", "from": { "piece": "b6cbcdfb80", "edge": 5 }, "to": { "piece": "7b10856ec3", "edge": 3 }, "reversed": false },
-        { "id": "e0eab035e5", "from": { "piece": "6a0952f721", "edge": 1 }, "to": { "piece": "6a0952f721", "edge": 4 }, "reversed": false },
-        { "id": "e216746a83", "from": { "piece": "6a0952f721", "edge": 2 }, "to": { "piece": "7b10856ec3", "edge": 6 }, "reversed": false },
-        { "id": "67d05979d3", "from": { "piece": "6a0952f721", "edge": 3 }, "to": { "piece": "b6cbcdfb80", "edge": 2 }, "reversed": false },
-        { "id": "469061c48d", "from": { "piece": "fad3eda5b1", "edge": 1 }, "to": { "piece": "fad3eda5b1", "edge": 4 }, "reversed": false },
-        { "id": "d9c75dea89", "from": { "piece": "fad3eda5b1", "edge": 2 }, "to": { "piece": "b6cbcdfb80", "edge": 6 }, "reversed": false },
-        { "id": "552f4ac1bb", "from": { "piece": "fad3eda5b1", "edge": 3 }, "to": { "piece": "7b10856ec3", "edge": 2 }, "reversed": false }
+        { "id": "690942d16d", "from": { "piece": "34e086c3fe", "edge": 1 }, "to": { "piece": "520f5c3ba8", "edge": 7 }, "reversed": false },
+        { "id": "f74120049e", "from": { "piece": "34e086c3fe", "edge": 7 }, "to": { "piece": "520f5c3ba8", "edge": 1 }, "reversed": false },
+        { "id": "ae757641b5", "from": { "piece": "34e086c3fe", "edge": 3 }, "to": { "piece": "520f5c3ba8", "edge": 5 }, "reversed": false },
+        { "id": "62b19e7511", "from": { "piece": "34e086c3fe", "edge": 5 }, "to": { "piece": "520f5c3ba8", "edge": 3 }, "reversed": false },
+        { "id": "6f01206bf9", "from": { "piece": "86a325ce44", "edge": 1 }, "to": { "piece": "86a325ce44", "edge": 4 }, "reversed": false },
+        { "id": "c98a820c29", "from": { "piece": "86a325ce44", "edge": 2 }, "to": { "piece": "520f5c3ba8", "edge": 6 }, "reversed": false },
+        { "id": "4afa9d4695", "from": { "piece": "86a325ce44", "edge": 3 }, "to": { "piece": "34e086c3fe", "edge": 2 }, "reversed": false },
+        { "id": "c30bb480ec", "from": { "piece": "07d8fa8e8e", "edge": 1 }, "to": { "piece": "07d8fa8e8e", "edge": 4 }, "reversed": false },
+        { "id": "97c9c2e24c", "from": { "piece": "07d8fa8e8e", "edge": 2 }, "to": { "piece": "34e086c3fe", "edge": 6 }, "reversed": false },
+        { "id": "0ddd7585a5", "from": { "piece": "07d8fa8e8e", "edge": 3 }, "to": { "piece": "520f5c3ba8", "edge": 2 }, "reversed": false }
       ]
     },
     {
-      "id": "51b77ddaf3",
+      "id": "8f31bb08f5",
       "name": "Skirt",
       "visible": true,
       "simulateWithOthers": false,
       "particleDistance": 2,
+      "topology": "triangles",
       "groups": [],
       "pieces": [
         {
-          "id": "f4a485b4cc",
+          "id": "f74c06f003",
           "name": "Skirt Front",
           "visible": true,
           "origin": [0, 77],
@@ -194,7 +196,7 @@
             { "at": [55, 50] },
             { "at": [15, 50] }
           ],
-          "placement": { "position": [0, 0.75, 0.265], "rotation": [0, 0, 0], "curvature": 0 },
+          "placement": { "position": [0, 0.75, 0.235], "rotation": [0, 0, 0], "curvature": 0 },
           "physics": {
             "preset": "Cotton",
             "density": 150,
@@ -205,11 +207,11 @@
             "friction": 40,
             "thickness": 3
           },
-          "material": "838a70d929",
+          "material": "6845c175aa",
           "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
         },
         {
-          "id": "f5bb45d35e",
+          "id": "7c4f44d940",
           "name": "Skirt Back",
           "visible": true,
           "origin": [85, 77],
@@ -219,7 +221,7 @@
             { "at": [55, 50] },
             { "at": [15, 50] }
           ],
-          "placement": { "position": [0, 0.75, -0.175], "rotation": [0, 180, 0], "curvature": 0 },
+          "placement": { "position": [0, 0.75, -0.145], "rotation": [0, 180, 0], "curvature": 0 },
           "physics": {
             "preset": "Cotton",
             "density": 150,
@@ -230,13 +232,13 @@
             "friction": 40,
             "thickness": 3
           },
-          "material": "838a70d929",
+          "material": "6845c175aa",
           "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
         }
       ],
       "seams": [
-        { "id": "abb19688d4", "from": { "piece": "f4a485b4cc", "edge": 1 }, "to": { "piece": "f5bb45d35e", "edge": 3 }, "reversed": false },
-        { "id": "bda43aa1b7", "from": { "piece": "f4a485b4cc", "edge": 3 }, "to": { "piece": "f5bb45d35e", "edge": 1 }, "reversed": false }
+        { "id": "4c55abed7d", "from": { "piece": "f74c06f003", "edge": 1 }, "to": { "piece": "7c4f44d940", "edge": 3 }, "reversed": false },
+        { "id": "d1c852ea58", "from": { "piece": "f74c06f003", "edge": 3 }, "to": { "piece": "7c4f44d940", "edge": 1 }, "reversed": false }
       ]
     }
   ]

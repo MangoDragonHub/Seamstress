@@ -17,6 +17,7 @@ internal sealed class StartupOptions
     public string View { get; set; } = "";
     public string? Avatar { get; set; }
     public bool Smoke { get; set; }
+    public bool Quads { get; set; }
     public bool AllowLaunch { get; set; } = true;
     public string RendererDescription { get; set; } = "GPU";
 
@@ -50,7 +51,8 @@ public static class Program
     [DllImport("libc", EntryPoint = "setenv")]
     private static extern int SetEnvUnix(string name, string value, int overwrite);
 
-    [DllImport("msvcrt", EntryPoint = "_putenv_s")]
+    // Qt reads its settings through the C runtime, which keeps its own copy of the environment on Windows.
+    [DllImport("ucrtbase", EntryPoint = "_putenv_s")]
     private static extern int SetEnvWindows(string name, string value);
 
     /// <summary>Sets a variable in the native process environment, where Qt reads its configuration.</summary>
@@ -103,6 +105,7 @@ public static class Program
                 case "--select-first": options.SelectFirst = true; break;
                 case "--view": options.View = Next(); break;
                 case "--avatar": options.Avatar = Next(); break;
+                case "--quads": options.Quads = true; break;
                 case "--smoke": options.Smoke = true; options.AllowLaunch = false; break;
                 case "--screenshot": options.Screenshot = Path.GetFullPath(Next()); options.AllowLaunch = false; break;
                 case "--help":
@@ -163,6 +166,7 @@ public static class Program
 
         AppController.Startup = options;
         Qt.Application.DisplayName = "Seamstress";
+        Qt.Application.SetWindowIcon("qrc:/assemblies/Seamstress/icons/seamstress.svg");
         Qml.LoadFromRootModule("Main");
         Qml.WaitForExit();
     }

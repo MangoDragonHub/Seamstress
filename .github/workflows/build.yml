@@ -1,0 +1,51 @@
+# Builds and tests Seamstress on Linux and Windows with the same scripts people use locally,
+# and keeps the packaged results as downloadable artifacts.
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    # An older Ubuntu on purpose: the AppImage runs on distributions at least as new as the one it was built on.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake build-essential libgl1-mesa-dev libxkbcommon-dev libxcb-cursor0 libkrb5-3
+      - name: Build and test
+        run: ./build.sh test --install-qt
+      - name: Package
+        run: ./build.sh appimage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Seamstress-linux
+          path: |
+            dist/Seamstress-x86_64.AppImage
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Build and test
+        shell: pwsh
+        run: ./build.ps1 test
+      - name: Package
+        shell: pwsh
+        run: ./build.ps1 package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Seamstress-windows
+          path: dist/Seamstress-win-x64.zip
+          if-no-files-found: error

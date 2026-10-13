@@ -31,13 +31,14 @@ public static class ObjExporter
                 sb.Append("g ").Append(ExportScene.SafeName(part.Name)).Append('\n');
                 sb.Append("usemtl ").Append(names[part.Material]).Append('\n');
                 sb.Append("s 1\n");
-                for (int t = 0; t < part.PositionIndices.Length; t += 3)
+                int corner = 0;
+                foreach (int size in part.FaceSizes)
                 {
                     sb.Append('f');
-                    for (int k = 0; k < 3; k++)
+                    for (int k = 0; k < size; k++, corner++)
                     {
-                        int p = part.PositionIndices[t + k] + positionBase;
-                        int uv = part.UvIndices[t + k] + uvBase;
+                        int p = part.FacePositionIndices[corner] + positionBase;
+                        int uv = part.FaceUvIndices[corner] + uvBase;
                         sb.Append(' ').Append(p).Append('/').Append(uv).Append('/').Append(p);
                     }
                     sb.Append('\n');

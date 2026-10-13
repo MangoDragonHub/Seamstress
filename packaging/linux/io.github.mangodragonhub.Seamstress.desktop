@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Seamstress
+GenericName=Garment Designer
+Comment=Draw sewing patterns, sew them and drape them on an avatar
+Exec=seamstress %f
+Icon=io.github.mangodragonhub.Seamstress
+Terminal=false
+Categories=Graphics;3DGraphics;
+MimeType=application/json;
+StartupWMClass=Seamstress

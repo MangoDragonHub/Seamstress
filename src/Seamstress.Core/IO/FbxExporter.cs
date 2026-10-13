@@ -239,26 +239,29 @@ public static class FbxExporter
                 vertices[3 * i + 1] = mesh.Positions[i].Y * cm;
                 vertices[3 * i + 2] = mesh.Positions[i].Z * cm;
             }
-            int corners = mesh.Parts.Sum(p => p.PositionIndices.Length);
+            int corners = mesh.Parts.Sum(p => p.FacePositionIndices.Length);
             var polygonIndex = new int[corners];
             var normals = new double[corners * 3];
             var uvIndex = new int[corners];
-            var faceMaterials = new int[corners / 3];
-            int c = 0;
+            var faceMaterials = new int[mesh.FaceCount];
+            int c = 0, face = 0;
             foreach (var part in mesh.Parts)
             {
                 int slot = meshMaterials.IndexOf(part.Material);
-                for (int k = 0; k < part.PositionIndices.Length; k++, c++)
+                int k = 0;
+                foreach (int size in part.FaceSizes)
                 {
-                    int p = part.PositionIndices[k];
-                    // The last corner of each polygon is stored bit-inverted to mark where the polygon ends.
-                    polygonIndex[c] = k % 3 == 2 ? ~p : p;
-                    normals[3 * c] = mesh.Normals[p].X;
-                    normals[3 * c + 1] = mesh.Normals[p].Y;
-                    normals[3 * c + 2] = mesh.Normals[p].Z;
-                    uvIndex[c] = part.UvIndices[k];
-                    if (k % 3 == 0)
-                        faceMaterials[c / 3] = slot;
+                    faceMaterials[face++] = slot;
+                    for (int corner = 0; corner < size; corner++, k++, c++)
+                    {
+                        int p = part.FacePositionIndices[k];
+                        // The last corner of each polygon is stored bit-inverted to mark where the polygon ends.
+                        polygonIndex[c] = corner == size - 1 ? ~p : p;
+                        normals[3 * c] = mesh.Normals[p].X;
+                        normals[3 * c + 1] = mesh.Normals[p].Y;
+                        normals[3 * c + 2] = mesh.Normals[p].Z;
+                        uvIndex[c] = part.FaceUvIndices[k];
+                    }
                 }
             }
             var uv = new double[mesh.Uvs.Length * 2];

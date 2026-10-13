@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.mangodragonhub.Seamstress</id>
+  <name>Seamstress</name>
+  <summary>3D garment creation with cloth simulation</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <description>
+    <p>
+      Seamstress is a garment creation tool: draw flat pattern pieces, sew their edges together and drape the result
+      on an avatar with a cloth simulation.
+    </p>
+    <ul>
+      <li>2D pattern editor with sewing, and a 3D view of the sewn garment</li>
+      <li>Per-garment simulation with adjustable fabric physics</li>
+      <li>Layers, undo and redo, UV layout and texel density preview</li>
+      <li>Export to OBJ, glTF and FBX, and directly into MakeHuman's clothes library</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.mangodragonhub.Seamstress.desktop</launchable>
+  <url type="homepage">https://github.com/MangoDragonHub/Seamstress</url>
+  <developer id="io.github.mangodragonhub">
+    <name>MangoDragonHub</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <categories>
+    <category>Graphics</category>
+    <category>3DGraphics</category>
+  </categories>
+</component>

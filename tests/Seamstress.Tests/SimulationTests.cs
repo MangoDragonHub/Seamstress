@@ -245,4 +245,163 @@ public class SimulationTests : IClassFixture<AvatarFixture>
             Assert.True(lowest > 0.2f, "the garment should stay on the body");
         }
     }
+
+    private static PatternPiece Sheet(string name, float size, float height)
+    {
+        var piece = new PatternPiece { Name = name };
+        piece.Points.Add(new PatternPoint(0, 0));
+        piece.Points.Add(new PatternPoint(size, 0));
+        piece.Points.Add(new PatternPoint(size, size));
+        piece.Points.Add(new PatternPoint(0, size));
+        // Lying flat in the air, facing up.
+        piece.Placement = new Placement { Position = new Vector3(0, height, 0), Rotation = new Vector3(-90, 0, 0) };
+        return piece;
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ClothRestsOnAnotherGarmentInsteadOfFallingThrough(bool collide)
+    {
+        var doc = new Document();
+        doc.Simulation.SelfCollision = collide;
+        var table = new Garment { Name = "Table", ParticleDistance = 3 };
+        table.Pieces.Add(Sheet("Table", 80, 0.60f));
+        var cloth = new Garment { Name = "Cloth", ParticleDistance = 2 };
+        cloth.Pieces.Add(Sheet("Cloth", 40, 0.70f));
+        doc.Garments.Add(table);
+        doc.Garments.Add(cloth);
+        var ws = new Workspace(doc);
+        ws.SelectLayer(cloth.Id);
+        var sim = new SimulationController(ws, () => null);
+        Assert.Null(sim.Start(false));
+        sim.RunFrames(150);
+        sim.Stop();
+
+        Assert.Null(table.Pieces[0].Drape);
+        var mesh = ws.MeshFor(cloth).Pieces[0];
+        var positions = Mesher.CurrentPositions(cloth.Pieces[0], mesh);
+        float lowest = positions.Min(p => p.Y), highest = positions.Max(p => p.Y);
+        _output.WriteLine($"collide={collide}: cloth between {lowest:0.000} and {highest:0.000} m");
+        if (collide)
+        {
+            Assert.InRange(lowest, 0.601f, 0.62f);
+            Assert.InRange(highest, 0.601f, 0.62f);
+        }
+        else
+        {
+            Assert.True(highest < 0.1f, "without collision the cloth drops to the ground");
+        }
+    }
+
+    [Fact]
+    public void ClothHangsOverAnotherGarmentWithoutSlidingOff()
+    {
+        // A long strip dropped across a narrow fixed bar should fold over it and stay there, half on each side.
+        var doc = new Document();
+        var bar = new Garment { Name = "Bar", ParticleDistance = 2 };
+        var barPiece = Sheet("Bar", 6, 1.0f);
+        barPiece.Points[1].Position = new Vector2(60, 0);
+        barPiece.Points[2].Position = new Vector2(60, 6);
+        bar.Pieces.Add(barPiece);
+        var strip = new Garment { Name = "Strip", ParticleDistance = 2 };
+        var stripPiece = Sheet("Strip", 30, 1.05f);
+        stripPiece.Points[2].Position = new Vector2(30, 90);
+        stripPiece.Points[3].Position = new Vector2(0, 90);
+        strip.Pieces.Add(stripPiece);
+        doc.Garments.Add(bar);
+        doc.Garments.Add(strip);
+        var ws = new Workspace(doc);
+        ws.SelectLayer(strip.Id);
+        var sim = new SimulationController(ws, () => null);
+        sim.Start(false);
+        sim.RunFrames(300);
+        sim.Stop();
+
+        var mesh = ws.MeshFor(strip).Pieces[0];
+        var pos = Mesher.CurrentPositions(stripPiece, mesh);
+        // The strip's long (pattern Y) axis lies along world -Z after the piece is laid flat, so the half that started
+        // at +Z must hang in front of the other half at every height (they may swing, but never swap places).
+        int front = 0, back = 0, swapped = 0;
+        // The lowest few centimetres are left out: collision is tested between points and faces, so two free hems
+        // hanging at the same height can still slip around each other.
+        for (float band = 0.65f; band < 0.9f; band += 0.05f)
+        {
+            for (float column = -0.15f; column < 0.15f; column += 0.05f)
+            {
+                float frontMin = float.MaxValue, backMax = float.MinValue;
+                for (int i = 0; i < pos.Length; i++)
+                {
+                    if (pos[i].Y < band || pos[i].Y >= band + 0.05f || pos[i].X < column || pos[i].X >= column + 0.05f)
+                        continue;
+                    if (mesh.Points[i].Y < 45) { front++; frontMin = MathF.Min(frontMin, pos[i].Z); }
+                    else { back++; backMax = MathF.Max(backMax, pos[i].Z); }
+                }
+                if (frontMin != float.MaxValue && backMax != float.MinValue && frontMin < backMax)
+                {
+                    swapped++;
+                    _output.WriteLine($"   y {band:0.00} x {column:0.00}: front from {frontMin:0.000}, back up to {backMax:0.000}");
+                }
+            }
+        }
+        _output.WriteLine($"{front} + {back} vertices hang below the bar, {swapped} patches swapped, lowest {pos.Min(p => p.Y):0.00}");
+        Assert.True(pos.Min(p => p.Y) > 0.45f, "the strip should stay on the bar");
+        Assert.True(front > pos.Length / 4 && back > pos.Length / 4, "half the strip hangs on each side");
+        Assert.Equal(0, swapped);
+    }
+
+    /// <summary>How many particles of a piece lie almost inside a part of the same piece that is far away in the pattern.</summary>
+    private static int SelfOverlaps(PieceMesh mesh, Vector3[] pos)
+    {
+        int count = 0;
+        for (int i = 0; i < pos.Length; i++)
+        {
+            for (int t = 0; t < mesh.Triangles.Length; t += 3)
+            {
+                int a = mesh.Triangles[t], b = mesh.Triangles[t + 1], c = mesh.Triangles[t + 2];
+                var centre = (mesh.Points[a] + mesh.Points[b] + mesh.Points[c]) / 3;
+                if (Vector2.Distance(centre, mesh.Points[i]) < 6)
+                    continue;
+                var q = SdfGrid.ClosestPointOnTriangle(pos[i], pos[a], pos[b], pos[c]);
+                if (Vector3.Distance(q, pos[i]) < 0.0012f)
+                {
+                    count++;
+                    break;
+                }
+            }
+        }
+        return count;
+    }
+
+    [Fact]
+    public void CrumplingClothKeepsItsLayersApart()
+    {
+        int Crumple(bool collide)
+        {
+            // A limp sheet standing on its edge collapses onto the ground in a heap of folds.
+            var doc = new Document();
+            doc.Simulation.SelfCollision = collide;
+            var garment = new Garment { Name = "Sheet", ParticleDistance = 2 };
+            var piece = Sheet("Sheet", 30, 0.40f);
+            piece.Points[2].Position = new Vector2(30, 70);
+            piece.Points[3].Position = new Vector2(0, 70);
+            piece.Placement.Rotation = new Vector3(8, 0, 0);
+            piece.Physics = FabricPhysics.FromPreset("Silk");
+            garment.Pieces.Add(piece);
+            doc.Garments.Add(garment);
+            var ws = new Workspace(doc);
+            var sim = new SimulationController(ws, () => null);
+            sim.Start(false);
+            sim.RunFrames(240);
+            sim.Stop();
+            var mesh = ws.MeshFor(garment).Pieces[0];
+            var pos = Mesher.CurrentPositions(piece, mesh);
+            Assert.True(pos.Max(p => p.Y) < 0.25f, "the sheet should have collapsed");
+            return SelfOverlaps(mesh, pos);
+        }
+        int with = Crumple(true), without = Crumple(false);
+        _output.WriteLine($"overlapping particles: {with} with collision, {without} without");
+        Assert.True(without > 20, "the scenario must actually fold the cloth onto itself");
+        Assert.True(with <= without / 10, $"collision should keep the layers apart ({with} vs {without})");
+    }
 }

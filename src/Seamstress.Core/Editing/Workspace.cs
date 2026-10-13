@@ -67,6 +67,7 @@ public sealed class Workspace
     {
         var hash = new HashCode();
         hash.Add(garment.ParticleDistance);
+        hash.Add(garment.Topology);
         foreach (var piece in garment.Pieces)
         {
             hash.Add(piece.Id);
@@ -808,6 +809,13 @@ public sealed class Workspace
         }, "garment-pd:" + garmentId);
     }
 
+    public void SetTopology(string garmentId, MeshTopology topology)
+    {
+        if (Document.FindGarment(garmentId) is not { } current || current.Topology == topology)
+            return;
+        History.Execute("Change topology", doc => doc.FindGarment(garmentId)!.Topology = topology);
+    }
+
     public void SetSimulateWithOthers(string garmentId, bool value)
     {
         History.Execute("Change simulation scope", doc =>
@@ -856,6 +864,115 @@ public sealed class Workspace
             foreach (var piece in doc.AllPieces().Where(p => ids.Contains(p.Id)))
                 piece.ClearDrape();
         });
+    }
+
+    // ---------------------------------------------------------------- moving pieces in 3D
+
+    private sealed record PlacementStart(Vector3 Position, Vector3 Rotation, float[]? Drape);
+    private Dictionary<string, PlacementStart>? _placementStart;
+    private Vector3 _placementPivot;
+    private bool _placementMoved;
+
+    /// <summary>Centre of a piece in 3D: where it has been draped, or else where it is arranged.</summary>
+    private static Vector3 CentreOf(PatternPiece piece)
+    {
+        if (piece.Drape is not { Length: >= 3 } drape)
+            return piece.Placement.Position;
+        var sum = Vector3.Zero;
+        for (int i = 0; i + 2 < drape.Length; i += 3)
+            sum += new Vector3(drape[i], drape[i + 1], drape[i + 2]);
+        return sum / (drape.Length / 3);
+    }
+
+    /// <summary>Where the 3D move/rotate handles sit: the middle of the selected pieces, or null with no selection.</summary>
+    public Vector3? SelectionCentre()
+    {
+        var pieces = SelectedPieceObjects().ToList();
+        if (pieces.Count == 0)
+            return null;
+        return pieces.Aggregate(Vector3.Zero, (sum, p) => sum + CentreOf(p)) / pieces.Count;
+    }
+
+    /// <summary>Starts dragging the selected pieces in the 3D view.</summary>
+    public bool BeginPlacementEdit()
+    {
+        if (SelectionCentre() is not { } pivot)
+            return false;
+        History.Begin(SelectedPieces.Count == 1 ? "Move piece in 3D" : "Move pieces in 3D");
+        _placementPivot = pivot;
+        _placementMoved = false;
+        _placementStart = SelectedPieceObjects().ToDictionary(p => p.Id, p => new PlacementStart(p.Placement.Position, p.Placement.Rotation, p.Drape));
+        return true;
+    }
+
+    /// <summary>
+    /// Moves the pieces being dragged to "where they started, turned by <paramref name="rotation"/> about the
+    /// selection centre, then shifted by <paramref name="translation"/>". A draped piece keeps its draped shape.
+    /// </summary>
+    public void ApplyPlacementEdit(Vector3 translation, Quaternion rotation)
+    {
+        if (_placementStart == null)
+            return;
+        _placementMoved |= translation != Vector3.Zero || !rotation.IsIdentity;
+        var turn = Matrix4x4.CreateFromQuaternion(rotation);
+        foreach (var piece in Document.AllPieces())
+        {
+            if (!_placementStart.TryGetValue(piece.Id, out var start))
+                continue;
+            piece.Placement.Position = _placementPivot + Vector3.Transform(start.Position - _placementPivot, rotation) + translation;
+            piece.Placement.Rotation = rotation.IsIdentity ? start.Rotation : ToEuler(EulerMatrix(start.Rotation) * turn);
+            if (start.Drape != null)
+            {
+                var moved = new float[start.Drape.Length];
+                for (int i = 0; i + 2 < moved.Length; i += 3)
+                {
+                    var p = new Vector3(start.Drape[i], start.Drape[i + 1], start.Drape[i + 2]);
+                    p = _placementPivot + Vector3.Transform(p - _placementPivot, rotation) + translation;
+                    moved[i] = p.X;
+                    moved[i + 1] = p.Y;
+                    moved[i + 2] = p.Z;
+                }
+                piece.Drape = moved;
+            }
+        }
+        History.NotifyLiveChange();
+    }
+
+    public void EndPlacementEdit()
+    {
+        if (_placementStart == null)
+            return;
+        _placementStart = null;
+        if (_placementMoved)
+            History.Commit();
+        else
+            History.Cancel();
+    }
+
+    /// <summary>Rotation matrix for Euler angles in degrees, applied X then Y then Z (as <see cref="Placement"/> stores them).</summary>
+    public static Matrix4x4 EulerMatrix(Vector3 degrees)
+        => Matrix4x4.CreateRotationX(degrees.X * MathF.PI / 180f)
+         * Matrix4x4.CreateRotationY(degrees.Y * MathF.PI / 180f)
+         * Matrix4x4.CreateRotationZ(degrees.Z * MathF.PI / 180f);
+
+    /// <summary>Inverse of <see cref="EulerMatrix"/>.</summary>
+    public static Vector3 ToEuler(Matrix4x4 m)
+    {
+        float sinY = Math.Clamp(-m.M13, -1f, 1f);
+        float x, y = MathF.Asin(sinY), z;
+        if (MathF.Abs(sinY) > 0.9999f)
+        {
+            // Looking straight along the Y rotation: X and Z turn about the same axis, so put it all in X.
+            x = MathF.Atan2(-m.M32, m.M22);
+            z = 0;
+        }
+        else
+        {
+            x = MathF.Atan2(m.M23, m.M33);
+            z = MathF.Atan2(m.M12, m.M11);
+        }
+        const float toDegrees = 180f / MathF.PI;
+        return new Vector3(MathF.Round(x * toDegrees, 2), MathF.Round(y * toDegrees, 2), MathF.Round(z * toDegrees, 2));
     }
 
     // ---------------------------------------------------------------- materials

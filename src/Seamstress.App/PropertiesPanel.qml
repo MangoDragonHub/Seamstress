@@ -58,7 +58,7 @@ Pane {
         Layout.fillWidth: true
         spacing: 6
         onValueChanged: if (!field.activeFocus) field.text = value.toFixed(decimals)
-        Label { text: numberRow.label; Layout.preferredWidth: 104; elide: Text.ElideRight; opacity: 0.85 }
+        Label { text: numberRow.label; Layout.preferredWidth: 118; elide: Text.ElideRight; opacity: 0.85 }
         TextField {
             id: field
             Layout.fillWidth: true
@@ -95,7 +95,7 @@ Pane {
         Layout.fillWidth: true
         spacing: 6
         onValueChanged: if (!slider.pressed) slider.value = value
-        Label { text: sliderRow.label; Layout.preferredWidth: 104; elide: Text.ElideRight; opacity: 0.85 }
+        Label { text: sliderRow.label; Layout.preferredWidth: 118; elide: Text.ElideRight; opacity: 0.85 }
         Slider {
             id: slider
             Layout.fillWidth: true
@@ -116,7 +116,7 @@ Pane {
         property string label: ""
         property string value: ""
         Layout.fillWidth: true
-        Label { text: parent.label; Layout.preferredWidth: 104; opacity: 0.85 }
+        Label { text: parent.label; Layout.preferredWidth: 118; opacity: 0.85 }
         Label { text: parent.value; Layout.fillWidth: true; elide: Text.ElideRight; horizontalAlignment: Text.AlignRight }
     }
 
@@ -160,17 +160,34 @@ Pane {
                     value: root.sel.garment ? root.sel.garment.particleDistance : 2
                     onEdited: (v) => App.setParticleDistance(v)
                 }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: "Faces"; Layout.preferredWidth: 118; opacity: 0.85 }
+                    ComboBox {
+                        Layout.fillWidth: true
+                        implicitHeight: 26
+                        model: ["Triangles", "Quads"]
+                        currentIndex: root.sel.garment && root.sel.garment.topology === "Quads" ? 1 : 0
+                        onActivated: App.setTopology(currentText)
+                    }
+                }
                 InfoRow {
                     label: "Garment mesh"
                     value: root.sel.garment ? root.sel.garment.faces.toLocaleString(Qt.locale(), "f", 0) + " faces  ·  "
                          + root.sel.garment.vertices.toLocaleString(Qt.locale(), "f", 0) + " verts" : ""
+                }
+                InfoRow {
+                    visible: root.sel.garment ? root.sel.garment.topology === "Quads" : false
+                    label: "Of which"
+                    value: root.sel.garment ? root.sel.garment.quads.toLocaleString(Qt.locale(), "f", 0) + " quads  ·  "
+                         + (root.sel.garment.faces - root.sel.garment.quads).toLocaleString(Qt.locale(), "f", 0) + " triangles" : ""
                 }
                 Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     opacity: 0.55
                     font.pixelSize: 11
-                    text: "Smaller distance = more faces: finer wrinkles, slower simulation."
+                    text: "Smaller distance = more faces: finer wrinkles, slower simulation. Quads export to OBJ and FBX; glTF and MakeHuman always receive triangles."
                 }
                 NumberRow {
                     visible: root.sel.kind === "pieces"
@@ -238,7 +255,7 @@ Pane {
                     wrapMode: Text.WordWrap
                     opacity: 0.55
                     font.pixelSize: 11
-                    text: "Where the flat piece starts before simulation. Wrap curls it around an arm or leg."
+                    text: "Where the piece sits in 3D; you can also drag the arrows and rings in the 3D view. Wrap curls the flat piece around an arm or leg."
                 }
             }
 
@@ -248,7 +265,7 @@ Pane {
                 visible: root.sel.kind === "pieces"
                 RowLayout {
                     Layout.fillWidth: true
-                    Label { text: "Preset"; Layout.preferredWidth: 104; opacity: 0.85 }
+                    Label { text: "Preset"; Layout.preferredWidth: 118; opacity: 0.85 }
                     ComboBox {
                         id: presetBox
                         Layout.fillWidth: true
@@ -293,7 +310,7 @@ Pane {
                 }
                 RowLayout {
                     Layout.fillWidth: true
-                    Label { text: "Name"; Layout.preferredWidth: 104; opacity: 0.85 }
+                    Label { text: "Name"; Layout.preferredWidth: 118; opacity: 0.85 }
                     TextField {
                         Layout.fillWidth: true
                         implicitHeight: 24
@@ -305,7 +322,7 @@ Pane {
                 }
                 RowLayout {
                     Layout.fillWidth: true
-                    Label { text: "Colour"; Layout.preferredWidth: 104; opacity: 0.85 }
+                    Label { text: "Colour"; Layout.preferredWidth: 118; opacity: 0.85 }
                     Rectangle {
                         Layout.fillWidth: true
                         implicitHeight: 24
@@ -317,7 +334,7 @@ Pane {
                 }
                 RowLayout {
                     Layout.fillWidth: true
-                    Label { text: "Texture"; Layout.preferredWidth: 104; opacity: 0.85 }
+                    Label { text: "Texture"; Layout.preferredWidth: 118; opacity: 0.85 }
                     Label {
                         Layout.fillWidth: true
                         elide: Text.ElideMiddle
@@ -385,7 +402,7 @@ Pane {
                 SliderRow { label: "Speed"; from: 0.1; to: 2; stepSize: 0.1; decimals: 1; suffix: "×"; value: root.sel.simulation.timeScale !== undefined ? root.sel.simulation.timeScale : 1; onEdited: (v) => App.setSimulationValue("timeScale", v) }
                 CheckBox {
                     Layout.fillWidth: true
-                    text: "Cloth-to-cloth collision (slower)"
+                    text: "Cloth-to-cloth collision"
                     checked: !!root.sel.simulation.selfCollision
                     onToggled: App.setSimulationValue("selfCollision", checked ? 1 : 0)
                 }

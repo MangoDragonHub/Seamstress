@@ -34,7 +34,7 @@ public partial class AppController
             bool active = garment.Id == _workspace.ActiveGarmentId;
             bool simulated = _simulation.SimulatedGarments.Contains(garment.Id);
             string extra = $",\"active\":{B(active)},\"simulateWithOthers\":{B(garment.SimulateWithOthers)},\"simulating\":{B(simulated)}"
-                         + $",\"faces\":{(garment.Pieces.Count > 0 ? _workspace.MeshFor(garment).TriangleCount : 0)}";
+                         + $",\"faces\":{(garment.Pieces.Count > 0 ? _workspace.MeshFor(garment).FaceCount : 0)}";
             Row(garment.Id, "garment", garment.Name, 0, garment.Visible, garment.Expanded,
                 _workspace.SelectedLayerId == garment.Id, garment.Pieces.Count + garment.Groups.Count > 0, extra);
             if (!garment.Expanded)
@@ -96,7 +96,8 @@ public partial class AppController
             var mesh = garment.Pieces.Count > 0 ? _workspace.MeshFor(garment) : null;
             sb.Append(",\"garment\":{\"id\":").Append(Q(garment.Id)).Append(",\"name\":").Append(Q(garment.Name));
             sb.Append(",\"particleDistance\":").Append(N(garment.ParticleDistance));
-            sb.Append(",\"faces\":").Append(mesh?.TriangleCount ?? 0).Append(",\"vertices\":").Append(mesh?.VertexCount ?? 0);
+            sb.Append(",\"faces\":").Append(mesh?.FaceCount ?? 0).Append(",\"vertices\":").Append(mesh?.VertexCount ?? 0);
+            sb.Append(",\"quads\":").Append(mesh?.QuadCount ?? 0).Append(",\"topology\":\"").Append(garment.Topology).Append('"');
             sb.Append(",\"pieces\":").Append(garment.Pieces.Count).Append(",\"seams\":").Append(garment.Seams.Count);
             sb.Append(",\"simulateWithOthers\":").Append(B(garment.SimulateWithOthers)).Append('}');
         }
@@ -114,7 +115,7 @@ public partial class AppController
             sb.Append(",\"curvature\":").Append(N(piece.Placement.Curvature));
             sb.Append(",\"particleDistance\":").Append(N(piece.ParticleDistance ?? 0));
             sb.Append(",\"area\":").Append(N(pieces.Sum(Outline.Area)));
-            sb.Append(",\"faces\":").Append(pieces.Sum(p => _workspace.MeshFor(doc.GarmentOfPiece(p.Id)!).Find(p.Id)?.TriangleCount ?? 0));
+            sb.Append(",\"faces\":").Append(pieces.Sum(p => _workspace.MeshFor(doc.GarmentOfPiece(p.Id)!).Find(p.Id)?.FaceCount ?? 0));
             sb.Append(",\"vertices\":").Append(pieceMesh?.VertexCount ?? 0);
             sb.Append(",\"draped\":").Append(B(pieceMesh != null && piece.Drape != null && piece.DrapeKey == pieceMesh.Key));
             sb.Append(",\"uvScale\":").Append(N(piece.Uv.Scale)).Append(",\"uvRotation\":").Append(N(piece.Uv.Rotation));
@@ -157,7 +158,7 @@ public partial class AppController
         sb.Append(",\"simulation\":{\"gravity\":").Append(N(sim.Gravity)).Append(",\"substeps\":").Append(sim.Substeps);
         sb.Append(",\"timeScale\":").Append(N(sim.TimeScale)).Append(",\"selfCollision\":").Append(B(sim.SelfCollision));
         sb.Append(",\"groundPlane\":").Append(B(sim.GroundPlane)).Append('}');
-        sb.Append(",\"totalFaces\":").Append(doc.Garments.Where(g => g.Pieces.Count > 0).Sum(g => _workspace.MeshFor(g).TriangleCount));
+        sb.Append(",\"totalFaces\":").Append(doc.Garments.Where(g => g.Pieces.Count > 0).Sum(g => _workspace.MeshFor(g).FaceCount));
         sb.Append('}');
         return sb.ToString();
     }
@@ -170,6 +171,11 @@ public partial class AppController
             Open(options.File);
         foreach (string template in options.Templates)
             _workspace.AddTemplate(template);
+        if (options.Quads)
+        {
+            foreach (var garment in _workspace.Document.Garments)
+                garment.Topology = MeshTopology.Quads;
+        }
         if (options.Templates.Count > 0)
             _workspace.History.MarkSaved();
         if (options.SimulateFrames > 0)

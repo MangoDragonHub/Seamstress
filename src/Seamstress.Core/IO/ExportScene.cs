@@ -26,6 +26,14 @@ public sealed class ExportPart
 
     /// <summary>Three UV indices per triangle, parallel to <see cref="PositionIndices"/>.</summary>
     public required int[] UvIndices { get; init; }
+
+    /// <summary>
+    /// The same surface as polygons (3 or 4 corners each) for formats that can store quads: the number of corners
+    /// of each face, and the position and UV index of every corner in face order.
+    /// </summary>
+    public required int[] FaceSizes { get; init; }
+    public required int[] FacePositionIndices { get; init; }
+    public required int[] FaceUvIndices { get; init; }
 }
 
 /// <summary>One garment ready for export. Positions are metres, Y up; UVs have V up.</summary>
@@ -38,6 +46,7 @@ public sealed class ExportMesh
     public required List<ExportPart> Parts { get; init; }
 
     public int TriangleCount => Parts.Sum(p => p.PositionIndices.Length / 3);
+    public int FaceCount => Parts.Sum(p => p.FaceSizes.Length);
 }
 
 /// <summary>Format-independent description of what gets exported; every exporter starts from this.</summary>
@@ -152,12 +161,27 @@ public sealed class ExportScene
                 positionIndices[k] = remap[uvIndices[k]];
             }
             allTriangles.AddRange(positionIndices);
+            var sizes = new List<int>();
+            var facePositions = new List<int>();
+            var faceUvs = new List<int>();
+            foreach (var face in pieceMesh.Faces())
+            {
+                sizes.Add(face.Length);
+                foreach (int v in face)
+                {
+                    faceUvs.Add(offsets[i] + v);
+                    facePositions.Add(remap[offsets[i] + v]);
+                }
+            }
             parts.Add(new ExportPart
             {
                 Name = piece.Name,
                 Material = document.FindMaterial(piece.MaterialId) ?? DefaultMaterial,
                 PositionIndices = positionIndices,
                 UvIndices = uvIndices,
+                FaceSizes = sizes.ToArray(),
+                FacePositionIndices = facePositions.ToArray(),
+                FaceUvIndices = faceUvs.ToArray(),
             });
         }
         if (parts.Count == 0)

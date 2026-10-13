@@ -33,6 +33,16 @@ internal sealed class ViewportSync : IDisposable
 
     public string CheckerUrl { get; }
 
+    /// <summary>Handle meshes for the move/rotate gizmo: a unit arrow along +Y and a unit ring around the Y axis.</summary>
+    public string ArrowUrl { get; }
+    public string RingUrl { get; }
+
+    /// <summary>When set, the outlines of all faces are written as a line mesh for the topology overlay.</summary>
+    public bool ShowWire { get; set; }
+
+    private readonly Queue<string> _wireFiles = new();
+    private string _wireUrl = "";
+
     public ViewportSync()
     {
         string root = OperatingSystem.IsLinux() && Directory.Exists("/dev/shm") ? "/dev/shm" : Path.GetTempPath();
@@ -42,6 +52,65 @@ internal sealed class ViewportSync : IDisposable
         string checker = Path.Combine(_folder, "checker.png");
         Seamstress.Core.IO.PngWriter.WriteChecker(checker);
         CheckerUrl = ToUrl(checker);
+        ArrowUrl = WriteArrow(Path.Combine(_folder, "gizmo_arrow.mesh"));
+        RingUrl = WriteRing(Path.Combine(_folder, "gizmo_ring.mesh"));
+    }
+
+    private static string WriteArrow(string file)
+    {
+        const int sides = 16;
+        var positions = new List<Vector3>();
+        var triangles = new List<int>();
+        void Ring(float y, float radius)
+        {
+            for (int i = 0; i < sides; i++)
+            {
+                float a = i * MathF.Tau / sides;
+                positions.Add(new Vector3(MathF.Cos(a) * radius, y, MathF.Sin(a) * radius));
+            }
+        }
+        void Band(int lower, int upper)
+        {
+            for (int i = 0; i < sides; i++)
+            {
+                int j = (i + 1) % sides;
+                triangles.AddRange(new[] { lower + i, upper + i, lower + j, lower + j, upper + i, upper + j });
+            }
+        }
+        Ring(0.12f, 0.022f);   // shaft
+        Ring(0.78f, 0.022f);
+        Ring(0.78f, 0.07f);    // head
+        Ring(1.0f, 0.001f);
+        Band(0, sides);
+        Band(sides, 2 * sides);
+        Band(2 * sides, 3 * sides);
+        var p = positions.ToArray();
+        var t = triangles.ToArray();
+        QtMesh.WriteTriangles(file, p, Mesher.ComputeNormals(p, t), null, t);
+        return ToUrl(file);
+    }
+
+    private static string WriteRing(string file)
+    {
+        const int around = 64, tube = 8;
+        const float radius = 0.72f, thickness = 0.022f;
+        var positions = new Vector3[around * tube];
+        var triangles = new List<int>();
+        for (int i = 0; i < around; i++)
+        {
+            float a = i * MathF.Tau / around;
+            var centre = new Vector3(MathF.Cos(a), 0, MathF.Sin(a));
+            for (int k = 0; k < tube; k++)
+            {
+                float b = k * MathF.Tau / tube;
+                positions[i * tube + k] = centre * (radius + MathF.Cos(b) * thickness) + Vector3.UnitY * (MathF.Sin(b) * thickness);
+                int i2 = (i + 1) % around, k2 = (k + 1) % tube;
+                triangles.AddRange(new[] { i * tube + k, i * tube + k2, i2 * tube + k, i2 * tube + k, i * tube + k2, i2 * tube + k2 });
+            }
+        }
+        var t = triangles.ToArray();
+        QtMesh.WriteTriangles(file, positions, Mesher.ComputeNormals(positions, t), null, t);
+        return ToUrl(file);
     }
 
     private static void RemoveStaleFolders(string root)
@@ -76,7 +145,7 @@ internal sealed class ViewportSync : IDisposable
         while (history.Count > 4)
         {
             try { File.Delete(history.Dequeue()); }
-            catch (IOException) { }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         }
         return file;
     }
@@ -103,6 +172,7 @@ internal sealed class ViewportSync : IDisposable
         bool first = true, anyChanged = false;
         var seen = new HashSet<string>();
         var seamLines = new List<Vector3>();
+        var wireLines = ShowWire ? new List<Vector3>() : null;
 
         foreach (var garment in doc.Garments)
         {
@@ -154,6 +224,25 @@ internal sealed class ViewportSync : IDisposable
                 if (!Workspace.IsEffectivelyVisible(garment, piece) || pieceMesh.TriangleCount == 0)
                     continue;
                 seen.Add(piece.Id);
+                if (wireLines != null)
+                {
+                    // Face outlines, lifted a hair off the surface on both sides so they are not hidden by it.
+                    var drawn = new HashSet<long>();
+                    foreach (var face in pieceMesh.Faces())
+                    {
+                        for (int k = 0; k < face.Length; k++)
+                        {
+                            int a = face[k], b = face[(k + 1) % face.Length];
+                            if (!drawn.Add(a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a))
+                                continue;
+                            foreach (float lift in new[] { 0.0008f, -0.0008f })
+                            {
+                                wireLines.Add(positions[i][a] + normals[i][a] * lift);
+                                wireLines.Add(positions[i][b] + normals[i][b] * lift);
+                            }
+                        }
+                    }
+                }
                 if (!_entries.TryGetValue(piece.Id, out var entry))
                     _entries[piece.Id] = entry = new Entry();
 
@@ -200,7 +289,7 @@ internal sealed class ViewportSync : IDisposable
             foreach (string file in _entries[id].Files)
             {
                 try { File.Delete(file); }
-                catch (IOException) { }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
             }
             _entries.Remove(id);
             anyChanged = true;
@@ -220,7 +309,21 @@ internal sealed class ViewportSync : IDisposable
             }
         }
 
+        if (wireLines == null || wireLines.Count == 0)
+        {
+            _wireUrl = "";
+        }
+        else if (anyChanged || _wireUrl.Length == 0)
+        {
+            string file = NextFile("wire", _wireFiles);
+            QtMesh.WriteLines(file, wireLines.ToArray());
+            _wireUrl = ToUrl(file);
+        }
+
         sb.Append("],\"seams\":\"").Append(_seamUrl).Append('"');
+        sb.Append(",\"wire\":\"").Append(_wireUrl).Append('"');
+        if (workspace.SelectionCentre() is { } centre)
+            sb.Append(inv, $",\"gizmo\":[{centre.X:0.#####},{centre.Y:0.#####},{centre.Z:0.#####}]");
         sb.Append(",\"avatar\":\"").Append(AvatarUrl(avatar)).Append('"');
         sb.Append('}');
         return sb.ToString();

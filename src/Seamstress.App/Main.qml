@@ -90,7 +90,7 @@ ApplicationWindow {
         active: App.startupSmoke
         source: "SmokeTest.qml"
         onLoaded: {
-            item.folder = App.startupScreenshot.replace(/\/[^\/]*$/, "")
+            item.folder = App.startupFolderUrl
             item.run()
             smokeFinish.start()
         }
@@ -168,7 +168,7 @@ ApplicationWindow {
                         model: recentMenu.files
                         delegate: MenuItem {
                             required property string modelData
-                            text: modelData.split("/").pop()
+                            text: App.fileName(modelData)
                             onTriggered: window.guard(() => App.open(modelData))
                         }
                         onObjectAdded: (index, object) => recentMenu.insertItem(index, object)
@@ -253,6 +253,7 @@ ApplicationWindow {
                 MenuSeparator {}
                 MenuItem { text: "3D: Checker (Texel Density)"; checkable: true; checked: viewport.displayMode === "checker"; onTriggered: viewport.displayMode = checked ? "checker" : "shaded" }
                 MenuItem { text: "3D: Wireframe (Topology)"; checkable: true; checked: viewport.wireframe; onTriggered: viewport.wireframe = checked }
+                MenuItem { text: "3D: Move / Rotate Handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
                 MenuItem { text: "3D: Show Avatar"; checkable: true; checked: viewport.showAvatar; onTriggered: viewport.showAvatar = checked }
                 MenuItem { text: "3D: Show Sewing Threads"; checkable: true; checked: viewport.showThreads; onTriggered: viewport.showThreads = checked }
             }
@@ -341,8 +342,8 @@ ApplicationWindow {
             orientation: Qt.Horizontal
 
             LayersPanel {
-                SplitView.preferredWidth: 250
-                SplitView.minimumWidth: 170
+                SplitView.preferredWidth: 280
+                SplitView.minimumWidth: 200
             }
 
             SplitView {
@@ -362,8 +363,8 @@ ApplicationWindow {
 
             PropertiesPanel {
                 id: propertiesPanel
-                SplitView.preferredWidth: 310
-                SplitView.minimumWidth: 240
+                SplitView.preferredWidth: 330
+                SplitView.minimumWidth: 260
                 onPickColor: (current) => { colorDialog.selectedColor = current; colorDialog.open() }
                 onPickTexture: textureDialog.open()
             }

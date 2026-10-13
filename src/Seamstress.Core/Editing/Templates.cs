@@ -135,8 +135,9 @@ public static class Templates
         var back = Panel("Skirt Back");
         front.Origin = new Vector2(0, rowY);
         back.Origin = new Vector2(85, rowY);
-        front.Placement = new Placement { Position = new Vector3(0, 0.75f, BodyCentreZ + 0.22f) };
-        back.Placement = new Placement { Position = new Vector3(0, 0.75f, BodyCentreZ - 0.22f), Rotation = new Vector3(0, 180, 0) };
+        // A little closer to the body than the tops start, so a top simulated at the same time ends up over the skirt.
+        front.Placement = new Placement { Position = new Vector3(0, 0.75f, BodyCentreZ + 0.19f) };
+        back.Placement = new Placement { Position = new Vector3(0, 0.75f, BodyCentreZ - 0.19f), Rotation = new Vector3(0, 180, 0) };
         garment.Pieces.Add(front);
         garment.Pieces.Add(back);
         garment.Seams.Add(new Seam { A = new EdgeRef(front.Id, 1), B = new EdgeRef(back.Id, 3) });

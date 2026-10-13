@@ -1,0 +1,4 @@
+#!/bin/sh
+# AppImage entry point.
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/usr/lib/seamstress/seamstress.sh" "$@"

@@ -1,0 +1,31 @@
+# Flatpak manifest. It packages the self-contained build that "./build.sh flatpak" assembles in
+# dist/Seamstress-linux-x64 (Qt and the .NET runtime included), so run it through build.sh rather than directly.
+app-id: io.github.mangodragonhub.Seamstress
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: seamstress
+finish-args:
+  - --share=ipc
+  - --socket=x11
+  - --device=dri
+  # Projects, textures and exports live wherever the user keeps them; MakeHuman's folder is in the home directory.
+  - --filesystem=home
+modules:
+  - name: seamstress
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/lib/seamstress
+      - cp -a app/. /app/lib/seamstress/
+      - install -Dm755 seamstress-launcher /app/bin/seamstress
+      - install -Dm644 app/io.github.mangodragonhub.Seamstress.desktop /app/share/applications/io.github.mangodragonhub.Seamstress.desktop
+      - install -Dm644 app/io.github.mangodragonhub.Seamstress.metainfo.xml /app/share/metainfo/io.github.mangodragonhub.Seamstress.metainfo.xml
+      - install -Dm644 app/io.github.mangodragonhub.Seamstress.svg /app/share/icons/hicolor/scalable/apps/io.github.mangodragonhub.Seamstress.svg
+    sources:
+      - type: dir
+        path: ../../dist/Seamstress-linux-x64
+        dest: app
+      - type: script
+        dest-filename: seamstress-launcher
+        commands:
+          - exec /app/lib/seamstress/seamstress.sh "$@"

@@ -59,3 +59,8 @@ obj/
 *.user
 .vs/
 TestResults/
+
+# Build script output
+dist/
+.tools/
+.flatpak-builder/

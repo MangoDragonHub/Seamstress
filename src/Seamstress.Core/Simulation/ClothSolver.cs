@@ -22,7 +22,7 @@ public sealed class ClothPiece
 /// Position-based cloth solver (XPBD with small substeps). Every mesh edge is a stretch constraint, every pair of
 /// adjacent triangles a bend constraint, and every stitch pulls two particles together.
 /// </summary>
-public sealed class ClothSolver
+public sealed partial class ClothSolver
 {
     private const float FrameTime = 1f / 60f;
     private const float MaxSpeed = 8f;
@@ -36,15 +36,16 @@ public sealed class ClothSolver
     private readonly float[] _thickness;
     private readonly float[] _friction;
     private readonly float[] _drag;
-    private readonly float[] _radius;
+    private readonly float[] _clothThickness;
+    private readonly bool[] _openStitch;
     private readonly bool[] _stitched;
     private readonly int[] _pieceOf;
-    private readonly Vector2[] _rest2D;
 
     private int[] _ca = Array.Empty<int>(), _cb = Array.Empty<int>();
     private float[] _rest = Array.Empty<float>(), _compliance = Array.Empty<float>();
     private int[] _sa = Array.Empty<int>(), _sb = Array.Empty<int>();
-    private readonly List<(int A, int B)> _contacts = new();
+    private int[] _ha = Array.Empty<int>(), _hb = Array.Empty<int>(); // bending across seams
+    private float[] _hrest = Array.Empty<float>(), _hcompliance = Array.Empty<float>();
     private Vector3[] _pieceShift = Array.Empty<Vector3>();
     private int[] _pieceStitches = Array.Empty<int>();
     private int[] _garmentOfPiece = Array.Empty<int>();
@@ -76,10 +77,10 @@ public sealed class ClothSolver
         _thickness = new float[count];
         _friction = new float[count];
         _drag = new float[count];
-        _radius = new float[count];
+        _clothThickness = new float[count];
+        _openStitch = new bool[count];
         _stitched = new bool[count];
         _pieceOf = new int[count];
-        _rest2D = new Vector2[count];
         Pieces = pieces;
         Collider = collider;
         Settings = settings;
@@ -116,6 +117,9 @@ public sealed class ClothSolver
         }
 
         var solver = new ClothSolver(count, pieces, collider, settings);
+        // For every piece: boundary edge -> the vertex opposite it, used to resist folding across seams.
+        var rims = new Dictionary<PieceMesh, Dictionary<long, int>>();
+        var triangles = new List<int>();
         var ca = new List<int>();
         var cb = new List<int>();
         var rest = new List<float>();
@@ -127,8 +131,6 @@ public sealed class ClothSolver
             var mesh = cloth.Mesh;
             var physics = cloth.Piece.Physics;
             int off = cloth.Offset;
-            var garment = (cloth.Simulated ? simulated : obstacles).First(g => g.Pieces.Contains(mesh)).Garment;
-            float spacing = garment.EffectiveParticleDistance(cloth.Piece) * 0.01f;
 
             var positions = Mesher.CurrentPositions(cloth.Piece, mesh);
             var area = new float[mesh.VertexCount];
@@ -153,10 +155,11 @@ public sealed class ClothSolver
                 solver._thickness[p] = MathF.Max(physics.Thickness, 0.1f) * 0.001f + SkinOffset;
                 solver._friction[p] = Math.Clamp(physics.Friction / 100f, 0, 1) * 1.5f;
                 solver._drag[p] = 0.2f + Math.Clamp(physics.Damping, 0, 100) * 0.06f;
-                solver._radius[p] = spacing * 0.45f;
+                solver._clothThickness[p] = MathF.Max(physics.Thickness, 0.5f) * 0.001f;
                 solver._pieceOf[p] = pi;
-                solver._rest2D[p] = mesh.Points[i];
             }
+            foreach (int index in mesh.Triangles)
+                triangles.Add(off + index);
             if (!cloth.Simulated)
                 continue;
 
@@ -172,9 +175,12 @@ public sealed class ClothSolver
                 }
             }
 
-            float bendStiffness = MathF.Pow(10f, -2f + 3.5f * Math.Clamp(physics.Bend, 0, 100) / 100f);
+            float bendStiffness = BendStiffness(physics);
+            var rim = rims[mesh] = new Dictionary<long, int>();
             foreach (var (key, opposite) in edges)
             {
+                if (opposite.D < 0)
+                    rim[key] = opposite.C;
                 int a = (int)(key >> 32), b = (int)(key & 0xFFFFFFFF);
                 var d2 = mesh.Points[b] - mesh.Points[a];
                 float length = d2.Length() * 0.01f;
@@ -203,17 +209,66 @@ public sealed class ClothSolver
 
         var sa = new List<int>();
         var sb = new List<int>();
+        var welds = new List<(int, int)>();
+        var ha = new List<int>();
+        var hb = new List<int>();
+        var hrest = new List<float>();
+        var hcompliance = new List<float>();
+        static long EdgeKey(int a, int b) => a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a;
         foreach (var g in simulated)
         {
-            foreach (var stitch in g.Stitches)
+            for (int k = 0; k < g.Stitches.Count; k++)
             {
-                int a = offsets[g.Pieces[stitch.PieceA]] + stitch.VertexA;
-                int b = offsets[g.Pieces[stitch.PieceB]] + stitch.VertexB;
+                var stitch = g.Stitches[k];
+                var meshA = g.Pieces[stitch.PieceA];
+                var meshB = g.Pieces[stitch.PieceB];
+                int a = offsets[meshA] + stitch.VertexA;
+                int b = offsets[meshB] + stitch.VertexB;
                 sa.Add(a);
                 sb.Add(b);
+                welds.Add((a, b));
                 solver._stitched[a] = true;
                 solver._stitched[b] = true;
+
+                // A seam is a hinge unless something resists folding across it. Tie the vertices facing each other
+                // over the seam together at the distance they would have if both pieces lay flat, just like the
+                // bend constraints inside a piece.
+                if (k + 1 >= g.Stitches.Count)
+                    continue;
+                var next = g.Stitches[k + 1];
+                if (next.PieceA != stitch.PieceA || next.PieceB != stitch.PieceB
+                    || !rims[meshA].TryGetValue(EdgeKey(stitch.VertexA, next.VertexA), out int c)
+                    || !rims[meshB].TryGetValue(EdgeKey(stitch.VertexB, next.VertexB), out int d))
+                    continue;
+                static (float Along, float Height) Local(PieceMesh m, int from, int to, int v)
+                {
+                    var e = m.Points[to] - m.Points[from];
+                    float length = MathF.Max(e.Length(), 1e-6f);
+                    var r = m.Points[v] - m.Points[from];
+                    return (Vector2.Dot(r, e) / length / length, MathF.Abs(e.X * r.Y - e.Y * r.X) / length);
+                }
+                var lc = Local(meshA, stitch.VertexA, next.VertexA, c);
+                var ld = Local(meshB, stitch.VertexB, next.VertexB, d);
+                float edge = 0.5f * (Vector2.Distance(meshA.Points[stitch.VertexA], meshA.Points[next.VertexA])
+                                   + Vector2.Distance(meshB.Points[stitch.VertexB], meshB.Points[next.VertexB]));
+                float along = (lc.Along - ld.Along) * edge;
+                float flat = MathF.Sqrt(along * along + (lc.Height + ld.Height) * (lc.Height + ld.Height)) * 0.01f;
+                var pieceA = g.Garment.FindPiece(meshA.PieceId)!;
+                var pieceB = g.Garment.FindPiece(meshB.PieceId)!;
+                ha.Add(offsets[meshA] + c);
+                hb.Add(offsets[meshB] + d);
+                hrest.Add(flat);
+                hcompliance.Add(2f / (BendStiffness(pieceA.Physics) + BendStiffness(pieceB.Physics)));
             }
+        }
+        if (settings.SelfCollision)
+        {
+            foreach (var g in obstacles)
+            {
+                foreach (var stitch in g.Stitches)
+                    welds.Add((offsets[g.Pieces[stitch.PieceA]] + stitch.VertexA, offsets[g.Pieces[stitch.PieceB]] + stitch.VertexB));
+            }
+            solver.BuildContactTopology(triangles.ToArray(), welds);
         }
 
         solver._garmentOfPiece = pieces.Select(p => p.Garment).ToArray();
@@ -228,10 +283,17 @@ public sealed class ClothSolver
         solver._cb = cb.ToArray();
         solver._rest = rest.ToArray();
         solver._compliance = compliance.ToArray();
+        solver._ha = ha.ToArray();
+        solver._hb = hb.ToArray();
+        solver._hrest = hrest.ToArray();
+        solver._hcompliance = hcompliance.ToArray();
         solver._sa = sa.ToArray();
         solver._sb = sb.ToArray();
         return solver;
     }
+
+    private static float BendStiffness(FabricPhysics physics)
+        => MathF.Pow(10f, -2f + 3.5f * Math.Clamp(physics.Bend, 0, 100) / 100f);
 
     /// <summary>Advances the cloth by one display frame (1/60 s of simulated time at time scale 1).</summary>
     public void Step()
@@ -245,10 +307,14 @@ public sealed class ClothSolver
         // that garment so the pieces do not fall off the avatar before they are attached. If the seams stop getting
         // closer (a seam that cannot close, such as a garment too tight for the body) the phase ends anyway.
         Array.Clear(_gap);
+        Array.Clear(_openStitch);
         for (int c = 0; c < _sa.Length; c++)
         {
             int g = _garmentOfPiece[_pieceOf[_sa[c]]];
-            _gap[g] = MathF.Max(_gap[g], Vector3.DistanceSquared(x[_sa[c]], x[_sb[c]]));
+            float apart = Vector3.DistanceSquared(x[_sa[c]], x[_sb[c]]);
+            _gap[g] = MathF.Max(_gap[g], apart);
+            if (apart > 0.002f * 0.002f)
+                _openStitch[_sa[c]] = _openStitch[_sb[c]] = true;
         }
         float widest = 0;
         for (int g = 0; g < _gap.Length; g++)
@@ -271,11 +337,15 @@ public sealed class ClothSolver
         SeamGap = widest;
         var fullGravity = new Vector3(0, Settings.Gravity, 0);
 
-        if (Settings.SelfCollision)
-            FindContacts();
+        // Cloth pairs have to be found before they touch, so fast-moving cloth is searched several times a frame:
+        // often enough that nothing travels further than the search distance in between.
+        float travel = 2f * PeakSpeed * h * substeps;
+        int searchEvery = Math.Max(1, substeps / Math.Clamp((int)MathF.Ceiling(travel / (0.75f * ContactMargin)), 1, substeps));
 
         for (int step = 0; step < substeps; step++)
         {
+            if (Settings.SelfCollision && step % searchEvery == 0)
+                FindContacts();
             for (int i = 0; i < n; i++)
             {
                 if (_invMass[i] == 0)
@@ -291,6 +361,7 @@ public sealed class ClothSolver
 
             SolveSeams(h, true);
             SolveDistances(h);
+            SolveSeamHinges(h);
             SolveSeams(h, false);
             if (Settings.SelfCollision)
                 SolveContacts();
@@ -329,6 +400,26 @@ public sealed class ClothSolver
             var correction = d * (lambda / length);
             x[a] += correction * wa;
             x[b] -= correction * wb;
+        }
+    }
+
+    /// <summary>Bending resistance across seams; only once the seam has been pulled shut.</summary>
+    private void SolveSeamHinges(float h)
+    {
+        var x = Positions;
+        float invH2 = 1f / (h * h);
+        for (int c = 0; c < _ha.Length; c++)
+        {
+            int a = _ha[c], b = _hb[c];
+            float w = _invMass[a] + _invMass[b];
+            var d = x[b] - x[a];
+            float length = d.Length();
+            if (w == 0 || length < 1e-9f || length > _hrest[c] * 1.5f)
+                continue;
+            float lambda = (length - _hrest[c]) / (w + _hcompliance[c] * invH2);
+            var correction = d * (lambda / length);
+            x[a] += correction * _invMass[a];
+            x[b] -= correction * _invMass[b];
         }
     }
 
@@ -412,6 +503,10 @@ public sealed class ClothSolver
 
     private void ApplyFriction(int i, Vector3 normal, float depth)
     {
+        // A stitch that is still open slides freely: thread tension beats friction, and otherwise two stitched
+        // points resting on opposite sides of a ridge (a shoulder) would never meet.
+        if (_openStitch[i])
+            return;
         var move = Positions[i] - _previous[i];
         var tangent = move - normal * Vector3.Dot(move, normal);
         float slide = tangent.Length();
@@ -419,82 +514,6 @@ public sealed class ClothSolver
             return;
         float grip = _friction[i] * depth;
         Positions[i] -= slide <= grip ? tangent : tangent * (grip / slide);
-    }
-
-    private void FindContacts()
-    {
-        _contacts.Clear();
-        var x = Positions;
-        int n = x.Length;
-        if (n == 0)
-            return;
-        float maxRadius = 0;
-        for (int i = 0; i < n; i++)
-            maxRadius = MathF.Max(maxRadius, _radius[i]);
-        float cell = MathF.Max(maxRadius * 2.5f, 1e-3f);
-        var buckets = new Dictionary<long, List<int>>();
-        long Key(int cx, int cy, int cz) => ((long)(cx & 0x1FFFFF) << 42) | ((long)(cy & 0x1FFFFF) << 21) | (long)(cz & 0x1FFFFF);
-        for (int i = 0; i < n; i++)
-        {
-            long key = Key((int)MathF.Floor(x[i].X / cell), (int)MathF.Floor(x[i].Y / cell), (int)MathF.Floor(x[i].Z / cell));
-            if (!buckets.TryGetValue(key, out var list))
-                buckets[key] = list = new List<int>(4);
-            list.Add(i);
-        }
-        for (int i = 0; i < n; i++)
-        {
-            int cx = (int)MathF.Floor(x[i].X / cell), cy = (int)MathF.Floor(x[i].Y / cell), cz = (int)MathF.Floor(x[i].Z / cell);
-            for (int dz = -1; dz <= 1; dz++)
-            {
-                for (int dy = -1; dy <= 1; dy++)
-                {
-                    for (int dx = -1; dx <= 1; dx++)
-                    {
-                        if (!buckets.TryGetValue(Key(cx + dx, cy + dy, cz + dz), out var list))
-                            continue;
-                        foreach (int j in list)
-                        {
-                            if (j <= i || (_invMass[i] == 0 && _invMass[j] == 0))
-                                continue;
-                            float reach = (_radius[i] + _radius[j]) * 1.25f;
-                            if (Vector3.DistanceSquared(x[i], x[j]) > reach * reach)
-                                continue;
-                            if (_pieceOf[i] == _pieceOf[j])
-                            {
-                                // Particles that are neighbours in the flat pattern are held apart by the cloth itself.
-                                if (Vector2.Distance(_rest2D[i], _rest2D[j]) * 0.01f < (_radius[i] + _radius[j]) * 1.05f)
-                                    continue;
-                            }
-                            else if (_stitched[i] && _stitched[j])
-                            {
-                                continue;
-                            }
-                            _contacts.Add((i, j));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private void SolveContacts()
-    {
-        var x = Positions;
-        foreach (var (a, b) in _contacts)
-        {
-            float wa = _invMass[a], wb = _invMass[b];
-            float w = wa + wb;
-            if (w == 0)
-                continue;
-            var d = x[b] - x[a];
-            float length = d.Length();
-            float min = _radius[a] + _radius[b];
-            if (length >= min || length < 1e-9f)
-                continue;
-            var correction = d * ((min - length) / (length * w));
-            x[a] -= correction * wa;
-            x[b] += correction * wb;
-        }
     }
 
     /// <summary>Copies the current particle positions of a piece into a new drape array.</summary>

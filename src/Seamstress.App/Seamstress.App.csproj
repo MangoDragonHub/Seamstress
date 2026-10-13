@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <QtBridgeAssemblyResourceId>Seamstress</QtBridgeAssemblyResourceId>
 
     <!-- Qt Bridge for C# ships one package per platform; pick the one for the machine being built on. -->
     <QtBridgePackagePrefix>QtGroup.Qt.Bridge.CSharp</QtBridgePackagePrefix>
@@ -40,6 +41,7 @@
   <ItemGroup>
     <Compile Include="**\*.cs" Exclude="obj\**;bin\**" />
     <None Include="*.qml" />
+    <QtResource Include="icons/seamstress.svg" />
   </ItemGroup>
 
 </Project>

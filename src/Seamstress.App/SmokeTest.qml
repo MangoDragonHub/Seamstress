@@ -79,6 +79,26 @@ QtObject {
         check("more faces at smaller particle distance", selection().garment.faces > faces * 2)
         App.setParticleDistance(2)
 
+        // Topology, and moving a piece with the 3D handles.
+        const triangles = selection().garment.faces
+        App.setTopology("Quads")
+        check("quad topology", selection().garment.topology === "Quads" && selection().garment.quads > 0 && selection().garment.faces < triangles)
+        App.setTopology("Triangles")
+        check("back to triangles", selection().garment.faces === triangles)
+        App.showWire = true
+        check("wire overlay", JSON.parse(App.viewportModels()).wire !== "")
+        App.showWire = false
+        const startX = selection().piece.posX
+        check("handles appear for the selection", JSON.parse(App.viewportModels()).gizmo !== undefined)
+        check("handle drag begins", App.gizmoBegin())
+        App.gizmoMove(0.1, 0, 0); App.gizmoMove(0.25, 0, 0)
+        App.gizmoEnd()
+        check("piece moved in 3D", Math.abs(selection().piece.posX - (startX + 0.25)) < 1e-4)
+        App.gizmoBegin(); App.gizmoRotate("y", 90); App.gizmoEnd()
+        check("piece rotated in 3D", Math.abs(selection().piece.rotY - 90) < 0.1)
+        App.undo(); App.undo()
+        check("3D moves undo", Math.abs(selection().piece.posX - startX) < 1e-4 && Math.abs(selection().piece.rotY) < 0.1)
+
         // Layers.
         App.selectAll()
         App.groupSelection()
@@ -116,7 +136,7 @@ QtObject {
         App.selectLayer(JSON.parse(App.layers())[0].id, false)
         check("other garment untouched", selection().piece.draped === false)
 
-        const base = "file://" + folder + "/smoke"
+        const base = folder + "/smoke"
         check("save", App.saveAs(base + ".garment.json") && !App.dirty)
         check("export obj", App.exportTo("obj", base + ".obj", true, false))
         check("export glb", App.exportTo("gltf", base + ".glb", true, false))
