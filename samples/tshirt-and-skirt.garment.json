@@ -1,0 +1,243 @@
+{
+  "format": "seamstress-garment",
+  "version": 1,
+  "name": "T-Shirt and Skirt",
+  "units": { "pattern": "cm", "world": "m", "angles": "degrees" },
+  "simulation": {
+    "gravity": -9.81,
+    "substeps": 12,
+    "timeScale": 1,
+    "selfCollision": false,
+    "groundPlane": true
+  },
+  "avatar": {
+    "kind": "Mannequin",
+    "scale": 1
+  },
+  "materials": [
+    {
+      "id": "339b70c9b3",
+      "name": "Shirt fabric",
+      "color": "#4F8FD9",
+      "repeat": 1,
+      "roughness": 0.8,
+      "metallic": 0,
+      "opacity": 1
+    },
+    {
+      "id": "838a70d929",
+      "name": "Skirt fabric",
+      "color": "#7A5FC2",
+      "repeat": 1,
+      "roughness": 0.8,
+      "metallic": 0,
+      "opacity": 1
+    }
+  ],
+  "garments": [
+    {
+      "id": "7dda118e26",
+      "name": "T-Shirt",
+      "visible": true,
+      "simulateWithOthers": false,
+      "particleDistance": 2,
+      "groups": [
+        {
+          "id": "8ca929bc25",
+          "name": "Sleeves",
+          "visible": true
+        }
+      ],
+      "pieces": [
+        {
+          "id": "b6cbcdfb80",
+          "name": "Front",
+          "visible": true,
+          "origin": [0, 0],
+          "points": [
+            { "at": [0, 0] },
+            { "at": [50, 0] },
+            { "at": [50, 37], "curve": [41, 42] },
+            { "at": [42, 60] },
+            { "at": [36, 62], "curve": [25, 44] },
+            { "at": [14, 62] },
+            { "at": [8, 60], "curve": [9, 42] },
+            { "at": [0, 37] }
+          ],
+          "placement": { "position": [0, 1.13, 0.265], "rotation": [0, 0, 0], "curvature": 0 },
+          "physics": {
+            "preset": "Cotton",
+            "density": 150,
+            "stretch": 80,
+            "shear": 60,
+            "bend": 30,
+            "damping": 20,
+            "friction": 40,
+            "thickness": 3
+          },
+          "material": "339b70c9b3",
+          "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
+        },
+        {
+          "id": "7b10856ec3",
+          "name": "Back",
+          "visible": true,
+          "origin": [75, 0],
+          "points": [
+            { "at": [0, 0] },
+            { "at": [50, 0] },
+            { "at": [50, 37], "curve": [41, 42] },
+            { "at": [42, 60] },
+            { "at": [36, 62], "curve": [25, 57] },
+            { "at": [14, 62] },
+            { "at": [8, 60], "curve": [9, 42] },
+            { "at": [0, 37] }
+          ],
+          "placement": { "position": [0, 1.13, -0.175], "rotation": [0, 180, 0], "curvature": 0 },
+          "physics": {
+            "preset": "Cotton",
+            "density": 150,
+            "stretch": 80,
+            "shear": 60,
+            "bend": 30,
+            "damping": 20,
+            "friction": 40,
+            "thickness": 3
+          },
+          "material": "339b70c9b3",
+          "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
+        },
+        {
+          "id": "6a0952f721",
+          "name": "Sleeve L",
+          "group": "8ca929bc25",
+          "visible": true,
+          "origin": [150, 10],
+          "points": [
+            { "at": [3, 0] },
+            { "at": [37, 0] },
+            { "at": [42, 16], "curve": [34, 26] },
+            { "at": [21, 28], "curve": [8, 26] },
+            { "at": [0, 16] }
+          ],
+          "placement": { "position": [0.34, 1.31, 0.045], "rotation": [0, 90, 45], "curvature": 150 },
+          "physics": {
+            "preset": "Cotton",
+            "density": 150,
+            "stretch": 80,
+            "shear": 60,
+            "bend": 30,
+            "damping": 20,
+            "friction": 40,
+            "thickness": 3
+          },
+          "material": "339b70c9b3",
+          "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
+        },
+        {
+          "id": "fad3eda5b1",
+          "name": "Sleeve R",
+          "group": "8ca929bc25",
+          "visible": true,
+          "origin": [205, 10],
+          "points": [
+            { "at": [3, 0] },
+            { "at": [37, 0] },
+            { "at": [42, 16], "curve": [34, 26] },
+            { "at": [21, 28], "curve": [8, 26] },
+            { "at": [0, 16] }
+          ],
+          "placement": { "position": [-0.34, 1.31, 0.045], "rotation": [0, -90, -45], "curvature": 150 },
+          "physics": {
+            "preset": "Cotton",
+            "density": 150,
+            "stretch": 80,
+            "shear": 60,
+            "bend": 30,
+            "damping": 20,
+            "friction": 40,
+            "thickness": 3
+          },
+          "material": "339b70c9b3",
+          "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
+        }
+      ],
+      "seams": [
+        { "id": "505327fe47", "from": { "piece": "b6cbcdfb80", "edge": 1 }, "to": { "piece": "7b10856ec3", "edge": 7 }, "reversed": false },
+        { "id": "5504e255d1", "from": { "piece": "b6cbcdfb80", "edge": 7 }, "to": { "piece": "7b10856ec3", "edge": 1 }, "reversed": false },
+        { "id": "d4c13fd505", "from": { "piece": "b6cbcdfb80", "edge": 3 }, "to": { "piece": "7b10856ec3", "edge": 5 }, "reversed": false },
+        { "id": "fda8c2f640", "from": { "piece": "b6cbcdfb80", "edge": 5 }, "to": { "piece": "7b10856ec3", "edge": 3 }, "reversed": false },
+        { "id": "e0eab035e5", "from": { "piece": "6a0952f721", "edge": 1 }, "to": { "piece": "6a0952f721", "edge": 4 }, "reversed": false },
+        { "id": "e216746a83", "from": { "piece": "6a0952f721", "edge": 2 }, "to": { "piece": "7b10856ec3", "edge": 6 }, "reversed": false },
+        { "id": "67d05979d3", "from": { "piece": "6a0952f721", "edge": 3 }, "to": { "piece": "b6cbcdfb80", "edge": 2 }, "reversed": false },
+        { "id": "469061c48d", "from": { "piece": "fad3eda5b1", "edge": 1 }, "to": { "piece": "fad3eda5b1", "edge": 4 }, "reversed": false },
+        { "id": "d9c75dea89", "from": { "piece": "fad3eda5b1", "edge": 2 }, "to": { "piece": "b6cbcdfb80", "edge": 6 }, "reversed": false },
+        { "id": "552f4ac1bb", "from": { "piece": "fad3eda5b1", "edge": 3 }, "to": { "piece": "7b10856ec3", "edge": 2 }, "reversed": false }
+      ]
+    },
+    {
+      "id": "51b77ddaf3",
+      "name": "Skirt",
+      "visible": true,
+      "simulateWithOthers": false,
+      "particleDistance": 2,
+      "groups": [],
+      "pieces": [
+        {
+          "id": "f4a485b4cc",
+          "name": "Skirt Front",
+          "visible": true,
+          "origin": [0, 77],
+          "points": [
+            { "at": [0, 0] },
+            { "at": [70, 0] },
+            { "at": [55, 50] },
+            { "at": [15, 50] }
+          ],
+          "placement": { "position": [0, 0.75, 0.265], "rotation": [0, 0, 0], "curvature": 0 },
+          "physics": {
+            "preset": "Cotton",
+            "density": 150,
+            "stretch": 80,
+            "shear": 60,
+            "bend": 30,
+            "damping": 20,
+            "friction": 40,
+            "thickness": 3
+          },
+          "material": "838a70d929",
+          "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
+        },
+        {
+          "id": "f5bb45d35e",
+          "name": "Skirt Back",
+          "visible": true,
+          "origin": [85, 77],
+          "points": [
+            { "at": [0, 0] },
+            { "at": [70, 0] },
+            { "at": [55, 50] },
+            { "at": [15, 50] }
+          ],
+          "placement": { "position": [0, 0.75, -0.175], "rotation": [0, 180, 0], "curvature": 0 },
+          "physics": {
+            "preset": "Cotton",
+            "density": 150,
+            "stretch": 80,
+            "shear": 60,
+            "bend": 30,
+            "damping": 20,
+            "friction": 40,
+            "thickness": 3
+          },
+          "material": "838a70d929",
+          "uv": { "offset": [0, 0], "scale": 1, "rotation": 0 }
+        }
+      ],
+      "seams": [
+        { "id": "abb19688d4", "from": { "piece": "f4a485b4cc", "edge": 1 }, "to": { "piece": "f5bb45d35e", "edge": 3 }, "reversed": false },
+        { "id": "bda43aa1b7", "from": { "piece": "f4a485b4cc", "edge": 3 }, "to": { "piece": "f5bb45d35e", "edge": 1 }, "reversed": false }
+      ]
+    }
+  ]
+}

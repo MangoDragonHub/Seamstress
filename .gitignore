@@ -52,3 +52,10 @@ compile_commands.json
 *creator.user*
 
 *_qmlcache.qrc
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/

@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Seamstress.App/Seamstress.App.csproj" />
+    <Project Path="src/Seamstress.Core/Seamstress.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Seamstress.Tests/Seamstress.Tests.csproj" />
+  </Folder>
+</Solution>
