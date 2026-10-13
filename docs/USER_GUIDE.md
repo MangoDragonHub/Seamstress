@@ -127,6 +127,7 @@ maps what you already know to where it lives here.
 | Simulate (Space) | **Simulate** (Space) |
 | Reset 3D Arrangement | **Reset** button, or **Simulation ▸ Reset Arrangement** |
 | Gizmo | The arrows and rings on the selected piece in the 3D view |
+| Dragging the cloth while simulating | **Pinch** (**G**) in the 3D view; it also works after the simulation has stopped |
 | Arrangement points | Not available. Place pieces with the gizmo or the numbers under **3D Arrangement**; **Wrap** curls a piece around an arm or leg |
 | Particle Distance | **Topology ▸ Particle distance** (per garment, with a per-piece override) |
 | Mesh type: Triangle / Quad | **Topology ▸ Faces**: Triangles or Quads |
@@ -242,8 +243,9 @@ simulation pulls each stitch shut.
 | 1–3 | **Front / Side / Back** | Jump to a standard camera angle. |
 | 4 | **Checker** | Replace fabric colours with a checker texture, to judge UVs and texel density. |
 | 5 | **Wire** | Draw the outline of every face, to see the topology. |
-| 6 | **Gizmo** | Show or hide the move and rotate handles. |
-| 7 | **Avatar** | Show or hide the avatar. Hidden, it still collides with the cloth. |
+| 6 | **Pinch** | Drag the cloth itself to tug it into place (see [Pinching the cloth](#pinching-the-cloth)). |
+| 7 | **Gizmo** | Show or hide the move and rotate handles. |
+| 8 | **Avatar** | Show or hide the avatar. Hidden, it still collides with the cloth. |
 
 ### Moving and rotating pieces
 
@@ -257,6 +259,27 @@ Select one or more pieces and the handles appear at their centre:
 A draped piece keeps its draped shape while you move it, and each drag is one undo step. The same values can be
 typed under **3D Arrangement** in Properties; typing a value there returns the piece to its flat shape at the
 new position. The handles are hidden while a simulation is running.
+
+### Pinching the cloth
+
+When part of a garment has bunched up, caught on the body, or settled a little off, take hold of it and pull.
+Turn on **Pinch** in the 3D view (or press **G**), then press on the cloth and drag: the cloth under the cursor
+follows your hand, the fabric around it comes along, and the rest of the garment reacts as it would on a real
+body.
+
+![A draped skirt, and the same skirt with its hem pulled outwards by a pinch](images/pinch.png)
+
+- **During a simulation**, pinching simply adds your hand to it. Let go and the cloth settles from where you
+  left it.
+- **After a simulation**, pinching starts the simulation for that garment for as long as you hold on, lets the
+  cloth settle for a moment after you let go, and stops again. The whole pinch is one undo step (**Ctrl+Z**).
+- The cloth still collides with the avatar and other garments, so you can pull it over a shoulder or smooth it
+  down against the body, but not drag it through.
+- While Pinch is on, dragging on the avatar or on empty space still orbits the camera, Shift+drag pans, and the
+  move/rotate handles are hidden. Turn Pinch off to get them back.
+- About 5 cm of cloth around the cursor is held; cloth further away is moved only by the fabric pulling on it.
+- Only garments that are being simulated can be pinched. If another garment is the active one and a simulation
+  is already running, stop it first or tick **All garments**.
 
 ---
 
@@ -574,6 +597,7 @@ starting Seamstress with `--cpu` or `--gpu`.
 | P / R / O | Polygon / Rectangle / Ellipse |
 | U | Switch the 2D view between pattern and UV layout |
 | F | Frame everything in the 2D view |
+| G | Turn Pinch on or off in the 3D view |
 | Space | Start or stop simulation |
 | Enter | Finish the polygon being drawn |
 | Esc | Cancel the current tool action |
@@ -590,7 +614,7 @@ starting Seamstress with `--cpu` or `--gpu`.
 
 | | 2D view | 3D view |
 | --- | --- | --- |
-| Left button | The current tool | Drag to orbit; click to select; drag a handle to move or rotate |
+| Left button | The current tool | Drag to orbit; click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it |
 | Ctrl or Shift + click | Add to the selection | Add to the selection |
 | Shift + drag | — | Pan |
 | Middle or right drag | Pan | Pan |
@@ -613,6 +637,9 @@ handles, and simulate again.
 
 **Some seams never close.** The garment is too small to go around the body there. Widen the pieces, or check
 that an arm or leg is not caught between two pieces that are meant to meet.
+
+**The cloth is bunched up or caught somewhere after simulating.** Turn on **Pinch** (**G**) in the 3D view and
+drag that part of the cloth to where it should sit.
 
 **Simulation is slow.** Raise **Particle distance** (fewer faces), lower **Substeps**, or switch off
 **Cloth-to-cloth collision** while blocking out the garment and turn it back on for the final drape.

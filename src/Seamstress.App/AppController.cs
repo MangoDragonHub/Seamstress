@@ -254,6 +254,67 @@ public partial class AppController : INotifyPropertyChanged
 
     public void GizmoEnd() => _workspace.EndPlacementEdit();
 
+    // Pinching cloth in the 3D view. If no simulation is running, one is started for the garment that was grabbed
+    // and stopped again shortly after the cloth is let go, so the whole pinch is a single undo step.
+    private bool _pinchStartedSimulation;
+    private bool _pinching;
+    private long _pinchStopFrame = -1;
+    private const int PinchSettleFrames = 45;
+
+    public bool PinchBegin(string pieceId, double x, double y, double z)
+    {
+        var garment = _workspace.Document.GarmentOfPiece(pieceId);
+        if (garment == null)
+            return false;
+        if (!_simulation.IsRunning)
+        {
+            if (_avatarTask != null)
+            {
+                StatusText = "The avatar is still being prepared — try again in a moment.";
+                return false;
+            }
+            if (_workspace.ActiveGarmentId != garment.Id)
+                _workspace.SelectPiece(pieceId);
+            string? problem = _simulation.Start(_simulateAll, "Pinch cloth");
+            if (problem != null)
+            {
+                StatusText = problem;
+                return false;
+            }
+            _pinchStartedSimulation = true;
+            Notify(nameof(Simulating));
+            Notify(nameof(CanUndo));
+        }
+        else if (!_simulation.SimulatedGarments.Contains(garment.Id))
+        {
+            StatusText = $"“{garment.Name}” is not part of the running simulation, so it cannot be pinched right now.";
+            return false;
+        }
+        _pinching = true;
+        _pinchStopFrame = -1;
+        _simulation.BeginPinch(new Vector3((float)x, (float)y, (float)z));
+        StatusText = "Pinching — drag to pull the cloth, release to let it settle.";
+        return true;
+    }
+
+    public void PinchMove(double x, double y, double z)
+    {
+        if (_pinching)
+            _simulation.MovePinch(new Vector3((float)x, (float)y, (float)z));
+    }
+
+    public void PinchEnd()
+    {
+        if (!_pinching)
+            return;
+        _pinching = false;
+        _simulation.EndPinch();
+        if (_pinchStartedSimulation)
+            _pinchStopFrame = _simulation.Frame + PinchSettleFrames;
+        else
+            StatusText = "Simulating — press Space to stop.";
+    }
+
     /// <summary>Called by a UI timer: applies the newest simulation frame and finishes background avatar loading.</summary>
     public void Tick()
     {
@@ -285,7 +346,19 @@ public partial class AppController : INotifyPropertyChanged
         }
 
         if (!_simulation.IsRunning)
+        {
+            _pinchStartedSimulation = false;
+            _pinchStopFrame = -1;
             return;
+        }
+        if (_pinchStartedSimulation && !_pinching && _pinchStopFrame >= 0 && _simulation.Frame >= _pinchStopFrame)
+        {
+            // The cloth has had a moment to settle after the pinch that started this run.
+            _simulation.Pump();
+            StopSimulation();
+            StatusText = "Pinch applied. Ctrl+Z undoes it.";
+            return;
+        }
         if (_simulation.Pump())
         {
             ViewportRevision++;
@@ -494,6 +567,9 @@ public partial class AppController : INotifyPropertyChanged
 
     private void StopSimulation()
     {
+        _pinching = false;
+        _pinchStartedSimulation = false;
+        _pinchStopFrame = -1;
         string? error = _simulation.Stop();
         SimInfo = "";
         Notify(nameof(Simulating));

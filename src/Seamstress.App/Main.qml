@@ -151,6 +151,7 @@ ApplicationWindow {
     Shortcut { sequence: "O"; onActivated: App.tool = "Ellipse" }
     Shortcut { sequence: "U"; onActivated: App.uvMode = !App.uvMode }
     Shortcut { sequence: "F"; onActivated: patternView.frameAll() }
+    Shortcut { sequence: "G"; onActivated: viewport.pinchMode = !viewport.pinchMode }
 
     Action { id: newAction; text: "&New"; onTriggered: window.guard(() => App.newDocument()) }
     Action { id: openAction; text: "&Open…"; onTriggered: window.guard(() => openDialog.open()) }
@@ -274,6 +275,7 @@ ApplicationWindow {
                 MenuSeparator {}
                 MenuItem { text: "3D: Checker (Texel Density)"; checkable: true; checked: viewport.displayMode === "checker"; onTriggered: viewport.displayMode = checked ? "checker" : "shaded" }
                 MenuItem { text: "3D: Wireframe (Topology)"; checkable: true; checked: viewport.wireframe; onTriggered: viewport.wireframe = checked }
+                MenuItem { text: "3D: Pinch Cloth"; checkable: true; checked: viewport.pinchMode; onTriggered: viewport.pinchMode = checked }
                 MenuItem { text: "3D: Move / Rotate Handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
                 MenuItem { text: "3D: Show Avatar"; checkable: true; checked: viewport.showAvatar; onTriggered: viewport.showAvatar = checked }
                 MenuItem { text: "3D: Show Sewing Threads"; checkable: true; checked: viewport.showThreads; onTriggered: viewport.showThreads = checked }

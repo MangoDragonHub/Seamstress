@@ -480,4 +480,50 @@ public class SimulationTests : IClassFixture<AvatarFixture>
             Assert.True(lowest > 0.2f, "the garment should stay on the body");
         }
     }
+
+    [Fact]
+    public void PinchingDragsTheClothButNotThroughTheBody()
+    {
+        var (ws, sim) = Setup("Skirt");
+        sim.Start(false);
+        sim.RunFrames(240);
+        var garment = ws.Document.Garments[0];
+        var mesh = ws.MeshFor(garment).Pieces[0];
+        sim.Pump(true);
+        var before = Mesher.CurrentPositions(garment.Pieces[0], mesh);
+        // Take the middle of the front hem and pull it 15 cm forward, away from the legs.
+        int hem = mesh.EdgeChains[0][mesh.EdgeChains[0].Length / 2];
+        var start = before[hem];
+        sim.BeginPinch(start);
+        sim.MovePinch(start + new Vector3(0, 0, 0.15f));
+        sim.RunFrames(40);
+        sim.Pump(true);
+        var held = Mesher.CurrentPositions(garment.Pieces[0], mesh);
+        _output.WriteLine($"hem {start} -> {held[hem]}");
+        Assert.True(Vector3.Distance(held[hem], start + new Vector3(0, 0, 0.15f)) < 0.01f, "the pinched point follows the hand");
+        int neighbour = mesh.EdgeChains[0][mesh.EdgeChains[0].Length / 2 + 1];
+        Assert.True(held[neighbour].Z > before[neighbour].Z + 0.08f, "the cloth around it comes along");
+        // Far from the hand the cloth barely moves: the back panel is a different piece on the other side.
+        var backMesh = ws.MeshFor(garment).Pieces[1];
+        var backBefore = Mesher.CurrentPositions(garment.Pieces[1], backMesh);
+
+        // Now push the same point straight into the body: collision must win.
+        sim.MovePinch(new Vector3(0, start.Y, 0.045f));
+        sim.RunFrames(60);
+        sim.Pump(true);
+        var pushed = Mesher.CurrentPositions(garment.Pieces[0], mesh);
+        float deepest = pushed.Min(p => _avatar.Sdf.Sample(p, out _));
+        _output.WriteLine($"pushed towards the body: hem at {pushed[hem]}, deepest {deepest * 1000:0.0} mm");
+        Assert.True(deepest > -0.004f, "pinching cannot pull cloth into the body");
+
+        // Letting go: the cloth is free again and falls back under gravity.
+        sim.MovePinch(start + new Vector3(0, 0.10f, 0.15f));
+        sim.RunFrames(40);
+        sim.EndPinch();
+        sim.RunFrames(90);
+        sim.Stop();
+        var released = Mesher.CurrentPositions(ws.Document.Garments[0].Pieces[0], mesh);
+        Assert.True(released[hem].Y < start.Y + 0.03f, "the released cloth drops back");
+        Assert.Equal("Simulate " + garment.Name, ws.History.UndoName);
+    }
 }

@@ -342,6 +342,7 @@ public sealed partial class ClothSolver
         float travel = 2f * PeakSpeed * h * substeps;
         int searchEvery = Math.Max(1, substeps / Math.Clamp((int)MathF.Ceiling(travel / (0.75f * ContactMargin)), 1, substeps));
 
+        UpdatePinch();
         for (int step = 0; step < substeps; step++)
         {
             if (Settings.SelfCollision && step % searchEvery == 0)
@@ -359,6 +360,7 @@ public sealed partial class ClothSolver
                 x[i] += v * h;
             }
 
+            ApplyPinch(h);
             SolveSeams(h, true);
             SolveDistances(h);
             SolveSeamHinges(h);

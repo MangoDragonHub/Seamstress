@@ -133,6 +133,15 @@ QtObject {
         check("simulation stopped", !App.simulating)
         App.selectAll()
         check("skirt draped", selection().piece.draped === true)
+
+        // Pinching with no simulation running starts one for that garment.
+        const skirtPiece = JSON.parse(App.layers()).filter(r => r.kind === "piece" && r.name === "Skirt Front")[0].id
+        check("pinch takes hold", App.pinchBegin(skirtPiece, 0, 0.45, 0.16))
+        check("pinch runs the simulation", App.simulating)
+        App.pinchMove(0, 0.5, 0.3)
+        App.pinchEnd()
+        App.toggleSimulation()
+        check("pinch is one undo step", App.undoText === "Undo Pinch cloth")
         App.selectLayer(JSON.parse(App.layers())[0].id, false)
         check("other garment untouched", selection().piece.draped === false)
 

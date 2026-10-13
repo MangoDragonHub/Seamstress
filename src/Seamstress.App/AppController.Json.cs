@@ -197,6 +197,18 @@ public partial class AppController
         {
             _simulation.RunFrames(options.SimulateFrames);
             _simulation.Stop();
+            if (options.View.Contains("pinch") && _workspace.Document.Garments.FirstOrDefault() is { Pieces.Count: > 0 } first
+                && _simulation.Start(true) == null)
+            {
+                // For documentation screenshots: hold the front hem pulled out, as if caught mid-pinch.
+                var mesh = _workspace.MeshFor(first).Pieces[0];
+                var hem = mesh.EdgeChains[0];
+                var point = Seamstress.Core.Geometry.Mesher.CurrentPositions(first.Pieces[0], mesh)[hem[hem.Length / 2]];
+                _simulation.BeginPinch(point);
+                _simulation.MovePinch(point + new System.Numerics.Vector3(0.05f, 0.06f, 0.16f));
+                _simulation.RunFrames(45);
+                _simulation.Stop();
+            }
         }
         if (options.Tool != null && Enum.TryParse<PatternTool>(options.Tool, true, out var tool))
             _editor.Tool = tool;

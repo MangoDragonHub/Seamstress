@@ -17,6 +17,7 @@ Item {
     property bool hasGizmo: false
     property vector3d gizmoOrigin: Qt.vector3d(0, 0, 0)
     property bool showGizmo: true
+    property bool pinchMode: false
     property bool showAvatar: true
     property bool showThreads: true
     property string avatarSource: ""
@@ -69,6 +70,7 @@ Item {
     Component.onCompleted: {
         if (App.startupView.indexOf("checker") >= 0) displayMode = "checker"
         if (App.startupView.indexOf("wire") >= 0) wireframe = true
+        if (App.startupView.indexOf("pinch") >= 0) pinchMode = true
         refresh()
     }
     Connections {
@@ -177,7 +179,7 @@ Item {
         id: gizmoView
         anchors.fill: parent
         camera: gizmoCamera
-        visible: root.hasGizmo && root.showGizmo && !App.simulating
+        visible: root.hasGizmo && root.showGizmo && !App.simulating && !root.pinchMode
         environment: SceneEnvironment { backgroundMode: SceneEnvironment.Transparent; antialiasingMode: SceneEnvironment.MSAA }
 
         Node {
@@ -216,7 +218,10 @@ Item {
         property real lastX: 0
         property real lastY: 0
         property real travelled: 0
-        property int mode: 0   // 1 orbit, 2 pan, 3 dragging a handle
+        property int mode: 0   // 1 orbit, 2 pan, 3 dragging a handle, 4 pinching cloth
+        property vector3d pinchStart: Qt.vector3d(0, 0, 0)
+        property real pinchScale: 0
+        cursorShape: mode === 4 ? Qt.ClosedHandCursor : (root.pinchMode ? Qt.OpenHandCursor : Qt.ArrowCursor)
         property string activePart: ""
         property real pressX: 0
         property real pressY: 0
@@ -271,6 +276,19 @@ Item {
                     return
                 }
             }
+            if (e.button === Qt.LeftButton && root.pinchMode && !(e.modifiers & Qt.ShiftModifier)) {
+                // Pinch: take hold of the cloth under the cursor. Dragging on the avatar or empty space still orbits.
+                const hit = view.pick(e.x, e.y)
+                if (hit.objectHit && hit.objectHit.pid
+                        && App.pinchBegin(hit.objectHit.pid, hit.scenePosition.x, hit.scenePosition.y, hit.scenePosition.z)) {
+                    pinchStart = hit.scenePosition
+                    // Metres per pixel at the depth of the grabbed point, so the cloth stays under the cursor.
+                    const depth = hit.scenePosition.minus(camera.scenePosition).dotProduct(camera.forward)
+                    pinchScale = 2 * depth * Math.tan(camera.fieldOfView * Math.PI / 360) / view.height
+                    mode = 4
+                    return
+                }
+            }
             mode = (e.button === Qt.LeftButton && !(e.modifiers & Qt.ShiftModifier)) ? 1 : 2
         }
         onPositionChanged: (e) => {
@@ -279,6 +297,10 @@ Item {
             travelled += Math.abs(dx) + Math.abs(dy)
             if (mode === 3) {
                 dragHandle(e.x, e.y)
+            } else if (mode === 4) {
+                const mx = (e.x - pressX) * pinchScale, my = (pressY - e.y) * pinchScale
+                const r = camera.right, u = camera.up
+                App.pinchMove(pinchStart.x + r.x * mx + u.x * my, pinchStart.y + r.y * mx + u.y * my, pinchStart.z + r.z * mx + u.z * my)
             } else if (mode === 1) {
                 root.yaw -= dx * 0.4
                 root.pitch = Math.max(-89, Math.min(89, root.pitch - dy * 0.4))
@@ -295,6 +317,8 @@ Item {
             if (mode === 3) {
                 App.gizmoEnd()
                 activePart = ""
+            } else if (mode === 4) {
+                App.pinchEnd()
             } else if (travelled < 4 && e.button === Qt.LeftButton) {
                 // A click without dragging selects the piece under the cursor.
                 const hit = view.pick(e.x, e.y)
@@ -305,6 +329,7 @@ Item {
         }
         onCanceled: {
             if (mode === 3) App.gizmoEnd()
+            if (mode === 4) App.pinchEnd()
             activePart = ""
             mode = 0
         }
@@ -347,6 +372,14 @@ Item {
             ToolTip.text: "Show the mesh topology"
         }
         ViewButton {
+            text: "Pinch"
+            checkable: true
+            checked: root.pinchMode
+            onToggled: root.pinchMode = checked
+            ToolTip.visible: hovered
+            ToolTip.text: "Drag the cloth itself to tug it into place, during or after simulation (G)"
+        }
+        ViewButton {
             text: "Gizmo"
             checkable: true
             checked: root.showGizmo
@@ -366,7 +399,8 @@ Item {
         anchors { left: parent.left; bottom: parent.bottom; margins: 8 }
         opacity: 0.55
         font.pixelSize: 11
-        text: "Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Handles: move / rotate"
+        text: root.pinchMode ? "Pinch: drag the cloth to pull it  ·  Drag elsewhere: orbit  ·  Shift-drag: pan  ·  Wheel: zoom"
+                            : "Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Handles: move / rotate"
     }
     Label {
         anchors { right: parent.right; bottom: parent.bottom; margins: 8 }

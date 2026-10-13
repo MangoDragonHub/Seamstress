@@ -12,7 +12,8 @@ Marvelous Designer.
 - **2D pattern view** – draw pieces (polygon, rectangle, ellipse), move them, edit points, curve edges, and
   sew edges together with the Sew tool. Seams are colour-coded, with dots marking the ends that meet.
 - **3D view** – shows the sewn pieces on an avatar. Orbit, pan, zoom, click to select, and drag the arrows and
-  rings on a selected piece to move and rotate it.
+  rings on a selected piece to move and rotate it. **Pinch** lets you drag the cloth itself, during or after
+  simulation, to tug bunched-up areas into place.
 - **Simulation** – the Simulate button sews and drapes the *active* garment only. Other garments stay as
   they are unless you link them (⇄ in the layers panel) or tick **All garments**. Cloth collides with the
   avatar, with itself and with the other garments, so a shirt settles over a skirt instead of through it.

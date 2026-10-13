@@ -43,7 +43,8 @@ public sealed class SimulationController : IDisposable
     }
 
     /// <summary>Starts simulating. Returns a message when there is nothing to simulate.</summary>
-    public string? Start(bool allGarments)
+    /// <param name="undoName">Name of the undo step for this run; null names it after the garments.</param>
+    public string? Start(bool allGarments, string? undoName = null)
     {
         if (IsRunning)
             return null;
@@ -53,7 +54,7 @@ public sealed class SimulationController : IDisposable
             return "There is no visible garment to simulate. Add a garment or select one in the layers panel.";
 
         _stopping = true; // Begin raises BeforeChange; this run has not started yet
-        _workspace.History.Begin(simulated.Count == 1 ? $"Simulate {simulated[0].Name}" : "Simulate garments");
+        _workspace.History.Begin(undoName ?? (simulated.Count == 1 ? $"Simulate {simulated[0].Name}" : "Simulate garments"));
         _stopping = false;
 
         var active = simulated.Select(g => _workspace.MeshFor(g)).ToList();
@@ -86,6 +87,14 @@ public sealed class SimulationController : IDisposable
         }
         return true;
     }
+
+    /// <summary>Takes hold of the simulated cloth nearest to a point in the 3D view (metres). Needs a running simulation.</summary>
+    public void BeginPinch(System.Numerics.Vector3 point, float radius = 0.05f) => _runner?.Solver.BeginPinch(point, radius);
+
+    /// <summary>Moves the held cloth towards a new position.</summary>
+    public void MovePinch(System.Numerics.Vector3 target) => _runner?.Solver.MovePinch(target);
+
+    public void EndPinch() => _runner?.Solver.EndPinch();
 
     /// <summary>Advances a started run by exactly <paramref name="frames"/> frames without real-time pacing.</summary>
     public void RunFrames(int frames) => _runner?.RunFrames(frames);

@@ -14,7 +14,8 @@
 #   --gender <0..1>       use the MakeHuman avatar with that gender (raw files mh_0, mh_0.5, mh_1)
 #   --view propsbottom    scroll the properties panel to its end
 #
-# Raw files expected: overview, arranged, editpoints, sew, uv, quads, layered, bottom, mh_0, mh_0.5, mh_1,
+# Raw files expected: overview, arranged, editpoints, sew, uv, quads, layered, bottom, pinch_before (a simulated
+# skirt), pinch (the same with --view pinch), mh_0, mh_0.5, mh_1,
 # dlg_prefs, dlg_export, dlg_bodyshape. The pixel positions below assume a 1920x1042 capture.
 import sys
 from PIL import Image, ImageDraw, ImageFont
@@ -72,11 +73,11 @@ for i, x in enumerate([36, 101, 161, 229, 298, 362, 421, 454, 517]):
 save(canvas, "toolbar")
 
 # 3. 3D view buttons
-vb = load("overview").crop((470, 74, 801, 102)).resize((993, 84), Image.LANCZOS)
-canvas = Image.new("RGB", (993, 134), "#1e1f22"); canvas.paste(vb, (0, 0))
+vb = load("overview").crop((438, 74, 801, 102)).resize((1089, 84), Image.LANCZOS)
+canvas = Image.new("RGB", (1089, 134), "#1e1f22"); canvas.paste(vb, (0, 0))
 d = ImageDraw.Draw(canvas)
-for i, x in enumerate([494, 533, 571, 636, 683, 726, 774]):
-    badge(d, (x - 470) * 3, 108, i + 1, COLORS[i % len(COLORS)], 15)
+for i, x in enumerate([452, 491, 529, 594, 641, 682, 726, 774]):
+    badge(d, (x - 438) * 3, 108, i + 1, COLORS[i % len(COLORS)], 15)
 save(canvas, "view-buttons")
 
 # 4. Workflow: arranged, then simulated
@@ -111,6 +112,13 @@ save(load("bottom").crop((1590, 72, 1920, 1016)), "properties-material-uv")
 save(load("quads").crop((283, 72, 1588, 1016)), "topology-quads")
 save(load("uv").crop((283, 72, 1588, 1016)), "uv-checker")
 save(load("layered").crop((283, 72, 801, 1016)), "layering")
+# Pinching: the draped skirt, and the same skirt with its front hem held pulled out
+pinch = Image.new("RGB", (518 * 2, 620), "#24262b")
+for i, (name, text) in enumerate([("pinch_before", "After simulating"), ("pinch", "Pinch on: front hem dragged outwards")]):
+    pinch.paste(load(name).crop((283, 72, 801, 692)), (518 * i, 0))
+    label(ImageDraw.Draw(pinch), 518 * i + 259, 70, text, "#ffe066", 16, "mm")
+save(pinch, "pinch")
+
 # MakeHuman body shape: gender 0, 0.5 and 1 side by side, each labelled
 bodies = Image.new("RGB", (460 * 3, 880), "#24262b")
 for i, (g, text) in enumerate([("0", "Gender 0 %  (female)"), ("0.5", "Gender 50 %  (neutral)"), ("1", "Gender 100 %  (male)")]):
