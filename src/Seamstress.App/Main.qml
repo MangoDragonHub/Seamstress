@@ -544,7 +544,7 @@ ApplicationWindow {
     MessageDialog {
         id: aboutDialog
         title: "About Seamstress"
-        text: "Seamstress"
+        text: "Seamstress " + App.version
         informativeText: "A 3D garment creation tool: draw pattern pieces, sew them, and drape them on an avatar.\n\nBuilt with C# and Qt Quick (Qt Bridge for C#).\n3D viewport: " + App.renderer
         buttons: MessageDialog.Ok
     }

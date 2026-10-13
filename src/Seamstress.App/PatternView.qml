@@ -24,6 +24,24 @@ Item {
     function wy(py) { return (height - py - panY) / zoom }
     function tolerance() { return 9 / zoom }
 
+    // The grid gets finer as you zoom in. Each level is [spacing in cm, its name, lines per stronger line]; the
+    // finest one whose squares are still at least 14 pixels wide is drawn.
+    readonly property var gridLevels: App.imperial
+        ? [[2.54 / 8, "1/8 in", 8], [2.54, "1 in", 12], [4 * 2.54, "4 in", 3], [12 * 2.54, "1 ft", 3], [36 * 2.54, "1 yd", 10]]
+        : [[0.1, "1 mm", 10], [1, "1 cm", 10], [10, "10 cm", 10], [100, "1 m", 10], [1000, "10 m", 10]]
+    function gridLevel() {
+        for (const level of gridLevels) {
+            if (level[0] * zoom >= 14)
+                return level
+        }
+        return gridLevels[gridLevels.length - 1]
+    }
+    function lengthText(cm) { return App.imperial ? (cm / 2.54).toFixed(2) + " in" : cm.toFixed(1) + " cm" }
+
+    // Shift keeps proportions in the drawing tools; follow the key itself so the shape reacts without a mouse move.
+    Keys.onPressed: (e) => { if (e.key === Qt.Key_Shift) App.constrain = true }
+    Keys.onReleased: (e) => { if (e.key === Qt.Key_Shift) App.constrain = false }
+
     function refresh() {
         scene = JSON.parse(App.patternScene())
         // Re-frame when switching between pattern and UV space, and the first time there is something to show.
@@ -90,6 +108,20 @@ Item {
             return [pts[0], pts[1]]
         }
 
+        // A length read-out: text on a dark pill at a world position, moved off it in the direction (nx, ny).
+        function measure(ctx, x, y, text, nx, ny) {
+            ctx.font = "bold 11px sans-serif"
+            ctx.textAlign = "center"
+            const w = ctx.measureText(text).width + 12
+            const px = root.sx(x) + nx * (w / 2 + 5), py = root.sy(y) - ny * 15
+            ctx.fillStyle = Qt.rgba(0.07, 0.07, 0.09, 0.88)
+            ctx.strokeStyle = "#ffd447"
+            ctx.lineWidth = 1
+            ctx.beginPath(); ctx.roundedRect(Math.round(px - w / 2) + 0.5, Math.round(py - 9) + 0.5, w, 18, 4, 4); ctx.fill(); ctx.stroke()
+            ctx.fillStyle = "#ffe58a"
+            ctx.fillText(text, px, py + 4)
+        }
+
         function withAlpha(hex, alpha) {
             const c = Qt.color(hex)
             return Qt.rgba(c.r, c.g, c.b, alpha)
@@ -116,14 +148,9 @@ Item {
                 ctx.lineWidth = 1
                 ctx.strokeRect(root.sx(0), root.sy(1), root.zoom, root.zoom)
             } else {
-                // Grid every 10 cm, with a stronger line every metre and at the origin. In imperial units the lines
-                // are 4 in apart with a stronger one every foot; zoomed out, a line per foot and a stronger one per yard.
-                const imperial = App.imperial
-                let step = imperial ? 4 * 2.54 : 10, perMajor = imperial ? 3 : 10
-                if (root.zoom * step < 14) {
-                    step = imperial ? 12 * 2.54 : 100
-                    perMajor = imperial ? 3 : 1
-                }
+                // Grid with a stronger line every few squares and at the origin.
+                const level = root.gridLevel()
+                const step = level[0], perMajor = level[2]
                 ctx.lineWidth = 1
                 for (let i = Math.floor(root.wx(0) / step); i * step <= root.wx(width); i++) {
                     const x = i * step
@@ -214,6 +241,28 @@ Item {
                 for (let i = 0; i < s.draft.length; i += 2)
                     ctx.fillRect(root.sx(s.draft[i]) - 3, root.sy(s.draft[i + 1]) - 3, 6, 6)
             }
+            for (let i = 0; s.measures && i < s.measures.length; i += 5)
+                measure(ctx, s.measures[i], s.measures[i + 1], root.lengthText(s.measures[i + 2]), s.measures[i + 3], s.measures[i + 4])
+            for (let i = 0; s.draftMeasures && i < s.draftMeasures.length; i += 3)
+                measure(ctx, s.draftMeasures[i], s.draftMeasures[i + 1], root.lengthText(s.draftMeasures[i + 2]), 0, 0)
+            if (s.draftSize)
+                measure(ctx, s.draftSize[0], s.draftSize[1], root.lengthText(s.draftSize[2]) + "  ×  " + root.lengthText(s.draftSize[3]), 0, 0)
+
+            if (!root.uv) {
+                // Scale bar: one grid square, with its size.
+                const level = root.gridLevel()
+                const len = level[0] * root.zoom, x = 10.5, y = height - 12.5
+                ctx.strokeStyle = "#c9ccd2"; ctx.lineWidth = 1
+                ctx.beginPath()
+                ctx.moveTo(x, y - 4); ctx.lineTo(x, y + 4)
+                ctx.moveTo(x, y); ctx.lineTo(x + len, y)
+                ctx.moveTo(x + len, y - 4); ctx.lineTo(x + len, y + 4)
+                ctx.stroke()
+                ctx.fillStyle = "#c9ccd2"
+                ctx.font = "11px sans-serif"
+                ctx.textAlign = "left"
+                ctx.fillText("1 square = " + level[1], x + len + 8, y + 4)
+            }
         }
     }
 
@@ -229,6 +278,7 @@ Item {
 
         onPressed: (e) => {
             root.forceActiveFocus()
+            App.constrain = (e.modifiers & Qt.ShiftModifier) !== 0
             if (e.button === Qt.LeftButton && !(e.modifiers & Qt.AltModifier)) {
                 App.pointerDown(root.wx(e.x), root.wy(e.y), root.tolerance(), (e.modifiers & Qt.ControlModifier) !== 0 || (e.modifiers & Qt.ShiftModifier) !== 0)
             } else {
@@ -244,6 +294,7 @@ Item {
                 lastX = e.x; lastY = e.y
                 canvas.requestPaint()
             } else {
+                App.constrain = (e.modifiers & Qt.ShiftModifier) !== 0
                 App.pointerMove(root.wx(e.x), root.wy(e.y), root.tolerance())
             }
             coords.text = root.uv

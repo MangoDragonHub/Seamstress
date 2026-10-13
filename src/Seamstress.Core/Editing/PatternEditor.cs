@@ -36,8 +36,11 @@ public sealed class PatternEditor
     private int _dragIndex;
     private readonly List<Vector2> _draft = new();
     private Vector2? _draftCursor;
+    private Vector2 _draftCursorRaw;
     private EdgeRef? _hoverEdge;
     private EdgeRef? _pendingEdge;
+    private readonly List<EdgeRef> _measured = new();
+    private bool _constrain;
 
     /// <summary>Raised when something only the 2D view shows (hover, draft shape, tool) changed.</summary>
     public event Action? Changed;
@@ -73,18 +76,67 @@ public sealed class PatternEditor
 
     public EdgeRef? PendingEdge => _pendingEdge;
 
+    /// <summary>
+    /// Shift held while drawing: rectangles become squares, ellipses become circles, and each polygon side snaps
+    /// to 15° steps and to a whole number of <see cref="LengthStep"/>.
+    /// </summary>
+    public bool Constrain
+    {
+        get => _constrain;
+        set
+        {
+            if (_constrain == value)
+                return;
+            _constrain = value;
+            // Pressing or releasing Shift updates the shape being drawn without waiting for the pointer to move.
+            if (_drag == Drag.Shape && _dragMoved)
+                BuildShape(_dragLast);
+            else if (_tool == PatternTool.Polygon && _draft.Count > 0 && _draftCursor != null)
+                _draftCursor = PolygonPoint(_draftCursorRaw);
+            else
+                return;
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>Length in centimetres that constrained polygon sides are rounded to.</summary>
+    public float LengthStep { get; set; } = 1f;
+
+    private Vector2 PolygonPoint(Vector2 world)
+    {
+        if (!_constrain || _draft.Count == 0)
+            return world;
+        var from = _draft[^1];
+        var d = world - from;
+        float length = d.Length();
+        if (length < 1e-4f)
+            return world;
+        const float angleStep = MathF.PI / 12;
+        float angle = MathF.Round(MathF.Atan2(d.Y, d.X) / angleStep) * angleStep;
+        if (LengthStep > 0)
+            length = MathF.Max(LengthStep, MathF.Round(length / LengthStep) * LengthStep);
+        return from + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * length;
+    }
+
+    private void Measure(params EdgeRef[] edges)
+    {
+        _measured.Clear();
+        _measured.AddRange(edges);
+        Changed?.Invoke();
+    }
+
     private Document Doc => _workspace.Document;
 
     public string Hint => _uvMode
         ? "UV layout of the active garment: drag a piece to move it in texture space. The checker shows texel density."
         : _tool switch
         {
-            PatternTool.Select => "Click a piece to select it, drag to move. Ctrl+click adds to the selection.",
-            PatternTool.EditPoints => "Drag a point to move it, drag an edge to curve it, double-click an edge to add a point, Delete removes the selected point.",
+            PatternTool.Select => "Click a piece to select it, drag to move. Click an edge to see its length. Ctrl+click adds to the selection.",
+            PatternTool.EditPoints => "Drag a point to move it, drag an edge to curve it, double-click an edge to add a point, Delete removes the selected point. Click an edge to see its length.",
             PatternTool.Sew => _pendingEdge == null ? "Click the first edge to sew." : "Click the edge to sew it to. Esc cancels.",
-            PatternTool.Polygon => _draft.Count == 0 ? "Click to place the first corner." : "Click to add corners; click the first corner, double-click or press Enter to finish.",
-            PatternTool.Rectangle => "Drag to draw a rectangular piece.",
-            PatternTool.Ellipse => "Drag to draw an elliptical piece.",
+            PatternTool.Polygon => _draft.Count == 0 ? "Click to place the first corner." : "Click to add corners; click the first corner, double-click or press Enter to finish. Hold Shift to snap the side's angle and length.",
+            PatternTool.Rectangle => "Drag to draw a rectangular piece. Hold Shift for a square.",
+            PatternTool.Ellipse => "Drag to draw an elliptical piece. Hold Shift for a circle.",
             _ => "",
         };
 
@@ -233,7 +285,9 @@ public sealed class PatternEditor
         {
             case PatternTool.Select:
                 {
-                    var piece = HitPiece(world);
+                    // An edge is hit a little outside the piece too, so it can be clicked to read its length.
+                    var edge = HitEdge(world, tolerance);
+                    var piece = HitPiece(world) ?? edge?.Piece;
                     var seam = piece == null || !_workspace.SelectedPieces.Contains(piece.Id) ? HitSeam(world, tolerance) : null;
                     if (seam != null)
                     {
@@ -250,6 +304,10 @@ public sealed class PatternEditor
                     {
                         _workspace.ClearSelection();
                     }
+                    if (seam == null && edge is { } clicked && clicked.Piece == piece)
+                        Measure(new EdgeRef(clicked.Piece.Id, clicked.Edge));
+                    else
+                        Measure();
                     break;
                 }
             case PatternTool.EditPoints:
@@ -260,12 +318,16 @@ public sealed class PatternEditor
                         _drag = Drag.Point;
                         _dragPiece = point.Piece.Id;
                         _dragIndex = point.Index;
+                        // The two edges that meet at the point change length as it moves.
+                        int count = point.Piece.Points.Count;
+                        Measure(new EdgeRef(point.Piece.Id, (point.Index + count - 1) % count), new EdgeRef(point.Piece.Id, point.Index));
                     }
                     else if (HitControl(world, tolerance) is { } control)
                     {
                         _drag = Drag.Control;
                         _dragPiece = control.Piece.Id;
                         _dragIndex = control.Edge;
+                        Measure(new EdgeRef(control.Piece.Id, control.Edge));
                     }
                     else if (HitEdge(world, tolerance) is { } edge)
                     {
@@ -273,14 +335,17 @@ public sealed class PatternEditor
                         _drag = Drag.Bend;
                         _dragPiece = edge.Piece.Id;
                         _dragIndex = edge.Edge;
+                        Measure(new EdgeRef(edge.Piece.Id, edge.Edge));
                     }
                     else if (HitPiece(world) is { } piece)
                     {
                         _workspace.SelectPiece(piece.Id);
+                        Measure();
                     }
                     else
                     {
                         _workspace.ClearSelection();
+                        Measure();
                     }
                     break;
                 }
@@ -317,8 +382,10 @@ public sealed class PatternEditor
                     }
                     else
                     {
-                        _draft.Add(world);
-                        _draftCursor = world;
+                        var corner = PolygonPoint(world);
+                        _draft.Add(corner);
+                        _draftCursorRaw = world;
+                        _draftCursor = corner;
                         Changed?.Invoke();
                     }
                     break;
@@ -397,7 +464,8 @@ public sealed class PatternEditor
             return;
         if (_tool == PatternTool.Polygon && _draft.Count > 0)
         {
-            _draftCursor = world;
+            _draftCursorRaw = world;
+            _draftCursor = PolygonPoint(world);
             Changed?.Invoke();
         }
         else if (_tool is PatternTool.Sew or PatternTool.EditPoints)
@@ -415,6 +483,13 @@ public sealed class PatternEditor
     private void BuildShape(Vector2 world)
     {
         _draft.Clear();
+        if (_constrain)
+        {
+            // Equal width and height, growing in the direction of the drag.
+            var d = world - _dragStart;
+            float side = MathF.Max(MathF.Abs(d.X), MathF.Abs(d.Y));
+            world = _dragStart + new Vector2(d.X < 0 ? -side : side, d.Y < 0 ? -side : side);
+        }
         var min = Vector2.Min(_dragStart, world);
         var max = Vector2.Max(_dragStart, world);
         if (_tool == PatternTool.Rectangle)
@@ -510,6 +585,7 @@ public sealed class PatternEditor
         _draftCursor = null;
         _pendingEdge = null;
         _hoverEdge = null;
+        _measured.Clear();
         Changed?.Invoke();
     }
 
@@ -643,11 +719,64 @@ public sealed class PatternEditor
         Edge("hover", _hoverEdge);
         Edge("pending", _pendingEdge);
 
+        // Length read-outs as x, y, length, nx, ny: the middle of the edge, its length in centimetres, and the
+        // direction into the piece, so labels of two edges that lie against each other can be kept apart.
+        if (!_uvMode)
+        {
+            var edges = new List<EdgeRef>();
+            if (_tool is PatternTool.Select or PatternTool.EditPoints)
+                edges.AddRange(_measured.Where(m => _workspace.SelectedPieces.Contains(m.PieceId)));
+            if (_hoverEdge != null)
+                edges.Add(_hoverEdge);
+            if (_pendingEdge != null)
+                edges.Add(_pendingEdge);
+            if (_workspace.SelectedSeamId != null && Doc.Garments.SelectMany(g => g.Seams).FirstOrDefault(s => s.Id == _workspace.SelectedSeamId) is { } chosen)
+            {
+                edges.Add(chosen.A);
+                edges.Add(chosen.B);
+            }
+            sb.Append(",\"measures\":[");
+            bool firstMeasure = true;
+            var seen = new HashSet<(string, int)>();
+            foreach (var edge in edges)
+            {
+                var piece = Doc.FindPiece(edge.PieceId);
+                if (piece == null || edge.Edge >= piece.EdgeCount || !seen.Add((edge.PieceId, edge.Edge)))
+                    continue;
+                var at = EdgeMiddle(piece, edge.Edge);
+                var inward = piece.Points.Aggregate(Vector2.Zero, (sum, p) => sum + p.Position) / piece.Points.Count + piece.Origin - at;
+                inward = inward.LengthSquared() > 1e-8f ? Vector2.Normalize(inward) : Vector2.Zero;
+                sb.Append(firstMeasure ? "" : ",").Append(inv, $"{at.X:0.###},{at.Y:0.###},{Outline.EdgeLength(piece, edge.Edge):0.###},{inward.X:0.##},{inward.Y:0.##}");
+                firstMeasure = false;
+            }
+            sb.Append(']');
+        }
+
         if (_draft.Count > 0)
         {
+            var draft = _tool == PatternTool.Polygon && _draftCursor is { } cursor ? _draft.Append(cursor).ToList() : _draft;
             sb.Append(",\"draft\":");
-            AppendPoints(sb, _tool == PatternTool.Polygon && _draftCursor is { } cursor ? _draft.Append(cursor) : _draft);
+            AppendPoints(sb, draft);
             sb.Append(",\"draftClosed\":").Append(_tool == PatternTool.Polygon ? "false" : "true");
+            if (_tool == PatternTool.Ellipse)
+            {
+                // An ellipse is measured across, not along its sides.
+                var lo = draft.Aggregate(Vector2.Min);
+                var hi = draft.Aggregate(Vector2.Max);
+                sb.Append(inv, $",\"draftSize\":[{(lo.X + hi.X) / 2:0.###},{(lo.Y + hi.Y) / 2:0.###},{hi.X - lo.X:0.###},{hi.Y - lo.Y:0.###}]");
+            }
+            else
+            {
+                // Every side of a polygon being drawn; a rectangle's width and height.
+                int sides = _tool == PatternTool.Rectangle ? Math.Min(2, draft.Count - 1) : draft.Count - 1;
+                sb.Append(",\"draftMeasures\":[");
+                for (int i = 0; i < sides; i++)
+                {
+                    var mid = (draft[i] + draft[i + 1]) / 2;
+                    sb.Append(i == 0 ? "" : ",").Append(inv, $"{mid.X:0.###},{mid.Y:0.###},{Vector2.Distance(draft[i], draft[i + 1]):0.###}");
+                }
+                sb.Append(']');
+            }
         }
         if (_uvMode)
         {

@@ -154,8 +154,11 @@ maps what you already know to where it lives here.
 
 ## The 2D pattern view
 
-The 2D view is where garments are designed. The grid has a line every 10 cm and a stronger line every metre;
-the cursor position in centimetres is shown in the bottom-right corner.
+The 2D view is where garments are designed. The cursor position is shown in the bottom-right corner.
+
+**The grid** gets finer as you zoom in. The scale bar in the bottom-left corner is the width of one grid
+square and says how big it is: 1 mm, 1 cm, 10 cm, 1 m or 10 m in metric, and 1/8 in, 1 in, 4 in, 1 ft or 1 yd
+in imperial. Every few squares there is a stronger line (every tenth square in metric).
 
 **Moving around:** scroll to zoom about the cursor; drag with the middle or right mouse button (or
 Alt+left-drag) to pan; press **F** to frame everything.
@@ -164,9 +167,25 @@ Alt+left-drag) to pan; press **F** to frame everything.
 
 New pieces go into the active garment. If there is none, one is created.
 
-- **Rectangle** and **Ellipse**: drag from one corner to the opposite corner.
+- **Rectangle** and **Ellipse**: drag from one corner to the opposite corner. Hold **Shift** for a square or
+  a circle.
 - **Polygon**: click each corner in turn. Finish by clicking the first corner again, double-clicking, or
-  pressing **Enter**. **Esc** abandons the shape.
+  pressing **Enter**. **Esc** abandons the shape. Hold **Shift** to constrain the side you are placing: its
+  angle snaps to 15° steps and its length to a whole centimetre (or quarter inch). Shift applies side by
+  side, so you can hold it for one side and let go for the next.
+
+While you draw, each side shows its length; a rectangle shows its width and height and an ellipse its size
+across. Shift can be pressed or released in the middle of a drag.
+
+### Measuring edges
+
+![The hem of the front piece clicked, showing its length, and the scale bar in the corner](images/edge-length.png)
+
+Click an edge with the **Select** or **Edit Points** tool to see how long it is, straight or curved, in the
+units chosen in Preferences. Clicking a little outside the piece is close enough. The label follows the edge
+while you bend it, and dragging a point shows the two edges that meet there. With the **Sew** tool the edge
+under the cursor and the first edge you picked show their lengths, and a selected seam shows both of its
+edges, which makes it easy to see whether the two sides match.
 
 A new piece takes the material and fabric of the garment's first piece, and is placed in front of the avatar's
 chest in 3D.
@@ -618,6 +637,7 @@ starting Seamstress with `--cpu` or `--gpu`.
 | --- | --- | --- |
 | Left button | The current tool | Drag to orbit; click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it |
 | Ctrl or Shift + click | Add to the selection | Add to the selection |
+| Shift while drawing | Square, circle, or a snapped polygon side | — |
 | Shift + drag | — | Pan |
 | Middle or right drag | Pan | Pan |
 | Alt + left drag | Pan | — |

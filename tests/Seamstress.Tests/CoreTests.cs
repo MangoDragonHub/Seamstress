@@ -330,6 +330,74 @@ public class DocumentTests
     }
 
     [Fact]
+    public void ShiftKeepsDrawnShapesInProportion()
+    {
+        var ws = new Workspace();
+        var editor = new PatternEditor(ws) { Constrain = true };
+
+        // A rectangle dragged 30 × 12 becomes a 30 × 30 square, growing the way the drag goes.
+        editor.Tool = PatternTool.Rectangle;
+        editor.PointerDown(new Vector2(10, 10), 1, false);
+        editor.PointerMove(new Vector2(40, -2), 1);
+        editor.PointerUp(new Vector2(40, -2));
+        var square = ws.Document.Garments[0].Pieces[0];
+        var world = square.Points.Select(p => p.Position + square.Origin).ToList();
+        Assert.Equal(10f, world.Min(p => p.X), 0.001f);
+        Assert.Equal(40f, world.Max(p => p.X), 0.001f);
+        Assert.Equal(-20f, world.Min(p => p.Y), 0.001f);
+        Assert.Equal(10f, world.Max(p => p.Y), 0.001f);
+
+        // An ellipse becomes a circle.
+        editor.Tool = PatternTool.Ellipse;
+        editor.PointerDown(new Vector2(100, 0), 1, false);
+        editor.PointerMove(new Vector2(120, 50), 1);
+        Assert.Contains("\"draftSize\":[125,25,50,50]", editor.SceneJson(2048));
+        editor.PointerUp(new Vector2(120, 50));
+
+        // Each polygon side snaps on its own: angle to 15° steps, length to whole centimetres.
+        editor.Tool = PatternTool.Polygon;
+        editor.PointerDown(new Vector2(200, 0), 1, false);
+        editor.PointerDown(new Vector2(230.4f, 1.5f), 1, false);    // nearly horizontal, 30.4 long -> 30 along X
+        editor.PointerDown(new Vector2(231, 20.3f), 1, false);      // nearly vertical -> 20 straight up
+        editor.Constrain = false;
+        editor.PointerDown(new Vector2(203.3f, 17.7f), 1, false);   // free again
+        editor.Confirm();
+        var polygon = ws.Document.Garments[0].Pieces[2];
+        var corners = polygon.Points.Select(p => p.Position + polygon.Origin).ToList();
+        Assert.Equal(4, corners.Count);
+        Assert.Contains(corners, c => Vector2.Distance(c, new Vector2(230, 0)) < 1e-3f);
+        Assert.Contains(corners, c => Vector2.Distance(c, new Vector2(230, 20)) < 1e-3f);
+        Assert.Contains(corners, c => Vector2.Distance(c, new Vector2(203.3f, 17.7f)) < 1e-3f);
+    }
+
+    [Fact]
+    public void ClickingAnEdgeReportsItsLength()
+    {
+        var ws = new Workspace();
+        var editor = new PatternEditor(ws);
+        editor.Tool = PatternTool.Rectangle;
+        editor.PointerDown(new Vector2(0, 0), 1, false);
+        editor.PointerMove(new Vector2(30, 40), 1);
+        Assert.Contains("\"draftMeasures\":[15,0,30,30,20,40]", editor.SceneJson(2048));
+        editor.PointerUp(new Vector2(30, 40));
+
+        editor.Tool = PatternTool.Select;
+        Assert.Contains("\"measures\":[]", editor.SceneJson(2048));
+        editor.PointerDown(new Vector2(30.5f, 20), 1, false);   // just outside the right-hand edge
+        editor.PointerUp(new Vector2(30.5f, 20));
+        Assert.Contains("\"measures\":[30,20,40,-1,0]", editor.SceneJson(2048));
+        editor.PointerDown(new Vector2(15, 20), 1, false);      // the middle of the piece
+        editor.PointerUp(new Vector2(15, 20));
+        Assert.Contains("\"measures\":[]", editor.SceneJson(2048));
+
+        // Dragging a corner shows the two edges that meet there.
+        editor.Tool = PatternTool.EditPoints;
+        editor.PointerDown(new Vector2(30, 40), 1, false);
+        editor.PointerUp(new Vector2(30, 40));
+        Assert.Contains("\"measures\":[30,20,40,-1,0,15,40,30,0,-1]", editor.SceneJson(2048));
+    }
+
+    [Fact]
     public void SewToolCreatesSeamBetweenClickedEdges()
     {
         var ws = new Workspace();

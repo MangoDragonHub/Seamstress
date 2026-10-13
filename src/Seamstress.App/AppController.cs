@@ -166,6 +166,10 @@ public partial class AppController : INotifyPropertyChanged
         }
     }
     public string Renderer => Startup.RendererDescription;
+
+    /// <summary>The application version from Directory.Build.props, without the source revision the SDK appends.</summary>
+    public string Version { get; } = (System.Reflection.CustomAttributeExtensions
+        .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(AppController).Assembly)?.InformationalVersion ?? "").Split('+')[0];
     public string StartupScreenshot => Startup.Screenshot ?? "";
     public string StartupView => Startup.View;
     public bool StartupSmoke => Startup.Smoke;
@@ -203,6 +207,21 @@ public partial class AppController : INotifyPropertyChanged
     // ---------------------------------------------------------------- 2D viewport
 
     public string PatternScene() => _editor.SceneJson(_settings.TextureResolution);
+
+    /// <summary>Shift is held in the 2D view: the drawing tools keep their proportions (see PatternEditor.Constrain).</summary>
+    public bool Constrain
+    {
+        get => _editor.Constrain;
+        set
+        {
+            if (_editor.Constrain == value)
+                return;
+            // Constrained polygon sides come out as round numbers in the units being shown: 1 cm or 1/4 in.
+            _editor.LengthStep = Imperial ? 0.635f : 1f;
+            _editor.Constrain = value;
+            Notify();
+        }
+    }
 
     public void PointerDown(double x, double y, double tolerance, bool additive)
         => _editor.PointerDown(new Vector2((float)x, (float)y), (float)tolerance, additive);

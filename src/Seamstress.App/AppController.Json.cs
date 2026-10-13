@@ -215,6 +215,13 @@ public partial class AppController
         _editor.UvMode = options.UvMode;
         if (options.SelectFirst && _workspace.Document.AllPieces().FirstOrDefault() is { } firstPiece)
             _workspace.SelectPiece(firstPiece.Id);
+        if (options.View.Contains("measure") && _workspace.Document.AllPieces().FirstOrDefault() is { } measured)
+        {
+            // For documentation screenshots: click the middle of the first piece's first edge.
+            var middle = Seamstress.Core.Geometry.Outline.SampleEdge(measured, 0, 2)[1] + measured.Origin;
+            _editor.PointerDown(middle, 0.5f, false);
+            _editor.PointerUp(middle);
+        }
         if (options.SelectPiece != null)
         {
             // A piece, group or garment by name; "seam" selects the first seam.

@@ -116,6 +116,19 @@ QtObject {
         check("uv mode", scene().mode === "uv" && scene().pieces.length === 3)
         App.uvMode = false
 
+        // Shift draws a square, and the sides are measured while drawing.
+        App.tool = "Rectangle"
+        App.constrain = true
+        App.pointerDown(200, 0, 1, false)
+        App.pointerMove(230, 12, 1)
+        const sides = scene().draftMeasures
+        check("shift draws a square", sides && sides.length === 6 && Math.abs(sides[2] - 30) < 0.01 && Math.abs(sides[5] - 30) < 0.01)
+        App.constrain = false
+        check("releasing shift frees the shape", Math.abs(scene().draftMeasures[5] - 12) < 0.01)
+        App.cancelTool()
+        App.tool = "Select"
+        check("version reported", /^\d+\.\d+\.\d+/.test(App.version))
+
         // Templates, a second garment and per-garment simulation.
         App.addTemplate("Skirt")
         rows = JSON.parse(App.layers())
