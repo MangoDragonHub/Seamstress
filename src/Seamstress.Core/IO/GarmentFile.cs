@@ -55,6 +55,13 @@ public static class GarmentFile
             if (doc.Avatar.Path != null)
                 w.WriteString("path", doc.Avatar.Path);
             w.WriteNumber("scale", doc.Avatar.Scale);
+            if (doc.Avatar.Kind == AvatarKind.MakeHuman)
+            {
+                // MakeHuman body shape: 0 to 1 each, 0.5 is MakeHuman's default; gender 0 is female, 1 is male.
+                w.WritePropertyName("shape");
+                w.WriteRawValue($"{{ \"gender\": {N(doc.Avatar.Gender)}, \"age\": {N(doc.Avatar.Age)}, \"muscle\": {N(doc.Avatar.Muscle)}, "
+                    + $"\"weight\": {N(doc.Avatar.Weight)}, \"height\": {N(doc.Avatar.Height)}, \"proportions\": {N(doc.Avatar.Proportions)} }}");
+            }
             w.WriteEndObject();
 
             w.WriteStartArray("materials");
@@ -222,6 +229,15 @@ public static class GarmentFile
                 doc.Avatar.Kind = kind;
             doc.Avatar.Path = Str(avatar, "path");
             doc.Avatar.Scale = Num(avatar, "scale", 1f);
+            if (avatar.TryGetProperty("shape", out var shape) && shape.ValueKind == JsonValueKind.Object)
+            {
+                doc.Avatar.Gender = Math.Clamp(Num(shape, "gender", 0.5f), 0, 1);
+                doc.Avatar.Age = Math.Clamp(Num(shape, "age", 0.5f), 0, 1);
+                doc.Avatar.Muscle = Math.Clamp(Num(shape, "muscle", 0.5f), 0, 1);
+                doc.Avatar.Weight = Math.Clamp(Num(shape, "weight", 0.5f), 0, 1);
+                doc.Avatar.Height = Math.Clamp(Num(shape, "height", 0.5f), 0, 1);
+                doc.Avatar.Proportions = Math.Clamp(Num(shape, "proportions", 0.5f), 0, 1);
+            }
         }
         foreach (var m in Items(root, "materials"))
         {

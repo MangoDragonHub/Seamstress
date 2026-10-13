@@ -74,9 +74,15 @@ public sealed class Avatar
     }
 
     /// <summary>Loads the MakeHuman base mesh (hm08) so garments can be fitted and sent back to MakeHuman.</summary>
-    public static Avatar FromMakeHumanBase(string baseObjPath)
+    /// <param name="shape">Body shape sliders; null keeps MakeHuman's neutral default.</param>
+    public static Avatar FromMakeHumanBase(string baseObjPath, Model.AvatarSettings? shape = null)
     {
         var obj = ObjFile.Load(baseObjPath);
+        // The file itself is MakeHuman's average woman. MakeHuman's targets turn it into the requested body; when
+        // they are not installed next to the mesh, the unmodified mesh is used.
+        int targets = MakeHumanShape.TargetsFolderFor(baseObjPath) is { } folder
+            ? MakeHumanShape.Apply(obj.Positions, folder, shape ?? new Model.AvatarSettings())
+            : 0;
         // base.obj also contains joint markers and clothing helpers; only the body is a real surface.
         bool IsBody(string group) => !group.StartsWith("joint-", StringComparison.Ordinal) && !group.StartsWith("helper-", StringComparison.Ordinal);
         var body = Ground(obj.ToTriMesh(IsBody, MakeHumanBase.UnitsToMetres), out var offset);
@@ -86,6 +92,7 @@ public sealed class Avatar
             Vertices = obj.Positions,
             BodyTriangles = obj.Triangulate(IsBody),
             Offset = offset,
+            Shaped = targets > 0,
         };
         return new Avatar { Name = "MakeHuman", Mesh = body, Sdf = SdfGrid.FromMesh(body), MakeHuman = info };
     }
@@ -117,6 +124,9 @@ public sealed class MakeHumanBase
 
     /// <summary>Translation (metres) applied after scaling to stand the avatar on the ground.</summary>
     public required Vector3 Offset { get; init; }
+
+    /// <summary>False when MakeHuman's shape targets were not found, so the body is the unmodified base mesh.</summary>
+    public bool Shaped { get; init; }
 
     public Vector3 ToMakeHuman(Vector3 metres) => (metres - Offset) / UnitsToMetres;
 }

@@ -265,12 +265,13 @@ public sealed class Workspace
         return added;
     }
 
-    public Garment AddTemplate(string template)
+    /// <param name="bodyHeight">Height of the current avatar in metres, so the pieces start at the right level.</param>
+    public Garment AddTemplate(string template, float bodyHeight = Templates.ReferenceBodyHeight)
     {
         Garment? added = null;
         History.Execute($"Add {template}", doc =>
         {
-            added = Templates.Create(template, doc);
+            added = Templates.Create(template, doc, bodyHeight);
             doc.Garments.Add(added);
         });
         SelectLayer(added!.Id);
@@ -848,6 +849,36 @@ public sealed class Workspace
             doc.Avatar.Kind = kind;
             doc.Avatar.Path = path;
             doc.Avatar.Scale = scale;
+        });
+    }
+
+    /// <summary>Sets one of the MakeHuman body sliders ("gender", "age", "muscle", "weight", "height", "proportions").</summary>
+    public void SetAvatarShape(string key, float value)
+    {
+        if (float.IsNaN(value))
+            return;
+        value = Math.Clamp(value, 0, 1);
+        History.Execute("Change avatar body", doc =>
+        {
+            var a = doc.Avatar;
+            switch (key)
+            {
+                case "gender": a.Gender = value; break;
+                case "age": a.Age = value; break;
+                case "muscle": a.Muscle = value; break;
+                case "weight": a.Weight = value; break;
+                case "height": a.Height = value; break;
+                case "proportions": a.Proportions = value; break;
+            }
+        }, "avatar-shape:" + key);
+    }
+
+    public void ResetAvatarShape()
+    {
+        History.Execute("Reset avatar body", doc =>
+        {
+            var a = doc.Avatar;
+            a.Gender = a.Age = a.Muscle = a.Weight = a.Height = a.Proportions = 0.5f;
         });
     }
 

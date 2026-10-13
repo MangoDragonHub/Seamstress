@@ -18,6 +18,10 @@ internal sealed class StartupOptions
     public string? Avatar { get; set; }
     public bool Smoke { get; set; }
     public bool Quads { get; set; }
+    public float? Gender { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
+    public string? SelectPiece { get; set; }
     public bool AllowLaunch { get; set; } = true;
     public string RendererDescription { get; set; } = "GPU";
 
@@ -106,6 +110,21 @@ public static class Program
                 case "--view": options.View = Next(); break;
                 case "--avatar": options.Avatar = Next(); break;
                 case "--quads": options.Quads = true; break;
+                case "--gender":
+                    if (float.TryParse(Next(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float g))
+                        options.Gender = g;
+                    break;
+                case "--select": options.SelectPiece = Next(); break;
+                case "--size":
+                    {
+                        var parts = Next().Split('x');
+                        if (parts.Length == 2 && int.TryParse(parts[0], out int w) && int.TryParse(parts[1], out int h))
+                        {
+                            options.Width = w;
+                            options.Height = h;
+                        }
+                        break;
+                    }
                 case "--smoke": options.Smoke = true; options.AllowLaunch = false; break;
                 case "--screenshot": options.Screenshot = Path.GetFullPath(Next()); options.AllowLaunch = false; break;
                 case "--help":

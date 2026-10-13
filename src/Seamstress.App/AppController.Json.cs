@@ -169,8 +169,23 @@ public partial class AppController
         var options = Startup;
         if (options.File != null)
             Open(options.File);
+        if (options.Gender is { } gender)
+        {
+            _workspace.Document.Avatar.Kind = AvatarKind.MakeHuman;
+            _workspace.Document.Avatar.Gender = gender;
+        }
+        if (options.Avatar != null && Enum.TryParse<AvatarKind>(options.Avatar, true, out var kind))
+            _workspace.Document.Avatar.Kind = kind;
+        if (options.SimulateFrames > 0)
+        {
+            // Startup simulation runs before the window exists, so the avatar is built right here.
+            _avatar = _workspace.Document.Avatar.Kind == AvatarKind.MakeHuman
+                ? Seamstress.Core.Simulation.Avatar.FromMakeHumanBase(_settings.MakeHumanBaseMesh, _workspace.Document.Avatar)
+                : Seamstress.Core.Simulation.Avatar.CreateMannequin();
+            _avatarKey = AvatarKeyFor(_workspace.Document.Avatar);
+        }
         foreach (string template in options.Templates)
-            _workspace.AddTemplate(template);
+            _workspace.AddTemplate(template, _avatar?.Mesh.Bounds().Max.Y ?? Templates.ReferenceBodyHeight);
         if (options.Quads)
         {
             foreach (var garment in _workspace.Document.Garments)
@@ -178,25 +193,26 @@ public partial class AppController
         }
         if (options.Templates.Count > 0)
             _workspace.History.MarkSaved();
-        if (options.SimulateFrames > 0)
+        if (options.SimulateFrames > 0 && _simulation.Start(true) == null)
         {
-            // Startup simulation runs before the window exists, so the avatar is built right here.
-            if (options.Avatar != null && Enum.TryParse<AvatarKind>(options.Avatar, true, out var kind))
-                _workspace.Document.Avatar.Kind = kind;
-            _avatar = _workspace.Document.Avatar.Kind == AvatarKind.MakeHuman
-                ? Seamstress.Core.Simulation.Avatar.FromMakeHumanBase(_settings.MakeHumanBaseMesh)
-                : Seamstress.Core.Simulation.Avatar.CreateMannequin();
-            _avatarKey = AvatarKeyFor(_workspace.Document.Avatar);
-            if (_simulation.Start(true) == null)
-            {
-                _simulation.RunFrames(options.SimulateFrames);
-                _simulation.Stop();
-            }
+            _simulation.RunFrames(options.SimulateFrames);
+            _simulation.Stop();
         }
         if (options.Tool != null && Enum.TryParse<PatternTool>(options.Tool, true, out var tool))
             _editor.Tool = tool;
         _editor.UvMode = options.UvMode;
         if (options.SelectFirst && _workspace.Document.AllPieces().FirstOrDefault() is { } firstPiece)
             _workspace.SelectPiece(firstPiece.Id);
+        if (options.SelectPiece != null)
+        {
+            // A piece, group or garment by name; "seam" selects the first seam.
+            var doc = _workspace.Document;
+            if (options.SelectPiece == "seam" && doc.Garments.SelectMany(g => g.Seams).FirstOrDefault() is { } seam)
+                _workspace.SelectSeam(seam.Id);
+            else if (doc.AllPieces().FirstOrDefault(p => p.Name == options.SelectPiece) is { } named)
+                _workspace.SelectPiece(named.Id);
+            else if (doc.Garments.FirstOrDefault(g => g.Name == options.SelectPiece) is { } garment)
+                _workspace.SelectLayer(garment.Id);
+        }
     }
 }

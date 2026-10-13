@@ -19,6 +19,13 @@ Pane {
         function onSelectionRevisionChanged() { Qt.callLater(root.refresh) }
     }
 
+    // "--view propsbottom" (used when capturing documentation screenshots) starts scrolled to the end.
+    Timer {
+        interval: 2000
+        running: App.startupView.indexOf("propsbottom") >= 0
+        onTriggered: scroll.ScrollBar.vertical.position = 1 - scroll.ScrollBar.vertical.size
+    }
+
     component Section: ColumnLayout {
         id: section
         property string title: ""

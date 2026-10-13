@@ -144,6 +144,10 @@ QtObject {
         App.newDocument()
         check("reopen", App.open(base + ".garment.json") && scene().pieces.length === 5)
         check("viewport lists the pieces", JSON.parse(App.viewportModels()).models.length === 5)
+        App.setAvatarShape("gender", 0.9)
+        check("avatar body setting stored", Math.abs(JSON.parse(App.avatarShape()).gender - 0.9) < 1e-6)
+        App.resetAvatarShape()
+        check("avatar body reset", JSON.parse(App.avatarShape()).gender === 0.5)
         App.log(failures === 0 ? "smoke test passed" : "smoke test FAILED: " + failures)
     }
 }

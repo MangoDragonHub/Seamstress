@@ -360,5 +360,14 @@ public sealed class AvatarSettings
     /// <summary>Multiplier that converts custom OBJ units to metres.</summary>
     public float Scale { get; set; } = 1f;
 
+    // Body shape of the MakeHuman avatar, each 0-1 with 0.5 as MakeHuman's default, matching the sliders on
+    // MakeHuman's Main modelling tab. Gender runs from female (0) to male (1).
+    public float Gender { get; set; } = 0.5f;
+    public float Age { get; set; } = 0.5f;
+    public float Muscle { get; set; } = 0.5f;
+    public float Weight { get; set; } = 0.5f;
+    public float Height { get; set; } = 0.5f;
+    public float Proportions { get; set; } = 0.5f;
+
     public AvatarSettings Clone() => (AvatarSettings)MemberwiseClone();
 }

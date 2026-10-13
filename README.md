@@ -4,6 +4,9 @@ A 3D garment creation tool with cloth simulation: draw flat pattern pieces, sew 
 them on an avatar. Written in C#, with a Qt Quick interface through
 [Qt Bridge for C#](https://github.com/qt/qtbridge-csharp).
 
+**[User guide](docs/USER_GUIDE.md)** — a walk-through with screenshots, including notes for people coming from
+Marvelous Designer.
+
 ## What it does
 
 - **2D pattern view** – draw pieces (polygon, rectangle, ellipse), move them, edit points, curve edges, and
@@ -124,7 +127,8 @@ the finished garment stays put and the new one drapes over it.
 
 To make clothes for MakeHuman characters:
 
-1. **Avatar ▸ MakeHuman Base Mesh** — garments are fitted to this body.
+1. **Avatar ▸ MakeHuman Base Mesh** — garments are fitted to this body. **MakeHuman Body Shape…** changes its
+   gender, age, muscle, weight, height and proportions with MakeHuman's own shape data.
 2. Build and simulate the garment.
 3. **File ▸ Export ▸ Send to MakeHuman** writes `<name>.mhclo`, `.obj` and `.mhmat` into
    `<user data>/data/clothes/<name>/`. Every vertex is bound to the base mesh, so the garment follows the

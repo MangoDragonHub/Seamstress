@@ -404,4 +404,80 @@ public class SimulationTests : IClassFixture<AvatarFixture>
         Assert.True(without > 20, "the scenario must actually fold the cloth onto itself");
         Assert.True(with <= without / 10, $"collision should keep the layers apart ({with} vs {without})");
     }
+
+    [Fact]
+    public void MakeHumanBodyFollowsTheShapeSliders()
+    {
+        var settings = new Seamstress.Core.AppSettings();
+        settings.DetectMakeHuman();
+        if (!File.Exists(settings.MakeHumanBaseMesh) || MakeHumanShape.TargetsFolderFor(settings.MakeHumanBaseMesh) == null)
+            return; // MakeHuman (with its targets) is not installed on this machine
+
+        (float Height, float Shoulders, float Chest) Measure(AvatarSettings shape)
+        {
+            var avatar = Avatar.FromMakeHumanBase(settings.MakeHumanBaseMesh, shape);
+            Assert.True(avatar.MakeHuman!.Shaped);
+            var (min, max) = avatar.Mesh.Bounds();
+            float height = max.Y - min.Y;
+            // Width just below the shoulders (arms hang out to the sides lower down), and chest depth.
+            float shoulders = 0, front = float.MinValue, back = float.MaxValue;
+            foreach (var p in avatar.Mesh.Positions)
+            {
+                if (p.Y > height * 0.80f && p.Y < height * 0.83f)
+                    shoulders = MathF.Max(shoulders, MathF.Abs(p.X));
+                if (p.Y > height * 0.72f && p.Y < height * 0.76f && MathF.Abs(p.X) < 0.12f)
+                {
+                    front = MathF.Max(front, p.Z);
+                    back = MathF.Min(back, p.Z);
+                }
+            }
+            return (height, shoulders * 2, front - back);
+        }
+
+        var neutral = Measure(new AvatarSettings());
+        var female = Measure(new AvatarSettings { Gender = 0 });
+        var male = Measure(new AvatarSettings { Gender = 1 });
+        _output.WriteLine($"neutral {neutral}, female {female}, male {male}");
+        // MakeHuman reports 165.94 cm for its default character.
+        Assert.InRange(neutral.Height, 1.654f, 1.665f);
+        Assert.True(male.Height > neutral.Height && neutral.Height > female.Height);
+        Assert.True(male.Shoulders > female.Shoulders + 0.02f, "male shoulders are broader");
+        Assert.InRange(neutral.Shoulders, female.Shoulders, male.Shoulders);
+
+        var heavy = Measure(new AvatarSettings { Weight = 1 });
+        var tall = Measure(new AvatarSettings { Height = 1 });
+        _output.WriteLine($"heavy {heavy}, tall {tall}");
+        Assert.True(heavy.Chest > neutral.Chest + 0.005f, "more weight deepens the torso");
+        Assert.True(tall.Height > neutral.Height + 0.03f);
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(1f)]
+    public void TemplatesFitFemaleAndMaleMakeHumanBodies(float gender)
+    {
+        var settings = new Seamstress.Core.AppSettings();
+        settings.DetectMakeHuman();
+        if (!File.Exists(settings.MakeHumanBaseMesh) || MakeHumanShape.TargetsFolderFor(settings.MakeHumanBaseMesh) == null)
+            return; // MakeHuman (with its targets) is not installed on this machine
+        var avatar = Avatar.FromMakeHumanBase(settings.MakeHumanBaseMesh, new AvatarSettings { Gender = gender });
+        float height = avatar.Mesh.Bounds().Max.Y;
+        foreach (string template in new[] { "T-Shirt", "Skirt" })
+        {
+            var ws = new Workspace();
+            ws.AddTemplate(template, height);
+            var sim = new SimulationController(ws, () => avatar);
+            sim.Start(false);
+            sim.RunFrames(360);
+            sim.Stop();
+            var garment = ws.Document.Garments[0];
+            var mesh = ws.MeshFor(garment);
+            var pos = mesh.Pieces.Select(m => Mesher.CurrentPositions(garment.FindPiece(m.PieceId)!, m)).ToList();
+            var gaps = mesh.Stitches.Select(s => Vector3.Distance(pos[s.PieceA][s.VertexA], pos[s.PieceB][s.VertexB])).OrderBy(g => g).ToList();
+            float lowest = pos.Min(p => p.Min(v => v.Y));
+            _output.WriteLine($"gender {gender} ({height:0.00} m) {template}: 90% of stitches within {gaps[(int)(gaps.Count * 0.9f)] * 100:0.00} cm, worst {gaps[^1] * 100:0.0} cm, lowest {lowest:0.00} m");
+            Assert.True(gaps[(int)(gaps.Count * 0.9f)] < 0.005f, "seams should close");
+            Assert.True(lowest > 0.2f, "the garment should stay on the body");
+        }
+    }
 }

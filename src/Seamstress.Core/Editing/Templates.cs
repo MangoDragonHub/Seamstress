@@ -11,14 +11,19 @@ public static class Templates
     /// <summary>Both the mannequin's and the MakeHuman base mesh's torso sit slightly forward of Z = 0.</summary>
     private const float BodyCentreZ = 0.045f;
 
-    public static Garment Create(string template, Document document)
+    /// <summary>Height of the body the placements below were worked out on (the mannequin / neutral MakeHuman).</summary>
+    public const float ReferenceBodyHeight = 1.66f;
+
+    /// <param name="bodyHeight">Height of the avatar in metres; pieces are placed at its shoulders, arms and hips.</param>
+    public static Garment Create(string template, Document document, float bodyHeight = ReferenceBodyHeight)
     {
+        float scale = Math.Clamp(bodyHeight / ReferenceBodyHeight, 0.4f, 1.6f);
         var garment = template switch
         {
-            "T-Shirt" => Top(document, sleeves: true, length: 62),
-            "Tank Top" => Top(document, sleeves: false, length: 62),
-            "Dress" => Top(document, sleeves: false, length: 100),
-            "Skirt" => Skirt(document),
+            "T-Shirt" => Top(document, sleeves: true, length: 62, scale),
+            "Tank Top" => Top(document, sleeves: false, length: 62, scale),
+            "Dress" => Top(document, sleeves: false, length: 100, scale),
+            "Skirt" => Skirt(document, scale),
             _ => throw new ArgumentException($"Unknown template '{template}'."),
         };
         garment.Name = document.UniqueName(template);
@@ -44,7 +49,7 @@ public static class Templates
         return top;
     }
 
-    private static Garment Top(Document document, bool sleeves, float length)
+    private static Garment Top(Document document, bool sleeves, float length, float scale)
     {
         string material = MaterialFor(document, sleeves ? "Shirt fabric" : "Top fabric", sleeves ? "#4F8FD9" : "#D9694F");
         float rowY = NextRowY(document);
@@ -72,7 +77,8 @@ public static class Templates
         var back = Body("Back", 2.5f);
         front.Origin = new Vector2(0, rowY);
         back.Origin = new Vector2(75 + 2 * flare, rowY);
-        float centreY = 1.44f - length * 0.005f;
+        // The shoulder seam starts just above the avatar's shoulders, wherever those are on this body.
+        float centreY = 1.44f * scale - length * 0.005f;
         front.Placement = new Placement { Position = new Vector3(0, centreY, BodyCentreZ + 0.22f) };
         back.Placement = new Placement { Position = new Vector3(0, centreY, BodyCentreZ - 0.22f), Rotation = new Vector3(0, 180, 0) };
         garment.Pieces.Add(front);
@@ -102,7 +108,7 @@ public static class Templates
                 // Laid over the arm with the cap towards the shoulder and wrapped so its long edges meet underneath.
                 sleeve.Placement = new Placement
                 {
-                    Position = new Vector3(sign * 0.34f, 1.31f, BodyCentreZ),
+                    Position = new Vector3(sign * 0.34f * scale, 1.31f * scale, BodyCentreZ),
                     Rotation = new Vector3(0, sign * 90, sign * 45),
                     Curvature = 150,
                 };
@@ -117,7 +123,7 @@ public static class Templates
         return garment;
     }
 
-    private static Garment Skirt(Document document)
+    private static Garment Skirt(Document document, float scale)
     {
         string material = MaterialFor(document, "Skirt fabric", "#7A5FC2");
         float rowY = NextRowY(document);
@@ -136,8 +142,9 @@ public static class Templates
         front.Origin = new Vector2(0, rowY);
         back.Origin = new Vector2(85, rowY);
         // A little closer to the body than the tops start, so a top simulated at the same time ends up over the skirt.
-        front.Placement = new Placement { Position = new Vector3(0, 0.75f, BodyCentreZ + 0.19f) };
-        back.Placement = new Placement { Position = new Vector3(0, 0.75f, BodyCentreZ - 0.19f), Rotation = new Vector3(0, 180, 0) };
+        float waistY = 1.00f * scale - 0.25f;
+        front.Placement = new Placement { Position = new Vector3(0, waistY, BodyCentreZ + 0.19f) };
+        back.Placement = new Placement { Position = new Vector3(0, waistY, BodyCentreZ - 0.19f), Rotation = new Vector3(0, 180, 0) };
         garment.Pieces.Add(front);
         garment.Pieces.Add(back);
         garment.Seams.Add(new Seam { A = new EdgeRef(front.Id, 1), B = new EdgeRef(back.Id, 3) });

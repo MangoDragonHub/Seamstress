@@ -169,6 +169,8 @@ public partial class AppController : INotifyPropertyChanged
     public string StartupScreenshot => Startup.Screenshot ?? "";
     public string StartupView => Startup.View;
     public bool StartupSmoke => Startup.Smoke;
+    public int StartupWidth => Startup.Width;
+    public int StartupHeight => Startup.Height;
 
     /// <summary>Writes a line to standard error; used by the automated UI check.</summary>
     public void Log(string message) => Console.Error.WriteLine(message);
@@ -262,7 +264,10 @@ public partial class AppController : INotifyPropertyChanged
             {
                 _avatar = task.Result;
                 _avatarKey = _avatarTaskKey;
-                StatusText = _avatar == null ? "No avatar" : $"Avatar ready: {_avatar.Name}";
+                StatusText = _avatar == null ? "No avatar"
+                    : _avatar.MakeHuman is { Shaped: false }
+                        ? "Avatar ready: MakeHuman base mesh as it is on disk (MakeHuman's targets folder was not found next to it, so body shape cannot be changed)"
+                        : $"Avatar ready: {_avatar.Name}";
             }
             else
             {
@@ -294,7 +299,7 @@ public partial class AppController : INotifyPropertyChanged
     {
         AvatarKind.None => "none",
         AvatarKind.Mannequin => "mannequin",
-        AvatarKind.MakeHuman => "makehuman|" + _settings.MakeHumanBaseMesh,
+        AvatarKind.MakeHuman => $"makehuman|{_settings.MakeHumanBaseMesh}|{a.Gender}|{a.Age}|{a.Muscle}|{a.Weight}|{a.Height}|{a.Proportions}",
         _ => $"obj|{a.Path}|{a.Scale}",
     };
 
@@ -314,13 +319,30 @@ public partial class AppController : INotifyPropertyChanged
             AvatarKind.None => null,
             AvatarKind.Mannequin => Avatar.CreateMannequin(),
             AvatarKind.MakeHuman => File.Exists(baseMesh)
-                ? Avatar.FromMakeHumanBase(baseMesh)
+                ? Avatar.FromMakeHumanBase(baseMesh, wanted)
                 : throw new FileNotFoundException("The MakeHuman base mesh was not found. Set its location in Preferences."),
             _ => Avatar.FromObj(wanted.Path ?? throw new FileNotFoundException("No avatar file is set."), wanted.Scale),
         });
     }
 
     public string AvatarType => _workspace.Document.Avatar.Kind.ToString();
+
+    /// <summary>The MakeHuman body sliders (0-1 each) as JSON, plus the resulting height once the avatar is loaded.</summary>
+    public string AvatarShape()
+    {
+        var a = _workspace.Document.Avatar;
+        float height = _avatar?.MakeHuman != null ? _avatar.Mesh.Bounds().Max.Y * 100f : 0;
+        return System.Text.Json.JsonSerializer.Serialize(new
+        {
+            gender = a.Gender, age = a.Age, muscle = a.Muscle, weight = a.Weight, height = a.Height, proportions = a.Proportions,
+            heightCm = MathF.Round(height, 1),
+            shaped = _avatar?.MakeHuman?.Shaped ?? true,
+            loading = _avatarTask != null,
+        });
+    }
+
+    public void SetAvatarShape(string key, double value) => _workspace.SetAvatarShape(key, (float)value);
+    public void ResetAvatarShape() => _workspace.ResetAvatarShape();
 
     public void SetAvatar(string kind, string fileUrl, double scale)
     {
@@ -368,7 +390,7 @@ public partial class AppController : INotifyPropertyChanged
 
     public void AddTemplate(string name)
     {
-        _workspace.AddTemplate(name);
+        _workspace.AddTemplate(name, _avatar?.Mesh.Bounds().Max.Y ?? Templates.ReferenceBodyHeight);
         StatusText = $"Added {name}. Press Simulate to sew and drape it.";
     }
 

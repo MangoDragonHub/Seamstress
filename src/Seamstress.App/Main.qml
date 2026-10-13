@@ -7,8 +7,8 @@ import QtCore
 ApplicationWindow {
     id: window
     visible: true
-    width: 1500
-    height: 900
+    width: App.startupWidth > 0 ? App.startupWidth : 1500
+    height: App.startupHeight > 0 ? App.startupHeight : 900
     minimumWidth: 900
     minimumHeight: 560
     title: App.windowTitle
@@ -77,11 +77,31 @@ ApplicationWindow {
     Timer {
         interval: App.startupSmoke ? 6000 : 3500
         running: App.startupScreenshot !== ""
-        onTriggered: rootLayout.grabToImage(function(result) {
-            result.saveToFile(App.startupScreenshot)
-            window.closing = true
-            Qt.quit()
-        })
+        onTriggered: {
+            // "--view prefs|export|makehuman" captures that dialog instead of the main window.
+            const view = App.startupView
+            const dialog = view.indexOf("prefs") >= 0 ? preferences : view.indexOf("export") >= 0 ? exportOptions
+                         : view.indexOf("makehuman") >= 0 ? makeHumanDialog
+                         : view.indexOf("bodyshape") >= 0 ? bodyShape : null
+            const target = dialog ? dialog.contentItem.parent : rootLayout
+            target.grabToImage(function(result) {
+                result.saveToFile(App.startupScreenshot)
+                window.closing = true
+                Qt.quit()
+            })
+        }
+    }
+
+    Timer {
+        interval: 1500
+        running: App.startupScreenshot !== ""
+        onTriggered: {
+            const view = App.startupView
+            if (view.indexOf("prefs") >= 0) preferences.open()
+            if (view.indexOf("export") >= 0) { window.pendingExport = "fbx"; exportOptions.open() }
+            if (view.indexOf("makehuman") >= 0) makeHumanDialog.open()
+            if (view.indexOf("bodyshape") >= 0) bodyShape.open()
+        }
     }
 
     // Automated interface check ("--smoke <folder>"), loaded only when asked for.
@@ -242,6 +262,7 @@ ApplicationWindow {
                 title: "&Avatar"
                 MenuItem { text: "Mannequin"; checkable: true; checked: App.avatarType === "Mannequin"; onTriggered: App.setAvatar("Mannequin", "", 1) }
                 MenuItem { text: "MakeHuman Base Mesh"; checkable: true; checked: App.avatarType === "MakeHuman"; onTriggered: App.setAvatar("MakeHuman", "", 1) }
+                MenuItem { text: "MakeHuman Body Shape…"; enabled: App.avatarType === "MakeHuman"; onTriggered: bodyShape.open() }
                 MenuItem { text: "Load OBJ…"; checkable: true; checked: App.avatarType === "CustomObj"; onTriggered: avatarDialog.open() }
                 MenuItem { text: "None"; checkable: true; checked: App.avatarType === "None"; onTriggered: App.setAvatar("None", "", 1) }
             }
@@ -527,4 +548,5 @@ ApplicationWindow {
     }
 
     PreferencesDialog { id: preferences }
+    BodyShapeDialog { id: bodyShape }
 }
