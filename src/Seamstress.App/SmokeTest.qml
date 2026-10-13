@@ -91,13 +91,18 @@ QtObject {
         const startX = selection().piece.posX
         check("handles appear for the selection", JSON.parse(App.viewportModels()).gizmo !== undefined)
         check("handle drag begins", App.gizmoBegin())
-        App.gizmoMove(0.1, 0, 0); App.gizmoMove(0.25, 0, 0)
+        App.gizmoMove(0.1, 0, 0, false); App.gizmoMove(0.25, 0, 0, false)
         App.gizmoEnd()
         check("piece moved in 3D", Math.abs(selection().piece.posX - (startX + 0.25)) < 1e-4)
         App.gizmoBegin(); App.gizmoRotate("y", 90); App.gizmoEnd()
         check("piece rotated in 3D", Math.abs(selection().piece.rotY - 90) < 0.1)
         App.undo(); App.undo()
         check("3D moves undo", Math.abs(selection().piece.posX - startX) < 1e-4 && Math.abs(selection().piece.rotY) < 0.1)
+        // Shift on a move arrow: the piece lands on a multiple of the snap step.
+        App.gizmoBegin(); App.gizmoMove(0.133, 0, 0, true); App.gizmoEnd()
+        const step = App.snapStepCm / 100, snappedX = selection().piece.posX
+        check("3D move snaps to the grid", snappedX !== startX && Math.abs(snappedX / step - Math.round(snappedX / step)) < 1e-3)
+        App.undo()
 
         // Layers.
         App.selectAll()

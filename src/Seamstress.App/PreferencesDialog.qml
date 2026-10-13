@@ -21,12 +21,32 @@ Dialog {
         renderer.currentIndex = Math.max(0, ["auto", "gpu", "cpu"].indexOf(App.settingRenderer))
         resolution.currentIndex = Math.max(0, resolution.model.indexOf(App.settingTextureResolution))
         units.currentIndex = App.settingUnits === "imperial" ? 1 : 0
+        shownImperial = units.currentIndex === 1
+        gridSize.text = shownLength(App.gridSizeCm)
+        snapStep.text = shownLength(App.snapStepCm)
+    }
+
+    // The grid size and snap step are typed in the units chosen in this dialog and stored in centimetres.
+    property bool shownImperial: false
+    readonly property real unitCm: shownImperial ? 2.54 : 1
+    function shownLength(cm) { return String(Number((cm / unitCm).toFixed(shownImperial ? 3 : 2))) }
+    function typedCm(field) { const v = Number(field.text); return isNaN(v) ? 0 : v * unitCm }
+    function unitsChosen(imperial) {
+        // Keep the lengths the same when the units change, except that the default becomes the new default.
+        const convert = (field) => {
+            const cm = typedCm(field), wasDefault = Math.abs(cm - (shownImperial ? 10.16 : 10)) < 0.01
+            return wasDefault ? (imperial ? 10.16 : 10) : cm
+        }
+        const grid = convert(gridSize), snap = convert(snapStep)
+        shownImperial = imperial
+        gridSize.text = shownLength(grid)
+        snapStep.text = shownLength(snap)
     }
 
     onAboutToShow: load()
     onAccepted: App.savePreferences(userFolder.text, baseMesh.text, command.text,
                                     ["auto", "gpu", "cpu"][renderer.currentIndex], resolution.model[resolution.currentIndex], author.text,
-                                    units.currentIndex === 1 ? "imperial" : "metric")
+                                    units.currentIndex === 1 ? "imperial" : "metric", typedCm(gridSize), typedCm(snapStep))
 
     ColumnLayout {
         anchors.fill: parent
@@ -101,6 +121,30 @@ Dialog {
                 }
                 Label { text: "Currently using" }
                 Label { text: App.renderer; opacity: 0.75 }
+                Label { text: "Grid size" }
+                RowLayout {
+                    TextField {
+                        id: gridSize
+                        implicitWidth: 90
+                        selectByMouse: true
+                        horizontalAlignment: Text.AlignRight
+                        validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation; locale: "C" }
+                    }
+                    Label { text: root.shownImperial ? "in" : "cm"; opacity: 0.7 }
+                    Label { text: "One square of the ground grid."; opacity: 0.6; font.pixelSize: 11; Layout.leftMargin: 8 }
+                }
+                Label { text: "Snap step" }
+                RowLayout {
+                    TextField {
+                        id: snapStep
+                        implicitWidth: 90
+                        selectByMouse: true
+                        horizontalAlignment: Text.AlignRight
+                        validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation; locale: "C" }
+                    }
+                    Label { text: root.shownImperial ? "in" : "cm"; opacity: 0.7 }
+                    Label { text: "Hold Shift while dragging a move arrow to snap to this."; opacity: 0.6; font.pixelSize: 11; Layout.leftMargin: 8 }
+                }
                 Label {
                     Layout.columnSpan: 2
                     Layout.fillWidth: true
@@ -125,6 +169,7 @@ Dialog {
                     id: units
                     Layout.fillWidth: true
                     model: ["Metric (cm, m, g/m²)", "Imperial (in, oz/yd²)"]
+                    onActivated: root.unitsChosen(currentIndex === 1)
                 }
                 Label {
                     Layout.columnSpan: 2

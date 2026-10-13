@@ -88,9 +88,9 @@ Item {
             backgroundMode: SceneEnvironment.Color
             antialiasingMode: SceneEnvironment.MSAA
             antialiasingQuality: SceneEnvironment.High
-            // Ground: a 10 cm grid (4 in with imperial units) that fades with distance.
+            // Ground: a grid that fades with distance; 10 cm (4 in with imperial units) unless changed in Preferences.
             InfiniteGrid {
-                gridInterval: App.imperial ? 0.1016 : 0.1
+                gridInterval: App.gridSizeCm / 100
                 gridAxes: false
             }
         }
@@ -234,7 +234,7 @@ Item {
             return a === "x" ? Qt.vector3d(1, 0, 0) : a === "y" ? Qt.vector3d(0, 1, 0) : Qt.vector3d(0, 0, 1)
         }
 
-        function dragHandle(x, y) {
+        function dragHandle(x, y, snap) {
             const axis = axisOf(activePart)
             const origin = gizmoView.mapFrom3DScene(dragOrigin)
             if (activePart.charAt(0) === "t") {
@@ -245,7 +245,7 @@ Item {
                 if (length2 < 1e-6)
                     return
                 const amount = ((x - pressX) * sx + (y - pressY) * sy) / length2
-                App.gizmoMove(axis.x * amount, axis.y * amount, axis.z * amount)
+                App.gizmoMove(axis.x * amount, axis.y * amount, axis.z * amount, snap)
             } else {
                 // Turn by the angle the cursor sweeps around the handle centre, counting past half turns.
                 const angle = Math.atan2(y - origin.y, x - origin.x)
@@ -296,7 +296,7 @@ Item {
             lastX = e.x; lastY = e.y
             travelled += Math.abs(dx) + Math.abs(dy)
             if (mode === 3) {
-                dragHandle(e.x, e.y)
+                dragHandle(e.x, e.y, (e.modifiers & Qt.ShiftModifier) !== 0)
             } else if (mode === 4) {
                 const mx = (e.x - pressX) * pinchScale, my = (pressY - e.y) * pinchScale
                 const r = camera.right, u = camera.up
@@ -400,7 +400,7 @@ Item {
         opacity: 0.55
         font.pixelSize: 11
         text: root.pinchMode ? "Pinch: drag the cloth to pull it  ·  Drag elsewhere: orbit  ·  Shift-drag: pan  ·  Wheel: zoom"
-                            : "Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Handles: move / rotate"
+                            : "Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Handles: move / rotate  ·  Shift+arrow: snap"
     }
     Label {
         anchors { right: parent.right; bottom: parent.bottom; margins: 8 }

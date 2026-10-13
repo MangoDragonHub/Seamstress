@@ -280,6 +280,12 @@ A draped piece keeps its draped shape while you move it, and each drag is one un
 typed under **3D Arrangement** in Properties; typing a value there returns the piece to its flat shape at the
 new position. The handles are hidden while a simulation is running.
 
+**Snapping to the grid.** Hold **Shift** while dragging a move arrow and the piece jumps from one grid position
+to the next along that arrow's axis, so its position ends on a whole multiple of the snap step (10 cm unless
+you change it). Only the axis you drag is snapped; the other two stay where they were. With several pieces
+selected, their shared centre is what lands on the grid. The snap step and the size of the ground grid's
+squares are set in [Preferences](#preferences).
+
 ### Pinching the cloth
 
 When part of a garment has bunched up, caught on the body, or settled a little off, take hold of it and pull.
@@ -600,6 +606,8 @@ MakeHuman's body.
 | **Author name** | Written into exported MakeHuman assets. |
 | **Detect Automatically** | Looks for MakeHuman in the usual places and fills in the two paths. |
 | **Renderer** | *Automatic* uses the GPU and falls back to CPU rendering when no GPU driver is found or the GPU failed to start last time. *GPU* and *CPU* force one or the other. Takes effect on the next start. |
+| **Grid size** | The size of one square of the ground grid in the 3D view. 10 cm by default, 4 in with imperial units. |
+| **Snap step** | The step a piece snaps to when you hold Shift while dragging a move arrow in the 3D view. Starts the same as the grid size; set it smaller for finer steps. |
 | **Measurements** | *Metric* shows centimetres, metres, millimetres and g/m². *Imperial* shows inches, oz/yd² and feet and inches for the avatar height, and the grids change to 4 in squares with a stronger line every foot. Applies immediately. Only the interface changes: garment files and exports are the same either way. |
 | **Texture size for texel density** | The texture resolution assumed by the texel density read-outs. |
 
@@ -639,6 +647,7 @@ starting Seamstress with `--cpu` or `--gpu`.
 | Ctrl or Shift + click | Add to the selection | Add to the selection |
 | Shift while drawing | Square, circle, or a snapped polygon side | — |
 | Shift + drag | — | Pan |
+| Shift + drag a move arrow | — | Snap the piece to the grid along that axis |
 | Middle or right drag | Pan | Pan |
 | Alt + left drag | Pan | — |
 | Scroll | Zoom about the cursor | Zoom |

@@ -262,8 +262,8 @@ public partial class AppController : INotifyPropertyChanged
         return _workspace.BeginPlacementEdit();
     }
 
-    public void GizmoMove(double x, double y, double z)
-        => _workspace.ApplyPlacementEdit(new Vector3((float)x, (float)y, (float)z), Quaternion.Identity);
+    public void GizmoMove(double x, double y, double z, bool snap)
+        => _workspace.ApplyPlacementEdit(new Vector3((float)x, (float)y, (float)z), Quaternion.Identity, snap ? (float)(SnapStepCm / 100) : 0);
 
     public void GizmoRotate(string axis, double degrees)
     {
@@ -791,7 +791,14 @@ public partial class AppController : INotifyPropertyChanged
     /// <summary>True when lengths are shown in inches. "--units" overrides the saved preference for one run.</summary>
     public bool Imperial => (Startup.Units ?? _settings.Units) == "imperial";
 
-    public void SavePreferences(string userFolder, string baseMesh, string command, string renderer, int textureResolution, string author, string units)
+    /// <summary>Spacing of the 3D ground grid, in centimetres.</summary>
+    public double GridSizeCm => _settings.GridSize > 0 ? _settings.GridSize : AppSettings.DefaultGridStep(Imperial);
+
+    /// <summary>Step that Shift-dragging a move handle snaps to, in centimetres.</summary>
+    public double SnapStepCm => _settings.SnapStep > 0 ? _settings.SnapStep : AppSettings.DefaultGridStep(Imperial);
+
+    public void SavePreferences(string userFolder, string baseMesh, string command, string renderer, int textureResolution, string author, string units,
+        double gridSizeCm, double snapStepCm)
     {
         bool baseChanged = _settings.MakeHumanBaseMesh != LocalPath(baseMesh.Trim());
         _settings.MakeHumanUserFolder = LocalPath(userFolder.Trim());
@@ -801,6 +808,11 @@ public partial class AppController : INotifyPropertyChanged
         _settings.TextureResolution = Math.Clamp(textureResolution, 64, 16384);
         _settings.Author = author.Trim();
         _settings.Units = units == "imperial" ? "imperial" : "metric";
+        // A value equal to the default is stored as "default", so it follows the units if they change later.
+        double standard = AppSettings.DefaultGridStep(_settings.Units == "imperial");
+        double Chosen(double cm) => !(cm > 0) || Math.Abs(cm - standard) < 0.01 ? 0 : Math.Clamp(cm, 0.1, 1000);
+        _settings.GridSize = Chosen(gridSizeCm);
+        _settings.SnapStep = Chosen(snapStepCm);
         Startup.Units = null;
         TrySaveSettings();
         NotifySettings();
@@ -836,6 +848,8 @@ public partial class AppController : INotifyPropertyChanged
         Notify(nameof(SettingAuthor));
         Notify(nameof(SettingUnits));
         Notify(nameof(Imperial));
+        Notify(nameof(GridSizeCm));
+        Notify(nameof(SnapStepCm));
         Notify(nameof(MakeHumanLinked));
     }
 

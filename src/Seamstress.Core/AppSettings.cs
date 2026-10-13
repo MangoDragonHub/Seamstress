@@ -23,6 +23,15 @@ public sealed class AppSettings
     /// <summary>"metric" or "imperial". Only changes what the interface shows; files and exports stay metric.</summary>
     public string Units { get; set; } = "metric";
 
+    /// <summary>Spacing of the 3D ground grid in centimetres; 0 uses the default for the units (10 cm or 4 in).</summary>
+    public double GridSize { get; set; }
+
+    /// <summary>Step in centimetres that Shift-dragging a move handle snaps to; 0 uses the default for the units.</summary>
+    public double SnapStep { get; set; }
+
+    /// <summary>The grid size and snap step used until the user chooses their own.</summary>
+    public static double DefaultGridStep(bool imperial) => imperial ? 10.16 : 10;
+
     public string Author { get; set; } = "";
     public List<string> RecentFiles { get; set; } = new();
 

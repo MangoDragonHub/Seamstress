@@ -902,6 +902,7 @@ public sealed class Workspace
     private sealed record PlacementStart(Vector3 Position, Vector3 Rotation, float[]? Drape);
     private Dictionary<string, PlacementStart>? _placementStart;
     private Vector3 _placementPivot;
+    private Vector3 _placementSnapOrigin;
     private bool _placementMoved;
 
     /// <summary>Centre of a piece in 3D: where it has been draped, or else where it is arranged.</summary>
@@ -931,6 +932,8 @@ public sealed class Workspace
             return false;
         History.Begin(SelectedPieces.Count == 1 ? "Move piece in 3D" : "Move pieces in 3D");
         _placementPivot = pivot;
+        // With snapping, a single piece lands with its own position on the grid; several pieces with their centre.
+        _placementSnapOrigin = SelectedPieces.Count == 1 ? SelectedPieceObjects().First().Placement.Position : pivot;
         _placementMoved = false;
         _placementStart = SelectedPieceObjects().ToDictionary(p => p.Id, p => new PlacementStart(p.Placement.Position, p.Placement.Rotation, p.Drape));
         return true;
@@ -939,11 +942,20 @@ public sealed class Workspace
     /// <summary>
     /// Moves the pieces being dragged to "where they started, turned by <paramref name="rotation"/> about the
     /// selection centre, then shifted by <paramref name="translation"/>". A draped piece keeps its draped shape.
+    /// With a <paramref name="snapStep"/> (metres), the selection is moved to the nearest multiple of that step
+    /// along each axis it is being moved on.
     /// </summary>
-    public void ApplyPlacementEdit(Vector3 translation, Quaternion rotation)
+    public void ApplyPlacementEdit(Vector3 translation, Quaternion rotation, float snapStep = 0)
     {
         if (_placementStart == null)
             return;
+        if (snapStep > 0)
+        {
+            float Snap(float origin, float offset)
+                => offset == 0 ? 0 : MathF.Round((origin + offset) / snapStep) * snapStep - origin;
+            translation = new Vector3(Snap(_placementSnapOrigin.X, translation.X), Snap(_placementSnapOrigin.Y, translation.Y),
+                Snap(_placementSnapOrigin.Z, translation.Z));
+        }
         _placementMoved |= translation != Vector3.Zero || !rotation.IsIdentity;
         var turn = Matrix4x4.CreateFromQuaternion(rotation);
         foreach (var piece in Document.AllPieces())

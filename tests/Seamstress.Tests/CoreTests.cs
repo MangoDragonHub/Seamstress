@@ -536,6 +536,20 @@ public class DocumentTests
         var draped = Mesher.CurrentPositions(front, mesh);
         Assert.True(Vector3.Distance(draped[0], flat[0] + new Vector3(0.10f, 0.02f, 0)) < 1e-5f);
 
+        // With a snap step the piece lands on a multiple of it along the dragged axis only.
+        var beforeSnap = front.Placement.Position;
+        Assert.True(ws.BeginPlacementEdit());
+        ws.ApplyPlacementEdit(new Vector3(0.133f, 0, 0), Quaternion.Identity, 0.1f);
+        ws.EndPlacementEdit();
+        front = ws.Document.FindPiece(front.Id)!;
+        float snapped = front.Placement.Position.X;
+        Assert.Equal(MathF.Round(snapped / 0.1f) * 0.1f, snapped, 1e-5f);
+        Assert.InRange(MathF.Abs(snapped - (beforeSnap.X + 0.133f)), 0, 0.0501f);
+        Assert.Equal(beforeSnap.Y, front.Placement.Position.Y);
+        Assert.Equal(beforeSnap.Z, front.Placement.Position.Z);
+        ws.History.Undo();
+        front = ws.Document.FindPiece(front.Id)!;
+
         // Turning 90 degrees about the vertical axis: the arrangement and the drape agree afterwards.
         Assert.True(ws.BeginPlacementEdit());
         ws.ApplyPlacementEdit(Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2));
