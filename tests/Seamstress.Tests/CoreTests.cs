@@ -398,6 +398,67 @@ public class DocumentTests
     }
 
     [Fact]
+    public void TransformPointsMovesAndRotatesASelectionOfPoints()
+    {
+        var ws = new Workspace();
+        var editor = new PatternEditor(ws);
+        editor.Tool = PatternTool.Rectangle;
+        editor.PointerDown(new Vector2(0, 0), 1, false);
+        editor.PointerMove(new Vector2(40, 20), 1);
+        editor.PointerUp(new Vector2(40, 20));
+        string id = ws.Document.Garments[0].Pieces[0].Id;
+        List<Vector2> Corners()
+        {
+            var piece = ws.Document.FindPiece(id)!;
+            return piece.Points.Select(p => p.Position + piece.Origin).ToList();
+        }
+        void Drag(Vector2 from, Vector2 to, bool additive = false)
+        {
+            editor.PointerDown(from, 0.9f, additive);   // tolerance 0.9 = one pixel is 0.1 cm
+            editor.PointerMove((from + to) / 2, 0.9f);
+            editor.PointerMove(to, 0.9f);
+            editor.PointerUp(to);
+        }
+        void Near(Vector2 expected, Vector2 actual) => Assert.True(Vector2.Distance(expected, actual) < 1e-3f, $"{actual} is not {expected}");
+
+        // A box around the right-hand side selects its two corners: (40, 0) and (40, 20).
+        editor.Tool = PatternTool.TransformPoints;
+        Drag(new Vector2(35, -5), new Vector2(45, 25));
+        Assert.Equal(2, editor.SelectedPoints.Count);
+        Assert.Contains("\"pointGizmo\":[40,10,64,88]", editor.SceneJson(2048));
+        int undoBefore = CountUndo(ws);
+
+        // The X arrow moves along X only, however the cursor wanders.
+        Drag(new Vector2(43, 10), new Vector2(53, 14));
+        Near(new Vector2(50, 0), Corners()[1]);
+        Near(new Vector2(50, 20), Corners()[2]);
+        Near(new Vector2(0, 0), Corners()[0]);
+        Assert.Equal(undoBefore + 1, CountUndo(ws));
+        Assert.Equal("Move points", ws.History.UndoName);
+
+        // The ring turns the two points about their middle, (50, 10): a quarter turn lays them flat.
+        Drag(new Vector2(50 + 8.8f, 10), new Vector2(50, 10 + 8.8f));
+        Near(new Vector2(60, 10), Corners()[1]);
+        Near(new Vector2(40, 10), Corners()[2]);
+        Assert.Equal("Rotate points", ws.History.UndoName);
+        ws.History.Undo();
+        ws.History.Undo();
+        Near(new Vector2(40, 0), Corners()[1]);
+
+        // Ctrl+click adds a third point; a click on empty space clears the selection.
+        editor.PointerDown(new Vector2(0, 20), 0.9f, true);
+        editor.PointerUp(new Vector2(0, 20));
+        Assert.Equal(3, editor.SelectedPoints.Count);
+        editor.PointerDown(new Vector2(-30, -30), 0.9f, false);
+        editor.PointerUp(new Vector2(-30, -30));
+        Assert.Empty(editor.SelectedPoints);
+
+        // This tool never bends an edge: dragging one starts a selection box instead.
+        Drag(new Vector2(20, 0), new Vector2(20, 8));
+        Assert.All(ws.Document.FindPiece(id)!.Points, p => Assert.Null(p.Curve));
+    }
+
+    [Fact]
     public void SewToolCreatesSeamBetweenClickedEdges()
     {
         var ws = new Workspace();

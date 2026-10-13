@@ -65,10 +65,10 @@ outline(im, [
 save(im, "overview-annotated")
 
 # 2. Toolbar close-up with a number on every tool
-tb = load("overview").crop((0, 30, 580, 70)).resize((1160, 80), Image.LANCZOS)
-canvas = Image.new("RGB", (1160, 130), "#1e1f22"); canvas.paste(tb, (0, 0))
+tb = load("overview").crop((0, 30, 680, 70)).resize((1360, 80), Image.LANCZOS)
+canvas = Image.new("RGB", (1360, 130), "#1e1f22"); canvas.paste(tb, (0, 0))
 d = ImageDraw.Draw(canvas)
-for i, x in enumerate([36, 101, 161, 229, 298, 362, 421, 454, 517]):
+for i, x in enumerate([36, 101, 200, 280, 348, 417, 481, 540, 573, 635]):
     badge(d, x * 2, 104, i + 1, COLORS[i % len(COLORS)], 15)
 save(canvas, "toolbar")
 

@@ -222,6 +222,16 @@ public partial class AppController
             _editor.PointerDown(middle, 0.5f, false);
             _editor.PointerUp(middle);
         }
+        if (options.View.Contains("points") && _workspace.Document.AllPieces().FirstOrDefault() is { } shaped)
+        {
+            // For documentation screenshots: the Transform Points tool with the first piece's first two points chosen.
+            _editor.Tool = PatternTool.TransformPoints;
+            foreach (var point in shaped.Points.Take(2))
+            {
+                _editor.PointerDown(point.Position + shaped.Origin, 0.5f, true);
+                _editor.PointerUp(point.Position + shaped.Origin);
+            }
+        }
         if (options.SelectPiece != null)
         {
             // A piece, group or garment by name; "seam" selects the first seam.

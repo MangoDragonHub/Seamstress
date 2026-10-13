@@ -121,6 +121,22 @@ QtObject {
         check("uv mode", scene().mode === "uv" && scene().pieces.length === 3)
         App.uvMode = false
 
+        // Transform Points: box-select two corners of the first rectangle and slide them along X with the arrow.
+        App.tool = "TransformPoints"
+        const corner = scene().pieces[0].points
+        const right = Math.max(corner[0], corner[2], corner[4], corner[6]), low = Math.min(corner[1], corner[3], corner[5], corner[7])
+        const high = Math.max(corner[1], corner[3], corner[5], corner[7])
+        drag(right - 3, low - 3, right + 3, high + 3)
+        const handles = scene().pointGizmo
+        check("points box-selected", handles !== undefined && scene().pieces[0].selectedPoints.length === 2)
+        // Tolerance 1 means a pixel is 1/9 cm here, so 3 cm from the centre is on the X arrow.
+        drag(handles[0] + 3, handles[1], handles[0] + 8, handles[1] + 2)
+        const after = scene().pieces[0].points
+        check("points moved along X only", Math.abs(Math.max(after[0], after[2], after[4], after[6]) - (right + 5)) < 0.01
+              && Math.abs(Math.min(after[1], after[3], after[5], after[7]) - low) < 0.01)
+        App.undo()
+        App.tool = "Select"
+
         // Shift draws a square, and the sides are measured while drawing.
         App.tool = "Rectangle"
         App.constrain = true

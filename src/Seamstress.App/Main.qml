@@ -145,6 +145,7 @@ ApplicationWindow {
     Shortcut { sequences: ["Return", "Enter"]; onActivated: App.confirmTool() }
     Shortcut { sequence: "V"; onActivated: App.tool = "Select" }
     Shortcut { sequence: "E"; onActivated: App.tool = "EditPoints" }
+    Shortcut { sequence: "T"; onActivated: App.tool = "TransformPoints" }
     Shortcut { sequence: "S"; onActivated: App.tool = "Sew" }
     Shortcut { sequence: "P"; onActivated: App.tool = "Polygon" }
     Shortcut { sequence: "R"; onActivated: App.tool = "Rectangle" }
@@ -308,6 +309,7 @@ ApplicationWindow {
                 }
                 ToolChoice { text: "Select"; tool: "Select"; tip: "Select and move pieces (V)" }
                 ToolChoice { text: "Edit Points"; tool: "EditPoints"; tip: "Move points, curve edges, add points (E)" }
+                ToolChoice { text: "Transform Points"; tool: "TransformPoints"; tip: "Select points and move or rotate them with handles (T)" }
                 ToolChoice { text: "Sew"; tool: "Sew"; tip: "Click two edges to sew them together (S)" }
                 ToolSeparator {}
                 ToolChoice { text: "Polygon"; tool: "Polygon"; tip: "Draw a piece corner by corner (P)" }

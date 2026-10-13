@@ -96,13 +96,14 @@ The borders between the panels can be dragged to resize them.
 | --- | --- | --- | --- |
 | 1 | **Select** | V | Click a piece to select it, drag to move it in the pattern. Ctrl+click adds to the selection. Click a seam's dashed line to select the seam. |
 | 2 | **Edit Points** | E | Drag a point to move it. Drag an edge to curve it. Double-click an edge to add a point. |
-| 3 | **Sew** | S | Click one edge, then another, to sew them together. |
-| 4 | **Polygon** | P | Click to place corners; click the first corner again, double-click, or press Enter to finish. |
-| 5 | **Rectangle** | R | Drag out a rectangular piece. |
-| 6 | **Ellipse** | O | Drag out an elliptical piece. |
-| 7 | Undo | Ctrl+Z | Undo the last change. Hover to see what it will undo. |
-| 8 | Redo | Ctrl+Shift+Z | Redo. |
-| 9 | **Pattern / UV Layout** | U | Switch the 2D view between the pattern and the UV layout. |
+| 3 | **Transform Points** | T | Select one point or several, then move or rotate them with handles. Does not bend edges. |
+| 4 | **Sew** | S | Click one edge, then another, to sew them together. |
+| 5 | **Polygon** | P | Click to place corners; click the first corner again, double-click, or press Enter to finish. |
+| 6 | **Rectangle** | R | Drag out a rectangular piece. |
+| 7 | **Ellipse** | O | Drag out an elliptical piece. |
+| 8 | Undo | Ctrl+Z | Undo the last change. Hover to see what it will undo. |
+| 9 | Redo | Ctrl+Shift+Z | Redo. |
+| 10 | **Pattern / UV Layout** | U | Switch the 2D view between the pattern and the UV layout. |
 
 ---
 
@@ -120,6 +121,7 @@ maps what you already know to where it lives here.
 | Polygon, Rectangle, Ellipse tools | The same three tools, keys **P**, **R**, **O** |
 | Transform Pattern | **Select** tool (**V**): drag a piece. Rotate and mirror are in the **Edit** menu |
 | Edit Pattern (move points and lines) | **Edit Points** tool (**E**): drag a point |
+| Selecting several points and moving or rotating them | **Transform Points** tool (**T**) |
 | Edit Curvature | **Edit Points** tool: drag an edge to bend it |
 | Add Point / Split Line | **Edit Points** tool: double-click an edge |
 | Segment Sewing | **Sew** tool (**S**): click one edge, then the other |
@@ -211,6 +213,28 @@ also show a yellow handle.
 With the **Select** tool (**V**), drag pieces to lay them out. This only changes the 2D layout (and therefore
 the UVs), not the 3D placement. The **Edit** menu also has **Duplicate** (Ctrl+D), **Mirror Piece**, and
 **Rotate 90° Left / Right**. Seams stay attached to the right edges when you mirror, add or remove points.
+
+### Moving and rotating several points
+
+![Two points of the front piece selected, with the move arrows, the centre square and the rotate ring](images/transform-points.png)
+
+**Transform Points** (**T**) works on points rather than whole pieces.
+
+- **Select:** click a point; **Ctrl+click** (or Shift+click) adds or removes one; drag a box over empty space
+  to select every point inside it, across pieces. **Ctrl+A** selects every point of the active garment.
+  Click empty space to clear the selection.
+- **Move:** handles appear in the middle of the selected points. Drag the red arrow to move them left–right
+  only, the green arrow up–down only, or the white square to move them freely. You can also just drag any
+  selected point. Hold **Shift** on a free drag to keep to one axis.
+- **Rotate:** with two or more points selected, drag the blue ring to turn them about their middle. Hold
+  **Shift** for 15° steps.
+- **Delete** removes the selected points (a piece always keeps at least three).
+
+A curved edge keeps its shape when both of its ends are selected: the curve moves and turns with them. If
+only one end is selected, the curve handle stays where it is.
+
+This tool never bends an edge. To curve the edge between two points, switch back to **Edit Points** (**E**)
+and drag the edge.
 
 ---
 
@@ -622,7 +646,7 @@ starting Seamstress with `--cpu` or `--gpu`.
 
 | Key | Action |
 | --- | --- |
-| V / E / S | Select / Edit Points / Sew |
+| V / E / T / S | Select / Edit Points / Transform Points / Sew |
 | P / R / O | Polygon / Rectangle / Ellipse |
 | U | Switch the 2D view between pattern and UV layout |
 | F | Frame everything in the 2D view |
@@ -652,6 +676,7 @@ starting Seamstress with `--cpu` or `--gpu`.
 | Alt + left drag | Pan | — |
 | Scroll | Zoom about the cursor | Zoom |
 | Double-click | Finish a polygon; add a point (Edit Points) | — |
+| Drag on empty space (Transform Points) | Box-select points | — |
 
 ---
 

@@ -271,7 +271,43 @@ public partial class AppController : INotifyPropertyChanged
         _workspace.ApplyPlacementEdit(Vector3.Zero, Quaternion.CreateFromAxisAngle(direction, (float)(degrees * Math.PI / 180)));
     }
 
+    public bool GizmoBeginScale()
+    {
+        if (_simulation.IsRunning)
+            StopSimulation();
+        return _workspace.BeginPlacementEdit(_workspace.SelectedPieces.Count == 1 ? "Scale piece" : "Scale pieces");
+    }
+
+    /// <summary>Scale handles: <paramref name="axis"/> is "x", "y" or "z", or anything else to scale evenly.</summary>
+    public void GizmoScale(string axis, double factor, bool snap)
+    {
+        if (snap)
+            factor = Math.Round(factor * 10) / 10;
+        var direction = axis == "x" ? Vector3.UnitX : axis == "y" ? Vector3.UnitY : axis == "z" ? Vector3.UnitZ : Vector3.Zero;
+        _workspace.ApplyPlacementScale(direction, (float)factor);
+    }
+
     public void GizmoEnd() => _workspace.EndPlacementEdit();
+
+    /// <summary>Which handles the gizmos in both views show: "Full", "Move", "Rotate" or "Scale".</summary>
+    public string GizmoMode
+    {
+        get => _editor.GizmoMode.ToString();
+        set
+        {
+            if (!Enum.TryParse<GizmoMode>(value, out var mode) || mode == _editor.GizmoMode)
+                return;
+            _editor.GizmoMode = mode;
+            Notify();
+            StatusText = mode switch
+            {
+                Seamstress.Core.Editing.GizmoMode.Move => "Handles: move",
+                Seamstress.Core.Editing.GizmoMode.Rotate => "Handles: rotate",
+                Seamstress.Core.Editing.GizmoMode.Scale => "Handles: scale",
+                _ => "Handles: move, rotate and scale",
+            };
+        }
+    }
 
     // Pinching cloth in the 3D view. If no simulation is running, one is started for the garment that was grabbed
     // and stopped again shortly after the cloth is let go, so the whole pinch is a single undo step.
@@ -468,12 +504,19 @@ public partial class AppController : INotifyPropertyChanged
             StatusText = "Redone";
     }
 
-    public void DeleteSelection() => _workspace.DeleteSelection();
+    public void DeleteSelection()
+    {
+        // With the Transform Points tool, Delete removes the selected points rather than the piece.
+        if (!_editor.DeleteSelectedPoints())
+            _workspace.DeleteSelection();
+    }
     public void Duplicate() => _workspace.DuplicateSelection();
     public void Mirror() => _workspace.MirrorSelection();
     public void Rotate(double degrees) => _workspace.RotateSelection((float)degrees);
     public void SelectAll()
     {
+        if (_editor.SelectAllPoints())
+            return;
         if (_workspace.ActiveGarment is { } garment)
             _workspace.SelectLayer(garment.Id);
     }

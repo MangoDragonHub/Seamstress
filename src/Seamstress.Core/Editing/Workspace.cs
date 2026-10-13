@@ -685,6 +685,37 @@ public sealed class Workspace
         SelectionChanged?.Invoke();
     }
 
+    /// <summary>Removes several points as one undo step. Every piece keeps at least three points.</summary>
+    public void DeletePoints(IReadOnlyCollection<(string PieceId, int Index)> points)
+    {
+        if (points.Count == 0)
+            return;
+        History.Execute(points.Count == 1 ? "Delete point" : "Delete points", doc =>
+        {
+            // Highest index first, so the indices still to be removed stay valid.
+            foreach (var (pieceId, index) in points.Distinct().OrderByDescending(p => p.Index))
+            {
+                var garment = doc.GarmentOfPiece(pieceId);
+                var piece = garment?.FindPiece(pieceId);
+                if (piece == null || piece.Points.Count <= 3 || index < 0 || index >= piece.Points.Count)
+                    continue;
+                int n = piece.Points.Count;
+                piece.Points[(index - 1 + n) % n].Curve = null;
+                piece.Points.RemoveAt(index);
+                garment!.Seams.RemoveAll(s => s.A.Matches(pieceId, index) || s.B.Matches(pieceId, index));
+                foreach (var seam in garment.Seams)
+                {
+                    if (seam.A.PieceId == pieceId && seam.A.Edge > index)
+                        seam.A.Edge--;
+                    if (seam.B.PieceId == pieceId && seam.B.Edge > index)
+                        seam.B.Edge--;
+                }
+            }
+        });
+        SelectedPoint = null;
+        SelectionChanged?.Invoke();
+    }
+
     public void StraightenEdge(string pieceId, int edge)
     {
         History.Execute("Straighten edge", doc =>
@@ -899,7 +930,7 @@ public sealed class Workspace
 
     // ---------------------------------------------------------------- moving pieces in 3D
 
-    private sealed record PlacementStart(Vector3 Position, Vector3 Rotation, float[]? Drape);
+    private sealed record PlacementStart(Vector3 Position, Vector3 Rotation, float[]? Drape, Vector2 Centre, (Vector2 Position, Vector2? Curve)[] Points);
     private Dictionary<string, PlacementStart>? _placementStart;
     private Vector3 _placementPivot;
     private Vector3 _placementSnapOrigin;
@@ -926,16 +957,21 @@ public sealed class Workspace
     }
 
     /// <summary>Starts dragging the selected pieces in the 3D view.</summary>
-    public bool BeginPlacementEdit()
+    public bool BeginPlacementEdit(string? name = null)
     {
         if (SelectionCentre() is not { } pivot)
             return false;
-        History.Begin(SelectedPieces.Count == 1 ? "Move piece in 3D" : "Move pieces in 3D");
+        History.Begin(name ?? (SelectedPieces.Count == 1 ? "Move piece in 3D" : "Move pieces in 3D"));
         _placementPivot = pivot;
         // With snapping, a single piece lands with its own position on the grid; several pieces with their centre.
         _placementSnapOrigin = SelectedPieces.Count == 1 ? SelectedPieceObjects().First().Placement.Position : pivot;
         _placementMoved = false;
-        _placementStart = SelectedPieceObjects().ToDictionary(p => p.Id, p => new PlacementStart(p.Placement.Position, p.Placement.Rotation, p.Drape));
+        _placementStart = SelectedPieceObjects().ToDictionary(p => p.Id, p =>
+        {
+            var (min, max) = Outline.Bounds(p);
+            return new PlacementStart(p.Placement.Position, p.Placement.Rotation, p.Drape, (min + max) / 2,
+                p.Points.Select(point => (point.Position, point.Curve)).ToArray());
+        });
         return true;
     }
 
@@ -977,6 +1013,40 @@ public sealed class Workspace
                 }
                 piece.Drape = moved;
             }
+        }
+        History.NotifyLiveChange();
+    }
+
+    /// <summary>
+    /// Scales the pieces being dragged to <paramref name="factor"/> times the size they started at: their patterns
+    /// grow or shrink, and with several pieces selected they also move apart or together about the selection
+    /// centre. <paramref name="axis"/> is the world axis to scale along, or zero to scale evenly; a piece is only
+    /// changed along an axis as far as it actually lies along it, so the handle that points out of a flat piece
+    /// does nothing to it. A scaled piece goes back to its flat arrangement, since its mesh is no longer the same.
+    /// </summary>
+    public void ApplyPlacementScale(Vector3 axis, float factor)
+    {
+        if (_placementStart == null)
+            return;
+        factor = MathF.Max(factor, 0.05f);
+        _placementMoved |= factor != 1;
+        bool uniform = axis == Vector3.Zero;
+        float Along(float share) => uniform ? factor : 1 + (factor - 1) * MathF.Abs(share);
+        foreach (var piece in Document.AllPieces())
+        {
+            if (!_placementStart.TryGetValue(piece.Id, out var start) || start.Points.Length != piece.Points.Count)
+                continue;
+            var rotation = EulerMatrix(start.Rotation);
+            var scale = new Vector2(Along(Vector3.Dot(axis, Vector3.TransformNormal(Vector3.UnitX, rotation))),
+                Along(Vector3.Dot(axis, Vector3.TransformNormal(Vector3.UnitY, rotation))));
+            for (int i = 0; i < start.Points.Length; i++)
+            {
+                piece.Points[i].Position = start.Centre + (start.Points[i].Position - start.Centre) * scale;
+                piece.Points[i].Curve = start.Points[i].Curve is { } curve ? start.Centre + (curve - start.Centre) * scale : null;
+            }
+            var spread = new Vector3(Along(axis.X), Along(axis.Y), Along(axis.Z));
+            piece.Placement.Position = _placementPivot + (start.Position - _placementPivot) * spread;
+            piece.ClearDrape();
         }
         History.NotifyLiveChange();
     }

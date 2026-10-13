@@ -164,7 +164,7 @@ Item {
                 }
             }
 
-            const showPoints = s.tool === "EditPoints" && !root.uv
+            const showPoints = (s.tool === "EditPoints" || s.tool === "TransformPoints") && !root.uv
             for (const p of s.pieces) {
                 trace(ctx, p.outline, true)
                 ctx.fillStyle = withAlpha(p.color, p.active ? (root.uv ? 0.5 : 0.62) : 0.28)
@@ -197,7 +197,7 @@ Item {
             for (const p of s.pieces) {
                 if (showPoints || p.selected) {
                     for (let i = 0; i < p.points.length; i += 2) {
-                        const chosen = p.selectedPoint === i / 2
+                        const chosen = p.selectedPoint === i / 2 || (p.selectedPoints !== undefined && p.selectedPoints.indexOf(i / 2) >= 0)
                         const r = chosen ? 5 : 3.5
                         ctx.fillStyle = chosen ? root.accent : "#f2f3f5"
                         ctx.strokeStyle = "#1b1c1f"
@@ -240,6 +240,35 @@ Item {
                 ctx.fillStyle = root.accent
                 for (let i = 0; i < s.draft.length; i += 2)
                     ctx.fillRect(root.sx(s.draft[i]) - 3, root.sy(s.draft[i + 1]) - 3, 6, 6)
+            }
+            if (s.marquee) {
+                const x = root.sx(s.marquee[0]), y = root.sy(s.marquee[1])
+                ctx.fillStyle = withAlpha(root.accent, 0.15)
+                ctx.strokeStyle = root.accent; ctx.lineWidth = 1
+                ctx.setLineDash([4, 3])
+                ctx.fillRect(x, y, root.sx(s.marquee[2]) - x, root.sy(s.marquee[3]) - y)
+                ctx.strokeRect(x + 0.5, y + 0.5, root.sx(s.marquee[2]) - x, root.sy(s.marquee[3]) - y)
+                ctx.setLineDash([])
+            }
+            if (s.pointGizmo) {
+                // Move arrows (red along X, green along Y), a ring to rotate, and a square to move freely.
+                const cx = root.sx(s.pointGizmo[0]), cy = root.sy(s.pointGizmo[1]), arrow = s.pointGizmo[2], ring = s.pointGizmo[3]
+                if (ring > 0) {
+                    ctx.strokeStyle = "#3e7bdc"; ctx.lineWidth = 2.5
+                    ctx.beginPath(); ctx.arc(cx, cy, ring, 0, Math.PI * 2); ctx.stroke()
+                }
+                for (const a of [["#e5484d", 1, 0], ["#46a758", 0, -1]]) {
+                    const ex = cx + a[1] * arrow, ey = cy + a[2] * arrow
+                    ctx.strokeStyle = a[0]; ctx.fillStyle = a[0]; ctx.lineWidth = 3
+                    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke()
+                    ctx.beginPath()
+                    ctx.moveTo(ex + a[1] * 10, ey + a[2] * 10)
+                    ctx.lineTo(ex - a[2] * 6, ey + a[1] * 6)
+                    ctx.lineTo(ex + a[2] * 6, ey - a[1] * 6)
+                    ctx.closePath(); ctx.fill()
+                }
+                ctx.fillStyle = "#f2f3f5"; ctx.strokeStyle = "#1b1c1f"; ctx.lineWidth = 1
+                ctx.fillRect(cx - 6, cy - 6, 12, 12); ctx.strokeRect(cx - 5.5, cy - 5.5, 12, 12)
             }
             for (let i = 0; s.measures && i < s.measures.length; i += 5)
                 measure(ctx, s.measures[i], s.measures[i + 1], root.lengthText(s.measures[i + 2]), s.measures[i + 3], s.measures[i + 4])
