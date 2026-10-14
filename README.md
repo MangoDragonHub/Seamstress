@@ -115,11 +115,12 @@ the finished garment stays put and the new one drapes over it.
 | Key | Action | Key | Action |
 | --- | --- | --- | --- |
 | V | Select | Space | Start / stop simulation |
-| E | Edit points | Ctrl+Z / Ctrl+Shift+Z | Undo / redo |
+| A | Edit points | Ctrl+Z / Ctrl+Shift+Z | Undo / redo |
 | S | Sew | Delete | Delete selection |
-| P / R / O | Polygon / Rectangle / Ellipse | Ctrl+D | Duplicate |
+| P / B / O | Polygon / Rectangle / Ellipse | Ctrl+D | Duplicate |
 | U | Toggle UV layout | Ctrl+G | Group selected pieces |
 | F | Frame all in 2D | Esc / Enter | Cancel / finish the current tool |
+| T | Transform points | Q / W / E / R | Handles: all / move / rotate / scale |
 
 ## MakeHuman
 

@@ -295,7 +295,7 @@ public partial class AppController : INotifyPropertyChanged
         get => _editor.GizmoMode.ToString();
         set
         {
-            if (!Enum.TryParse<GizmoMode>(value, out var mode) || mode == _editor.GizmoMode)
+            if (!Enum.TryParse<Seamstress.Core.Editing.GizmoMode>(value, out var mode) || mode == _editor.GizmoMode)
                 return;
             _editor.GizmoMode = mode;
             Notify();

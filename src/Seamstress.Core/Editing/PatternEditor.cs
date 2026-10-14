@@ -407,8 +407,8 @@ public sealed class PatternEditor
     }
 
     private bool ShowsMove => _gizmoMode is GizmoMode.Full or GizmoMode.Move;
-    private bool ShowsRotate(int count) => count >= 2 && _gizmoMode is GizmoMode.Full or GizmoMode.Rotate && count >= 2;
-    private bool ShowsScale(int count) => count >= 2 && _gizmoMode is GizmoMode.Full or GizmoMode.Scale && count >= 2;
+    private bool ShowsRotate(int count) => count >= 2 && (_gizmoMode == GizmoMode.Full || _gizmoMode == GizmoMode.Rotate);
+    private bool ShowsScale(int count) => count >= 2 && (_gizmoMode == GizmoMode.Full || _gizmoMode == GizmoMode.Scale);
     private float ScaleBoxDistance => _gizmoMode == GizmoMode.Full ? GizmoScaleFull : GizmoScaleAlone;
     private float ScaleEvenOffset => _gizmoMode == GizmoMode.Full ? GizmoScaleEven : 0;
 
@@ -504,7 +504,10 @@ public sealed class PatternEditor
                 {
                     _pointsAxis = 0;
                     if (!additive && GizmoDown(world, tolerance))
+                    {
+                        Measure();
                         break;
+                    }
                     // An edge is hit a little outside the piece too, so it can be clicked to read its length.
                     var edge = HitEdge(world, tolerance);
                     var piece = HitPiece(world) ?? edge?.Piece;
@@ -1022,7 +1025,7 @@ public sealed class PatternEditor
         Edge("hover", _hoverEdge);
         Edge("pending", _pendingEdge);
 
-        if (!_uvMode && _tool is PatternTool.TransformPoints or PatternTool.Select && !_uvMode)
+        if (!_uvMode && (_tool == PatternTool.TransformPoints || _tool == PatternTool.Select))
         {
             // Handles at the middle of what is selected: x, y, then in pixels the arrow length, the ring radius, how
             // far out the scale boxes are and where the box that scales evenly sits; 0 leaves a handle out. A single

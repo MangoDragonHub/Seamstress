@@ -144,11 +144,16 @@ ApplicationWindow {
     Shortcut { sequence: "Escape"; onActivated: App.cancelTool() }
     Shortcut { sequences: ["Return", "Enter"]; onActivated: App.confirmTool() }
     Shortcut { sequence: "V"; onActivated: App.tool = "Select" }
-    Shortcut { sequence: "E"; onActivated: App.tool = "EditPoints" }
+    Shortcut { sequence: "A"; onActivated: App.tool = "EditPoints" }
+    // Which handles the gizmos show, in both views.
+    Shortcut { sequence: "Q"; onActivated: App.gizmoMode = "Full" }
+    Shortcut { sequence: "W"; onActivated: App.gizmoMode = "Move" }
+    Shortcut { sequence: "E"; onActivated: App.gizmoMode = "Rotate" }
     Shortcut { sequence: "T"; onActivated: App.tool = "TransformPoints" }
     Shortcut { sequence: "S"; onActivated: App.tool = "Sew" }
     Shortcut { sequence: "P"; onActivated: App.tool = "Polygon" }
-    Shortcut { sequence: "R"; onActivated: App.tool = "Rectangle" }
+    Shortcut { sequence: "R"; onActivated: App.gizmoMode = "Scale" }
+    Shortcut { sequence: "B"; onActivated: App.tool = "Rectangle" }
     Shortcut { sequence: "O"; onActivated: App.tool = "Ellipse" }
     Shortcut { sequence: "U"; onActivated: App.uvMode = !App.uvMode }
     Shortcut { sequence: "F"; onActivated: patternView.frameAll() }
@@ -277,7 +282,14 @@ ApplicationWindow {
                 MenuItem { text: "3D: Checker (Texel Density)"; checkable: true; checked: viewport.displayMode === "checker"; onTriggered: viewport.displayMode = checked ? "checker" : "shaded" }
                 MenuItem { text: "3D: Wireframe (Topology)"; checkable: true; checked: viewport.wireframe; onTriggered: viewport.wireframe = checked }
                 MenuItem { text: "3D: Pinch Cloth"; checkable: true; checked: viewport.pinchMode; onTriggered: viewport.pinchMode = checked }
-                MenuItem { text: "3D: Move / Rotate Handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
+                MenuItem { text: "3D: Show Handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
+                Menu {
+                    title: "Handles"
+                    MenuItem { text: "Move, Rotate and Scale\tQ"; checkable: true; checked: App.gizmoMode === "Full"; onTriggered: App.gizmoMode = "Full" }
+                    MenuItem { text: "Move\tW"; checkable: true; checked: App.gizmoMode === "Move"; onTriggered: App.gizmoMode = "Move" }
+                    MenuItem { text: "Rotate\tE"; checkable: true; checked: App.gizmoMode === "Rotate"; onTriggered: App.gizmoMode = "Rotate" }
+                    MenuItem { text: "Scale\tR"; checkable: true; checked: App.gizmoMode === "Scale"; onTriggered: App.gizmoMode = "Scale" }
+                }
                 MenuItem { text: "3D: Show Avatar"; checkable: true; checked: viewport.showAvatar; onTriggered: viewport.showAvatar = checked }
                 MenuItem { text: "3D: Show Sewing Threads"; checkable: true; checked: viewport.showThreads; onTriggered: viewport.showThreads = checked }
             }
@@ -308,12 +320,12 @@ ApplicationWindow {
                     ToolTip.text: tip
                 }
                 ToolChoice { text: "Select"; tool: "Select"; tip: "Select and move pieces (V)" }
-                ToolChoice { text: "Edit Points"; tool: "EditPoints"; tip: "Move points, curve edges, add points (E)" }
+                ToolChoice { text: "Edit Points"; tool: "EditPoints"; tip: "Move points, curve edges, add points (A)" }
                 ToolChoice { text: "Transform Points"; tool: "TransformPoints"; tip: "Select points and move or rotate them with handles (T)" }
                 ToolChoice { text: "Sew"; tool: "Sew"; tip: "Click two edges to sew them together (S)" }
                 ToolSeparator {}
                 ToolChoice { text: "Polygon"; tool: "Polygon"; tip: "Draw a piece corner by corner (P)" }
-                ToolChoice { text: "Rectangle"; tool: "Rectangle"; tip: "Drag out a rectangular piece (R)" }
+                ToolChoice { text: "Rectangle"; tool: "Rectangle"; tip: "Drag out a rectangular piece (B)" }
                 ToolChoice { text: "Ellipse"; tool: "Ellipse"; tip: "Drag out an elliptical piece (O)" }
                 ToolSeparator {}
                 ToolButton { text: "↶"; font.pixelSize: 18; enabled: App.canUndo; onClicked: App.undo(); ToolTip.visible: hovered; ToolTip.text: App.undoText }

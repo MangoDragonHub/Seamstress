@@ -95,11 +95,11 @@ The borders between the panels can be dragged to resize them.
 | # | Tool | Key | What it does |
 | --- | --- | --- | --- |
 | 1 | **Select** | V | Click a piece to select it, drag to move it in the pattern. Ctrl+click adds to the selection. Click a seam's dashed line to select the seam. |
-| 2 | **Edit Points** | E | Drag a point to move it. Drag an edge to curve it. Double-click an edge to add a point. |
+| 2 | **Edit Points** | A | Drag a point to move it. Drag an edge to curve it. Double-click an edge to add a point. |
 | 3 | **Transform Points** | T | Select one point or several, then move or rotate them with handles. Does not bend edges. |
 | 4 | **Sew** | S | Click one edge, then another, to sew them together. |
 | 5 | **Polygon** | P | Click to place corners; click the first corner again, double-click, or press Enter to finish. |
-| 6 | **Rectangle** | R | Drag out a rectangular piece. |
+| 6 | **Rectangle** | B | Drag out a rectangular piece. |
 | 7 | **Ellipse** | O | Drag out an elliptical piece. |
 | 8 | Undo | Ctrl+Z | Undo the last change. Hover to see what it will undo. |
 | 9 | Redo | Ctrl+Shift+Z | Redo. |
@@ -118,9 +118,9 @@ maps what you already know to where it lives here.
 | 3D Garment window | **3D Garment view** (left) |
 | Object Browser / Scene | **Layers** panel |
 | Property Editor | **Properties** panel |
-| Polygon, Rectangle, Ellipse tools | The same three tools, keys **P**, **R**, **O** |
+| Polygon, Rectangle, Ellipse tools | The same three tools, keys **P**, **B**, **O** |
 | Transform Pattern | **Select** tool (**V**): drag a piece. Rotate and mirror are in the **Edit** menu |
-| Edit Pattern (move points and lines) | **Edit Points** tool (**E**): drag a point |
+| Edit Pattern (move points and lines) | **Edit Points** tool (**A**): drag a point |
 | Selecting several points and moving or rotating them | **Transform Points** tool (**T**) |
 | Edit Curvature | **Edit Points** tool: drag an edge to bend it |
 | Add Point / Split Line | **Edit Points** tool: double-click an edge |
@@ -179,6 +179,14 @@ New pieces go into the active garment. If there is none, one is created.
 While you draw, each side shows its length; a rectangle shows its width and height and an ellipse its size
 across. Shift can be pressed or released in the middle of a drag.
 
+### Moving, rotating and scaling pieces in 2D
+
+With the **Select** tool, a selected piece shows the same handles as the 3D view (see
+[Choosing which handles are shown](#choosing-which-handles-are-shown)). The arrows move the piece along one
+axis, the ring turns it, and the boxes scale it: red for width, green for height, yellow for both. Hold
+**Shift** while turning for 15° steps and while scaling for steps of a tenth. You can still drag the piece
+itself to move it freely.
+
 ### Measuring edges
 
 ![The hem of the front piece clicked, showing its length, and the scale bar in the corner](images/edge-length.png)
@@ -194,7 +202,7 @@ chest in 3D.
 
 ### Shaping pieces
 
-Switch to **Edit Points** (**E**) and click a piece. Its corner points appear as white squares; curved edges
+Switch to **Edit Points** (**A**) and click a piece. Its corner points appear as white squares; curved edges
 also show a yellow handle.
 
 ![Edit Points: white squares are outline points, yellow dots are curve handles](images/edit-points.png)
@@ -220,6 +228,9 @@ the UVs), not the 3D placement. The **Edit** menu also has **Duplicate** (Ctrl+D
 
 **Transform Points** (**T**) works on points rather than whole pieces.
 
+- **Scale:** with two or more points selected, drag a box to scale them about their middle: red for width,
+  green for height, yellow for both. **Q / W / E / R** choose which handles are shown.
+
 - **Select:** click a point; **Ctrl+click** (or Shift+click) adds or removes one; drag a box over empty space
   to select every point inside it, across pieces. **Ctrl+A** selects every point of the active garment.
   Click empty space to clear the selection.
@@ -233,7 +244,7 @@ the UVs), not the 3D placement. The **Edit** menu also has **Duplicate** (Ctrl+D
 A curved edge keeps its shape when both of its ends are selected: the curve moves and turns with them. If
 only one end is selected, the curve handle stays where it is.
 
-This tool never bends an edge. To curve the edge between two points, switch back to **Edit Points** (**E**)
+This tool never bends an edge. To curve the edge between two points, switch back to **Edit Points** (**A**)
 and drag the edge.
 
 ---
@@ -288,10 +299,10 @@ simulation pulls each stitch shut.
 | 4 | **Checker** | Replace fabric colours with a checker texture, to judge UVs and texel density. |
 | 5 | **Wire** | Draw the outline of every face, to see the topology. |
 | 6 | **Pinch** | Drag the cloth itself to tug it into place (see [Pinching the cloth](#pinching-the-cloth)). |
-| 7 | **Gizmo** | Show or hide the move and rotate handles. |
+| 7 | **Gizmo** | Show or hide the move, rotate and scale handles. **Q / W / E / R** choose which of them are shown. |
 | 8 | **Avatar** | Show or hide the avatar. Hidden, it still collides with the cloth. |
 
-### Moving and rotating pieces
+### Moving, rotating and scaling pieces
 
 Select one or more pieces and the handles appear at their centre:
 
@@ -299,6 +310,30 @@ Select one or more pieces and the handles appear at their centre:
 
 - Drag an **arrow** to slide along that axis (red = X, green = Y/up, blue = Z/front).
 - Drag a **ring** to rotate about that axis.
+- Drag a **box** to scale. The white box in the middle scales evenly: drag up or right to grow, down or left
+  to shrink. A coloured box scales along its axis only. Hold **Shift** for steps of a tenth.
+
+Scaling changes the pattern itself, so the piece is the new size in the 2D view too. A coloured box only
+changes a piece as far as the piece lies along that axis: on a front panel facing you, red is its width,
+green its height, and blue (which points out of the cloth) does nothing. With several pieces selected they
+also move apart or together about their shared centre, so a whole garment scales as one. A scaled piece
+goes back to its flat arrangement and needs simulating again, and seams keep their edges but the two sides
+may no longer be the same length.
+
+### Choosing which handles are shown
+
+![Top: every handle, in 3D and 2D. Bottom: scale handles only](images/handle-modes.png)
+
+| Key | Handles |
+| --- | --- |
+| **Q** | Everything: move, rotate and scale |
+| **W** | Move only |
+| **E** | Rotate only |
+| **R** | Scale only |
+
+The keys work in both views and are also under **View ▸ Handles**. The same handles appear in the 2D view:
+on the selected pieces with the **Select** tool, and on the selected points with **Transform Points**. In 2D
+the yellow box scales evenly and the red and green boxes scale width and height.
 
 A draped piece keeps its draped shape while you move it, and each drag is one undo step. The same values can be
 typed under **3D Arrangement** in Properties; typing a value there returns the piece to its flat shape at the
@@ -646,8 +681,9 @@ starting Seamstress with `--cpu` or `--gpu`.
 
 | Key | Action |
 | --- | --- |
-| V / E / T / S | Select / Edit Points / Transform Points / Sew |
-| P / R / O | Polygon / Rectangle / Ellipse |
+| V / A / T / S | Select / Edit Points / Transform Points / Sew |
+| Q / W / E / R | Handles: all / move only / rotate only / scale only (both views) |
+| P / B / O | Polygon / Rectangle / Ellipse |
 | U | Switch the 2D view between pattern and UV layout |
 | F | Frame everything in the 2D view |
 | G | Turn Pinch on or off in the 3D view |

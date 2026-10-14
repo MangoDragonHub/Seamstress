@@ -17,6 +17,8 @@ Item {
     property bool hasGizmo: false
     property vector3d gizmoOrigin: Qt.vector3d(0, 0, 0)
     property bool showGizmo: true
+    // Distance of the scale boxes from the handle centre, in handle units (an arrow is 1 long).
+    readonly property real scaleReach: App.gizmoMode === "Full" ? 1.2 : 0.85
     property bool pinchMode: false
     property bool showAvatar: true
     property bool showThreads: true
@@ -202,12 +204,25 @@ Item {
             position: root.gizmoOrigin
             // Keeps the handles the same size on screen whatever the zoom.
             scale: Qt.vector3d(root.distance * 0.085, root.distance * 0.085, root.distance * 0.085)
-            Handle { part: "tx"; tint: "#e5484d"; source: App.gizmoArrow; eulerRotation.z: -90 }
-            Handle { part: "ty"; tint: "#46a758"; source: App.gizmoArrow }
-            Handle { part: "tz"; tint: "#3e7bdc"; source: App.gizmoArrow; eulerRotation.x: 90 }
-            Handle { part: "rx"; tint: "#e5484d"; source: App.gizmoRing; eulerRotation.z: -90 }
-            Handle { part: "ry"; tint: "#46a758"; source: App.gizmoRing }
-            Handle { part: "rz"; tint: "#3e7bdc"; source: App.gizmoRing; eulerRotation.x: 90 }
+            // Q shows every handle; W, E and R only those that move, rotate or scale.
+            readonly property bool moves: App.gizmoMode === "Full" || App.gizmoMode === "Move"
+            readonly property bool turns: App.gizmoMode === "Full" || App.gizmoMode === "Rotate"
+            readonly property bool scales: App.gizmoMode === "Full" || App.gizmoMode === "Scale"
+            Handle { part: "tx"; tint: "#e5484d"; source: App.gizmoArrow; eulerRotation.z: -90; visible: parent.moves }
+            Handle { part: "ty"; tint: "#46a758"; source: App.gizmoArrow; visible: parent.moves }
+            Handle { part: "tz"; tint: "#3e7bdc"; source: App.gizmoArrow; eulerRotation.x: 90; visible: parent.moves }
+            Handle { part: "rx"; tint: "#e5484d"; source: App.gizmoRing; eulerRotation.z: -90; visible: parent.turns }
+            Handle { part: "ry"; tint: "#46a758"; source: App.gizmoRing; visible: parent.turns }
+            Handle { part: "rz"; tint: "#3e7bdc"; source: App.gizmoRing; eulerRotation.x: 90; visible: parent.turns }
+            // Scale boxes: beyond the arrow tips when everything is shown, on short stalks on their own. The
+            // white box in the middle scales evenly. "#Cube" is 100 units wide.
+            Handle { part: "sx"; tint: "#e5484d"; source: "#Cube"; x: root.scaleReach; scale: Qt.vector3d(0.0011, 0.0011, 0.0011); visible: parent.scales }
+            Handle { part: "sy"; tint: "#46a758"; source: "#Cube"; y: root.scaleReach; scale: Qt.vector3d(0.0011, 0.0011, 0.0011); visible: parent.scales }
+            Handle { part: "sz"; tint: "#3e7bdc"; source: "#Cube"; z: root.scaleReach; scale: Qt.vector3d(0.0011, 0.0011, 0.0011); visible: parent.scales }
+            Handle { part: "su"; tint: "#f2f3f5"; source: "#Cube"; scale: Qt.vector3d(0.0013, 0.0013, 0.0013); visible: parent.scales }
+            Handle { part: "sx"; tint: "#e5484d"; source: "#Cube"; x: root.scaleReach / 2; scale: Qt.vector3d(root.scaleReach / 100, 0.00025, 0.00025); visible: App.gizmoMode === "Scale" }
+            Handle { part: "sy"; tint: "#46a758"; source: "#Cube"; y: root.scaleReach / 2; scale: Qt.vector3d(0.00025, root.scaleReach / 100, 0.00025); visible: App.gizmoMode === "Scale" }
+            Handle { part: "sz"; tint: "#3e7bdc"; source: "#Cube"; z: root.scaleReach / 2; scale: Qt.vector3d(0.00025, 0.00025, root.scaleReach / 100); visible: App.gizmoMode === "Scale" }
         }
     }
 
@@ -235,9 +250,23 @@ Item {
         }
 
         function dragHandle(x, y, snap) {
+            if (activePart === "su") {
+                // The middle box scales evenly: drag up or to the right to grow, down or to the left to shrink.
+                App.gizmoScale("u", Math.max(0.05, 1 + ((x - pressX) - (y - pressY)) / 150), snap)
+                return
+            }
             const axis = axisOf(activePart)
             const origin = gizmoView.mapFrom3DScene(dragOrigin)
-            if (activePart.charAt(0) === "t") {
+            if (activePart.charAt(0) === "s") {
+                // A box on an axis scales by how far it is pulled along that axis from where it was.
+                const tip = gizmoView.mapFrom3DScene(dragOrigin.plus(axis))
+                const sx = tip.x - origin.x, sy = tip.y - origin.y
+                const length2 = sx * sx + sy * sy
+                if (length2 < 1e-6)
+                    return
+                const amount = ((x - pressX) * sx + (y - pressY) * sy) / length2
+                App.gizmoScale(activePart.charAt(1), Math.max(0.05, 1 + amount / (root.distance * 0.085 * root.scaleReach)), snap)
+            } else if (activePart.charAt(0) === "t") {
                 // Slide along the axis by as much as the cursor moved along the axis as it appears on screen.
                 const tip = gizmoView.mapFrom3DScene(dragOrigin.plus(axis))
                 const sx = tip.x - origin.x, sy = tip.y - origin.y
@@ -266,7 +295,8 @@ Item {
             pressX = e.x; pressY = e.y
             if (e.button === Qt.LeftButton && gizmoView.visible) {
                 const hit = gizmoView.pick(e.x, e.y)
-                if (hit.objectHit && hit.objectHit.part && App.gizmoBegin()) {
+                if (hit.objectHit && hit.objectHit.part
+                        && (hit.objectHit.part.charAt(0) === "s" ? App.gizmoBeginScale() : App.gizmoBegin())) {
                     activePart = hit.objectHit.part
                     dragOrigin = root.gizmoOrigin
                     const origin = gizmoView.mapFrom3DScene(dragOrigin)
@@ -400,7 +430,7 @@ Item {
         opacity: 0.55
         font.pixelSize: 11
         text: root.pinchMode ? "Pinch: drag the cloth to pull it  ·  Drag elsewhere: orbit  ·  Shift-drag: pan  ·  Wheel: zoom"
-                            : "Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Handles: move / rotate  ·  Shift+arrow: snap"
+                            : "Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap"
     }
     Label {
         anchors { right: parent.right; bottom: parent.bottom; margins: 8 }

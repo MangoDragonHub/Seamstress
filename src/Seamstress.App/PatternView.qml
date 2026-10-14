@@ -251,13 +251,25 @@ Item {
                 ctx.setLineDash([])
             }
             if (s.pointGizmo) {
-                // Move arrows (red along X, green along Y), a ring to rotate, and a square to move freely.
+                // Move arrows (red along X, green along Y) with a square to move freely, a ring to rotate, and
+                // boxes to scale: one on each axis and a yellow one that scales evenly.
                 const cx = root.sx(s.pointGizmo[0]), cy = root.sy(s.pointGizmo[1]), arrow = s.pointGizmo[2], ring = s.pointGizmo[3]
+                const boxes = s.pointGizmo[4], even = s.pointGizmo[5]
                 if (ring > 0) {
                     ctx.strokeStyle = "#3e7bdc"; ctx.lineWidth = 2.5
                     ctx.beginPath(); ctx.arc(cx, cy, ring, 0, Math.PI * 2); ctx.stroke()
                 }
                 for (const a of [["#e5484d", 1, 0], ["#46a758", 0, -1]]) {
+                    if (boxes > 0) {
+                        const bx = cx + a[1] * boxes, by = cy + a[2] * boxes
+                        ctx.strokeStyle = a[0]; ctx.fillStyle = a[0]; ctx.lineWidth = 3
+                        if (arrow === 0) { ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by); ctx.stroke() }
+                        ctx.fillRect(bx - 6, by - 6, 12, 12)
+                        ctx.strokeStyle = "#1b1c1f"; ctx.lineWidth = 1
+                        ctx.strokeRect(bx - 5.5, by - 5.5, 12, 12)
+                    }
+                    if (arrow === 0)
+                        continue
                     const ex = cx + a[1] * arrow, ey = cy + a[2] * arrow
                     ctx.strokeStyle = a[0]; ctx.fillStyle = a[0]; ctx.lineWidth = 3
                     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke()
@@ -267,8 +279,15 @@ Item {
                     ctx.lineTo(ex + a[2] * 6, ey - a[1] * 6)
                     ctx.closePath(); ctx.fill()
                 }
-                ctx.fillStyle = "#f2f3f5"; ctx.strokeStyle = "#1b1c1f"; ctx.lineWidth = 1
-                ctx.fillRect(cx - 6, cy - 6, 12, 12); ctx.strokeRect(cx - 5.5, cy - 5.5, 12, 12)
+                ctx.strokeStyle = "#1b1c1f"; ctx.lineWidth = 1
+                if (arrow > 0) {
+                    ctx.fillStyle = "#f2f3f5"
+                    ctx.fillRect(cx - 6, cy - 6, 12, 12); ctx.strokeRect(cx - 5.5, cy - 5.5, 12, 12)
+                }
+                if (boxes > 0) {
+                    ctx.fillStyle = "#ffd447"
+                    ctx.fillRect(cx + even - 6, cy - even - 6, 12, 12); ctx.strokeRect(cx + even - 5.5, cy - even - 5.5, 12, 12)
+                }
             }
             for (let i = 0; s.measures && i < s.measures.length; i += 5)
                 measure(ctx, s.measures[i], s.measures[i + 1], root.lengthText(s.measures[i + 2]), s.measures[i + 3], s.measures[i + 4])

@@ -425,7 +425,7 @@ public class DocumentTests
         editor.Tool = PatternTool.TransformPoints;
         Drag(new Vector2(35, -5), new Vector2(45, 25));
         Assert.Equal(2, editor.SelectedPoints.Count);
-        Assert.Contains("\"pointGizmo\":[40,10,64,88]", editor.SceneJson(2048));
+        Assert.Contains("\"pointGizmo\":[40,10,64,88,112,40]", editor.SceneJson(2048));
         int undoBefore = CountUndo(ws);
 
         // The X arrow moves along X only, however the cursor wanders.
@@ -456,6 +456,73 @@ public class DocumentTests
         // This tool never bends an edge: dragging one starts a selection box instead.
         Drag(new Vector2(20, 0), new Vector2(20, 8));
         Assert.All(ws.Document.FindPiece(id)!.Points, p => Assert.Null(p.Curve));
+    }
+
+    [Fact]
+    public void PiecesScaleInBothViews()
+    {
+        var ws = new Workspace();
+        var editor = new PatternEditor(ws);
+        editor.Tool = PatternTool.Rectangle;
+        editor.PointerDown(new Vector2(0, 0), 1, false);
+        editor.PointerMove(new Vector2(40, 20), 1);
+        editor.PointerUp(new Vector2(40, 20));
+        string id = ws.Document.Garments[0].Pieces[0].Id;
+        (float Width, float Height) Size()
+        {
+            var (min, max) = Outline.Bounds(ws.Document.FindPiece(id)!);
+            return (max.X - min.X, max.Y - min.Y);
+        }
+        void Drag(Vector2 from, Vector2 to)
+        {
+            editor.PointerDown(from, 0.9f, false);   // tolerance 0.9 = one pixel is 0.1 cm
+            editor.PointerMove((from + to) / 2, 0.9f);
+            editor.PointerMove(to, 0.9f);
+            editor.PointerUp(to);
+        }
+
+        // 2D, Select tool: the piece is selected after drawing, with its handles at (20, 10).
+        editor.Tool = PatternTool.Select;
+        ws.SelectPiece(id);
+        editor.GizmoMode = GizmoMode.Scale;
+        Assert.Contains("\"pointGizmo\":[20,10,0,0,64,0]", editor.SceneJson(2048));
+        // The X box is 64 pixels (6.4 cm) out; pulling it to twice that doubles the width only.
+        Drag(new Vector2(26.4f, 10), new Vector2(32.8f, 13));
+        Assert.Equal(80f, Size().Width, 0.01f);
+        Assert.Equal(20f, Size().Height, 0.01f);
+        Assert.Equal("Scale pieces", ws.History.UndoName);
+        ws.History.Undo();
+        Assert.Equal(40f, Size().Width, 0.01f);
+
+        // With the move handles, the X arrow slides the piece sideways only.
+        editor.GizmoMode = GizmoMode.Move;
+        Assert.Contains("\"pointGizmo\":[20,10,64,0,0,0]", editor.SceneJson(2048));
+        var origin = ws.Document.FindPiece(id)!.Origin;
+        Drag(new Vector2(23, 10), new Vector2(33, 15));
+        Assert.Equal(origin + new Vector2(10, 0), ws.Document.FindPiece(id)!.Origin);
+        ws.History.Undo();
+
+        // 3D: scaling evenly by 1.5, then along world X only. The piece faces forward, so X is its width.
+        Assert.True(ws.BeginPlacementEdit("Scale piece"));
+        ws.ApplyPlacementScale(Vector3.Zero, 1.2f);
+        ws.ApplyPlacementScale(Vector3.Zero, 1.5f);
+        ws.EndPlacementEdit();
+        Assert.Equal(60f, Size().Width, 0.01f);
+        Assert.Equal(30f, Size().Height, 0.01f);
+        Assert.Equal("Scale piece", ws.History.UndoName);
+        var rotation = ws.Document.FindPiece(id)!.Placement.Rotation;
+        Assert.True(ws.BeginPlacementEdit("Scale piece"));
+        ws.ApplyPlacementScale(Vector3.UnitX, 2f);
+        ws.EndPlacementEdit();
+        Assert.Equal(rotation == Vector3.Zero ? 120f : Size().Width, Size().Width, 0.01f);
+        Assert.Equal(30f, Size().Height, 0.01f);
+        // The axis pointing out of the flat piece leaves it alone.
+        Assert.True(ws.BeginPlacementEdit("Scale piece"));
+        ws.ApplyPlacementScale(Vector3.UnitZ, 3f);
+        ws.EndPlacementEdit();
+        if (rotation == Vector3.Zero)
+            Assert.Equal(120f, Size().Width, 0.01f);
+        Assert.Equal(30f, Size().Height, 0.01f);
     }
 
     [Fact]

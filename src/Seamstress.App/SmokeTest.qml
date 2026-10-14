@@ -98,6 +98,15 @@ QtObject {
         check("piece rotated in 3D", Math.abs(selection().piece.rotY - 90) < 0.1)
         App.undo(); App.undo()
         check("3D moves undo", Math.abs(selection().piece.posX - startX) < 1e-4 && Math.abs(selection().piece.rotY) < 0.1)
+        // Scale handles: the pattern grows, as one undo step, and the handle modes switch.
+        const areaBefore = selection().piece.area
+        App.gizmoBeginScale(); App.gizmoScale("u", 1.4, false); App.gizmoScale("u", 2, false); App.gizmoEnd()
+        check("piece scaled in 3D", Math.abs(selection().piece.area - areaBefore * 4) < areaBefore * 0.01)
+        App.undo()
+        check("scale undone", Math.abs(selection().piece.area - areaBefore) < areaBefore * 0.001)
+        App.gizmoMode = "Scale"
+        check("handle mode switches", App.gizmoMode === "Scale")
+        App.gizmoMode = "Full"
         // Shift on a move arrow: the piece lands on a multiple of the snap step.
         App.gizmoBegin(); App.gizmoMove(0.133, 0, 0, true); App.gizmoEnd()
         const step = App.snapStepCm / 100, snappedX = selection().piece.posX

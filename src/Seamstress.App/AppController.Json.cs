@@ -232,6 +232,12 @@ public partial class AppController
                 _editor.PointerUp(point.Position + shaped.Origin);
             }
         }
+        // For documentation screenshots: "--view gizmoscale" (or gizmomove, gizmorotate) shows only those handles.
+        foreach (var mode in Enum.GetValues<GizmoMode>())
+        {
+            if (options.View.Contains("gizmo" + mode.ToString().ToLowerInvariant()))
+                _editor.GizmoMode = mode;
+        }
         if (options.SelectPiece != null)
         {
             // A piece, group or garment by name; "seam" selects the first seam.
