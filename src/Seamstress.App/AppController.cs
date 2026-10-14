@@ -223,6 +223,19 @@ public partial class AppController : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Size in centimetres of the squares the 2D grid is showing at its current zoom (see PatternEditor.GridStep).</summary>
+    public double PatternGridStep
+    {
+        get => _editor.GridStep;
+        set
+        {
+            if (Math.Abs(_editor.GridStep - value) < 1e-6)
+                return;
+            _editor.GridStep = (float)value;
+            Notify();
+        }
+    }
+
     public void PointerDown(double x, double y, double tolerance, bool additive)
         => _editor.PointerDown(new Vector2((float)x, (float)y), (float)tolerance, additive);
 

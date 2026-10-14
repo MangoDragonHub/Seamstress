@@ -119,6 +119,8 @@ public sealed class PatternEditor
             // Pressing or releasing Shift updates the shape being drawn without waiting for the pointer to move.
             if (_drag == Drag.Shape && _dragMoved)
                 BuildShape(_dragLast);
+            else if ((_drag is Drag.Point or Drag.Control) && _dragMoved)
+                DragPoint(_dragLast);
             else if (_tool == PatternTool.Polygon && _draft.Count > 0 && _draftCursor != null)
                 _draftCursor = PolygonPoint(_draftCursorRaw);
             else
@@ -129,6 +131,25 @@ public sealed class PatternEditor
 
     /// <summary>Length in centimetres that constrained polygon sides are rounded to.</summary>
     public float LengthStep { get; set; } = 1f;
+
+    /// <summary>Size in centimetres of the grid squares the 2D view shows; Edit Points snaps to it with Shift.</summary>
+    public float GridStep { get; set; } = 1f;
+
+    private Vector2 SnapToGrid(Vector2 world)
+        => GridStep > 0 ? new Vector2(MathF.Round(world.X / GridStep), MathF.Round(world.Y / GridStep)) * GridStep : world;
+
+    /// <summary>Moves the point or curve control being dragged in Edit Points; Shift puts it on the grid.</summary>
+    private void DragPoint(Vector2 world)
+    {
+        if (Doc.FindPiece(_dragPiece) is not { } owner || _dragIndex >= owner.Points.Count)
+            return;
+        var target = (_constrain ? SnapToGrid(world) : world) - owner.Origin;
+        if (_drag == Drag.Point)
+            owner.Points[_dragIndex].Position = target;
+        else
+            owner.Points[_dragIndex].Curve = target;
+        _workspace.History.NotifyLiveChange();
+    }
 
     private Vector2 PolygonPoint(Vector2 world)
     {
@@ -160,7 +181,7 @@ public sealed class PatternEditor
         : _tool switch
         {
             PatternTool.Select => "Click a piece to select it, drag to move. Use the handles to move, rotate or scale it (Q/W/E/R). Click an edge to see its length. Ctrl+click adds to the selection.",
-            PatternTool.EditPoints => "Drag a point to move it, drag an edge to curve it, double-click an edge to add a point, Delete removes the selected point. Click an edge to see its length.",
+            PatternTool.EditPoints => "Drag a point to move it, drag an edge to curve it, double-click an edge to add a point, Delete removes the selected point. Hold Shift to snap to the grid. Click an edge to see its length.",
             PatternTool.TransformPoints => "Click a point to select it, Ctrl+click to add, or drag a box around several. Drag an arrow to move them, the ring to rotate them, a box to scale them (Q/W/E/R choose the handles).",
             PatternTool.Sew => _pendingEdge == null ? "Click the first edge to sew." : "Click the edge to sew it to. Esc cancels.",
             PatternTool.Polygon => _draft.Count == 0 ? "Click to place the first corner." : "Click to add corners; click the first corner, double-click or press Enter to finish. Hold Shift to snap the side's angle and length.",
@@ -665,18 +686,8 @@ public sealed class PatternEditor
                 _workspace.History.NotifyLiveChange();
                 return;
             case Drag.Point:
-                if (Doc.FindPiece(_dragPiece) is { } owner && _dragIndex < owner.Points.Count)
-                {
-                    owner.Points[_dragIndex].Position = world - owner.Origin;
-                    _workspace.History.NotifyLiveChange();
-                }
-                return;
             case Drag.Control:
-                if (Doc.FindPiece(_dragPiece) is { } curved && _dragIndex < curved.Points.Count)
-                {
-                    curved.Points[_dragIndex].Curve = world - curved.Origin;
-                    _workspace.History.NotifyLiveChange();
-                }
+                DragPoint(world);
                 return;
             case Drag.Bend:
                 if (Doc.FindPiece(_dragPiece) is { } bent && _dragIndex < bent.Points.Count)

@@ -36,6 +36,8 @@ Item {
         }
         return gridLevels[gridLevels.length - 1]
     }
+    // Shift in Edit Points snaps to the smallest squares on screen.
+    Binding { target: App; property: "patternGridStep"; value: root.gridLevel()[0] }
     function lengthText(cm) { return App.imperial ? (cm / 2.54).toFixed(2) + " in" : cm.toFixed(1) + " cm" }
 
     // Shift keeps proportions in the drawing tools; follow the key itself so the shape reacts without a mouse move.

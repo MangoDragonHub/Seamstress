@@ -37,6 +37,8 @@ QtObject {
         check("first edge pending", scene().pending !== undefined)
         App.pointerDown(60, 30, 1, false); App.pointerUp(60, 30)
         check("seam created", scene().seams.length === 1)
+        // Shift in Edit Points snaps to the squares the 2D view is showing.
+        check("2D grid step reaches the editor", Math.abs(App.patternGridStep - patternView.gridLevel()[0]) < 1e-6)
         check("seam selected", selection().kind === "seam")
         App.reverseSeam()
         check("seam reversed", scene().seams[0].reversed === true)

@@ -210,11 +210,16 @@ also show a yellow handle.
 | To                               | Do this                                                               |
 | -------------------------------- | --------------------------------------------------------------------- |
 | Move a point                     | Drag a white square                                                   |
+| Put a point on the grid          | Hold **Shift** while dragging it (or its yellow handle)               |
 | Curve an edge                    | Drag anywhere along the edge; the curve follows the cursor            |
 | Adjust a curve                   | Drag its yellow handle                                                |
 | Add a point                      | Double-click the edge where you want it                               |
 | Remove a point                   | Click it, then press **Delete** (a piece keeps at least three points) |
 | Make curved edges straight again | **Edit ▸ Straighten Curved Edges**                                    |
+
+With **Shift** held, the point snaps to the nearest crossing of the smallest squares on screen, so the step
+follows the zoom: zoom in for finer steps (down to 1 mm, or 1/8 in in imperial) and out for coarser ones. The
+scale bar in the corner says how big a square is.
 
 ### Arranging pieces in the pattern
 
@@ -431,7 +436,7 @@ colour).
 | --- | --- |
 | Select | Click a row. Clicking a garment or group selects all its pieces. Ctrl+click adds pieces |
 | Make a garment active | Click it or any of its pieces |
-| Rename | Double-click the name, or right-click ▸ **Rename** |
+| Rename | Double-click the name, or right-click ▸ **Rename**. Type the new name and press **Enter** or click elsewhere to keep it; **Escape** cancels |
 | Hide or show | Click the circle at the right of the row. Hidden garments are neither simulated nor exported |
 | Fold a garment or group | Click the arrow at the left |
 | Group pieces | Select them, then **Ctrl+G** or right-click ▸ **Group Selected Pieces** |
@@ -708,6 +713,7 @@ starting Seamstress with `--cpu` or `--gpu`.
 | Shift while drawing | Square, circle, or a snapped polygon side | — |
 | Shift + drag | — | Pan |
 | Shift + drag a move arrow | — | Snap the piece to the grid along that axis |
+| Shift + drag a point (Edit Points) | Snap the point to the grid | — |
 | Middle or right drag | Pan | Pan |
 | Alt + left drag | Pan | — |
 | Scroll | Zoom about the cursor | Zoom |

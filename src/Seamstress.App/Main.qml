@@ -28,6 +28,8 @@ ApplicationWindow {
     property var afterDiscard: null      // what to do once unsaved changes were dealt with
     property bool closing: false
     property string pendingExport: ""
+    // A text box has the keyboard: Enter and Escape belong to it rather than to the tool shortcuts.
+    readonly property bool typing: activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined
 
     onFrameSwapped: {
         if (!viewportConfirmed) {
@@ -141,8 +143,8 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+G"; onActivated: App.groupSelection() }
     Shortcut { sequence: "Ctrl+A"; onActivated: App.selectAll() }
     Shortcut { sequence: "Space"; onActivated: App.toggleSimulation() }
-    Shortcut { sequence: "Escape"; onActivated: App.cancelTool() }
-    Shortcut { sequences: ["Return", "Enter"]; onActivated: App.confirmTool() }
+    Shortcut { sequence: "Escape"; enabled: !window.typing; onActivated: App.cancelTool() }
+    Shortcut { sequences: ["Return", "Enter"]; enabled: !window.typing; onActivated: App.confirmTool() }
     Shortcut { sequence: "V"; onActivated: App.tool = "Select" }
     Shortcut { sequence: "A"; onActivated: App.tool = "EditPoints" }
     // Which handles the gizmos show, in both views.

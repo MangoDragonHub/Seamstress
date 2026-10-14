@@ -13,7 +13,17 @@ Pane {
     property string menuKind: ""
     property var groupChoices: []
 
-    function refresh() { rows = JSON.parse(App.layers()) }
+    // Rebuilding the list would throw away a name being typed, so wait until the rename is done.
+    property bool refreshPending: false
+    function refresh() {
+        if (editingId !== "") {
+            refreshPending = true
+            return
+        }
+        refreshPending = false
+        rows = JSON.parse(App.layers())
+    }
+    onEditingIdChanged: if (editingId === "" && refreshPending) Qt.callLater(refresh)
     Component.onCompleted: refresh()
     Connections {
         target: App
@@ -115,15 +125,20 @@ Pane {
                         padding: 2
                         text: row.modelData.name
                         selectByMouse: true
-                        onVisibleChanged: if (visible) { text = row.modelData.name; forceActiveFocus(); selectAll() }
-                        onAccepted: {
-                            const id = row.modelData.id, value = text
+                        function start() { text = row.modelData.name; forceActiveFocus(); selectAll() }
+                        // Enter or clicking elsewhere keeps the new name; Escape leaves it as it was.
+                        function finish(keep) {
+                            if (root.editingId !== row.modelData.id)
+                                return
+                            const id = row.modelData.id, value = text.trim()
                             root.editingId = ""
-                            if (value.trim() !== "" && value !== row.modelData.name)
+                            if (keep && value !== "" && value !== row.modelData.name)
                                 App.rename(id, value)
                         }
-                        onActiveFocusChanged: if (!activeFocus && visible) root.editingId = ""
-                        Keys.onEscapePressed: root.editingId = ""
+                        onVisibleChanged: if (visible) start()
+                        onAccepted: finish(true)
+                        onActiveFocusChanged: if (!activeFocus && visible) finish(true)
+                        Keys.onEscapePressed: finish(false)
                     }
 
                     Label {

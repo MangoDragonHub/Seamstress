@@ -398,6 +398,42 @@ public class DocumentTests
     }
 
     [Fact]
+    public void ShiftSnapsEditedPointsToTheGrid()
+    {
+        var ws = new Workspace();
+        var editor = new PatternEditor(ws) { GridStep = 10 };
+        editor.Tool = PatternTool.Rectangle;
+        editor.PointerDown(new Vector2(0, 0), 1, false);
+        editor.PointerMove(new Vector2(30, 40), 1);
+        editor.PointerUp(new Vector2(30, 40));
+        Vector2 Corner()
+        {
+            var piece = ws.Document.Garments[0].Pieces[0];     // fetched again because undo restores a copy
+            return piece.Points.Select(p => p.Position + piece.Origin).OrderBy(p => Vector2.Distance(p, new Vector2(40, 50))).First();
+        }
+
+        // Without Shift the corner follows the pointer; with Shift it lands on the nearest grid line crossing.
+        editor.Tool = PatternTool.EditPoints;
+        editor.PointerDown(new Vector2(30, 40), 1, false);
+        editor.PointerMove(new Vector2(43.2f, 47.9f), 1);
+        Assert.True(Vector2.Distance(Corner(), new Vector2(43.2f, 47.9f)) < 1e-3f);
+        editor.Constrain = true;                                  // pressing Shift mid-drag snaps at once
+        Assert.True(Vector2.Distance(Corner(), new Vector2(40, 50)) < 1e-3f);
+        editor.PointerMove(new Vector2(56, 51), 1);
+        Assert.True(Vector2.Distance(Corner(), new Vector2(60, 50)) < 1e-3f);
+        editor.PointerUp(new Vector2(56, 51));
+
+        // A smaller grid on screen gives finer steps, and the drag is one undo step.
+        editor.GridStep = 1;
+        editor.PointerDown(new Vector2(60, 50), 1, false);
+        editor.PointerMove(new Vector2(52.4f, 44.6f), 1);
+        editor.PointerUp(new Vector2(52.4f, 44.6f));
+        Assert.True(Vector2.Distance(Corner(), new Vector2(52, 45)) < 1e-3f);
+        ws.History.Undo();
+        Assert.True(Vector2.Distance(Corner(), new Vector2(60, 50)) < 1e-3f);
+    }
+
+    [Fact]
     public void TransformPointsMovesAndRotatesASelectionOfPoints()
     {
         var ws = new Workspace();
