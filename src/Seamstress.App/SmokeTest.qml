@@ -59,7 +59,7 @@ QtObject {
         App.confirmTool()
         check("polygon piece added", scene().pieces.length === 3)
         App.tool = "EditPoints"
-        App.doubleClick(15, 80, 1)
+        App.doubleClick(15, 80, 1, false)
         check("point inserted on edge", scene().pieces[2].points.length === 10)
         drag(15, 80, 15, 70)
         check("point dragged", Math.abs(scene().pieces[2].points[3] - 70) < 0.01)
@@ -160,6 +160,39 @@ QtObject {
         App.cancelTool()
         App.tool = "Select"
         check("version reported", /^\d+\.\d+\.\d+/.test(App.version))
+
+        // Double-clicking a piece selects all of its points, in Transform Points.
+        const shape = scene().pieces[1]
+        App.doubleClick(shape.label[0] + 3, shape.label[1] + 3, 1, false)
+        check("double-click selects every point of the piece", App.tool === "TransformPoints"
+              && scene().pieces[1].selectedPoints !== undefined && scene().pieces[1].selectedPoints.length === shape.points.length / 2)
+        App.tool = "Select"
+
+        // Ruler in 2D: both ends catch on opposite corners of the second rectangle, 40 × 60.
+        App.tool = "Ruler"
+        const box = scene().pieces[1].points
+        drag(box[0] + 0.4, box[1] - 0.3, box[4] - 0.3, box[5] + 0.4)
+        const ruler = scene().ruler
+        check("2D ruler measures between corners", ruler !== undefined && Math.abs(ruler[4] - Math.hypot(40, 60)) < 0.01)
+        App.pointerDown(100, 100, 1, false); App.pointerUp(100, 100)
+        check("a click clears the ruler", scene().ruler === undefined)
+        App.tool = "Select"
+
+        // Orthographic 3D view and the right-click menu.
+        viewport.orthographic = true
+        check("orthographic camera", viewport.activeCamera !== null && viewport.magnification > 0)
+        viewport.orthographic = false
+        App.selectIn3D("", false)
+        App.contextSelect(shape.label[0], shape.label[1])
+        check("right-click selects the piece under it", selection().kind === "pieces")
+        contextMenu.popup()
+        check("context menu opens", contextMenu.visible)
+        contextMenu.close()
+
+        // Keyboard shortcuts come from the registry, and a key on two commands is reported.
+        const bindings = JSON.parse(App.keyBindingsJson())
+        check("shortcut registry", bindings.length > 40 && App.keyText("tool.ruler") !== "" && bindings.every(b => window.commands[b.id] !== undefined))
+        check("shortcut conflicts reported", JSON.parse(App.keyConflicts(JSON.stringify({ "tool.select": ["M"], "tool.ruler": ["m"] }))).length === 1)
 
         // Templates, a second garment and per-garment simulation.
         App.addTemplate("Skirt")

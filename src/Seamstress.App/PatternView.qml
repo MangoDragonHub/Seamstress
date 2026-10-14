@@ -17,6 +17,8 @@ Item {
     property bool userAdjusted: false   // once the user pans or zooms, resizing no longer re-frames the view
     readonly property bool uv: scene.mode === "uv"
     readonly property color accent: palette.highlight
+    // Right-click without dragging: the Edit menu. Dragging with the right button still pans.
+    signal contextMenuRequested()
 
     function sx(x) { return x * zoom + panX }
     function sy(y) { return height - (y * zoom + panY) }
@@ -297,6 +299,32 @@ Item {
                 measure(ctx, s.draftMeasures[i], s.draftMeasures[i + 1], root.lengthText(s.draftMeasures[i + 2]), 0, 0)
             if (s.draftSize)
                 measure(ctx, s.draftSize[0], s.draftSize[1], root.lengthText(s.draftSize[2]) + "  ×  " + root.lengthText(s.draftSize[3]), 0, 0)
+            if (s.ruler) {
+                // Ruler: a line between the two ends with end stops, a tick every grid square and the distance.
+                const ax = root.sx(s.ruler[0]), ay = root.sy(s.ruler[1]), bx = root.sx(s.ruler[2]), by = root.sy(s.ruler[3])
+                const len = Math.hypot(bx - ax, by - ay)
+                const ux = len > 0 ? (bx - ax) / len : 1, uy = len > 0 ? (by - ay) / len : 0
+                ctx.strokeStyle = "#ffd447"; ctx.lineWidth = 2
+                ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by)
+                for (const e of [[ax, ay], [bx, by]]) {
+                    ctx.moveTo(e[0] - uy * 8, e[1] + ux * 8); ctx.lineTo(e[0] + uy * 8, e[1] - ux * 8)
+                }
+                ctx.stroke()
+                const step = root.gridLevel()[0] * root.zoom
+                ctx.lineWidth = 1
+                ctx.beginPath()
+                for (let d = step; d < len - 1 && len / step < 400; d += step) {
+                    const tx = ax + ux * d, ty = ay + uy * d
+                    ctx.moveTo(tx - uy * 4, ty + ux * 4); ctx.lineTo(tx + uy * 4, ty - ux * 4)
+                }
+                ctx.stroke()
+                if (s.ruler[4] > 0) {
+                    const dx = s.ruler[2] - s.ruler[0], dy = s.ruler[3] - s.ruler[1]
+                    const angle = Math.atan2(dy, dx) * 180 / Math.PI
+                    measure(ctx, (s.ruler[0] + s.ruler[2]) / 2, (s.ruler[1] + s.ruler[3]) / 2,
+                            root.lengthText(s.ruler[4]) + "   " + angle.toFixed(0) + "°", -uy, -ux)
+                }
+            }
 
             if (!root.uv) {
                 // Scale bar: one grid square, with its size.
@@ -324,6 +352,7 @@ Item {
         property bool panning: false
         property real lastX: 0
         property real lastY: 0
+        property real travelled: 0
         cursorShape: panning ? Qt.ClosedHandCursor : (root.scene.tool === "Select" || root.uv ? Qt.ArrowCursor : Qt.CrossCursor)
 
         onPressed: (e) => {
@@ -334,11 +363,13 @@ Item {
             } else {
                 panning = true
                 lastX = e.x; lastY = e.y
+                travelled = 0
             }
         }
         onPositionChanged: (e) => {
             if (panning) {
                 root.userAdjusted = true
+                travelled += Math.abs(e.x - lastX) + Math.abs(e.y - lastY)
                 root.panX += e.x - lastX
                 root.panY -= e.y - lastY
                 lastX = e.x; lastY = e.y
@@ -353,11 +384,20 @@ Item {
                 : root.wx(e.x).toFixed(1) + ", " + root.wy(e.y).toFixed(1) + " cm"
         }
         onReleased: (e) => {
-            if (panning) panning = false
-            else if (e.button === Qt.LeftButton) App.pointerUp(root.wx(e.x), root.wy(e.y))
+            if (panning) {
+                panning = false
+                if (e.button === Qt.RightButton && travelled < 4) {
+                    if (!root.uv)
+                        App.contextSelect(root.wx(e.x), root.wy(e.y))
+                    root.contextMenuRequested()
+                }
+            } else if (e.button === Qt.LeftButton) {
+                App.pointerUp(root.wx(e.x), root.wy(e.y))
+            }
         }
         onDoubleClicked: (e) => {
-            if (e.button === Qt.LeftButton) App.doubleClick(root.wx(e.x), root.wy(e.y), root.tolerance())
+            if (e.button === Qt.LeftButton)
+                App.doubleClick(root.wx(e.x), root.wy(e.y), root.tolerance(), (e.modifiers & Qt.ControlModifier) !== 0 || (e.modifiers & Qt.ShiftModifier) !== 0)
         }
         onWheel: (e) => {
             // Zoom about the cursor so the point under it stays put.

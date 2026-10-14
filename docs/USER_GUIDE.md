@@ -94,16 +94,25 @@ The borders between the panels can be dragged to resize them.
 
 | # | Tool | Key | What it does |
 | --- | --- | --- | --- |
-| 1 | **Select** | V | Click a piece to select it, drag to move it in the pattern. Ctrl+click adds to the selection. Click a seam's dashed line to select the seam. |
+| 1 | **Select** | V | Click a piece to select it, drag to move it in the pattern. Ctrl+click adds to the selection. Click a seam's dashed line to select the seam. Double-click a piece to select all its points. |
 | 2 | **Edit Points** | A | Drag a point to move it. Drag an edge to curve it. Double-click an edge to add a point. |
 | 3 | **Transform Points** | T | Select one point or several, then move or rotate them with handles. Does not bend edges. |
 | 4 | **Sew** | S | Click one edge, then another, to sew them together. |
 | 5 | **Polygon** | P | Click to place corners; click the first corner again, double-click, or press Enter to finish. |
 | 6 | **Rectangle** | B | Drag out a rectangular piece. |
 | 7 | **Ellipse** | O | Drag out an elliptical piece. |
-| 8 | Undo | Ctrl+Z | Undo the last change. Hover to see what it will undo. |
-| 9 | Redo | Ctrl+Shift+Z | Redo. |
-| 10 | **Pattern / UV Layout** | U | Switch the 2D view between the pattern and the UV layout. |
+| 8 | **Ruler** | M | Measure a distance in the 2D view, or between two points on the cloth or avatar in the 3D view (see [Measuring with the Ruler](#measuring-with-the-ruler)). |
+| 9 | Undo | Ctrl+Z | Undo the last change. Hover to see what it will undo. |
+| 10 | Redo | Ctrl+Shift+Z | Redo. |
+| 11 | **Pattern / UV Layout** | U | Switch the 2D view between the pattern and the UV layout. |
+
+The keys are the defaults; every one of them can be changed in [Preferences ▸ Keyboard](#keyboard-shortcuts).
+
+**Right-click** in the 2D or 3D view opens the **Edit** menu, with each command's key on the right. The piece
+under the pointer is selected first, unless it is already part of the selection, so the menu acts on what you
+clicked. Dragging with the right button still pans.
+
+![The Edit menu, opened with a right-click](images/context-menu.png)
 
 ---
 
@@ -163,7 +172,7 @@ square and says how big it is: 1 mm, 1 cm, 10 cm, 1 m or 10 m in metric, and 1/8
 in imperial. Every few squares there is a stronger line (every tenth square in metric).
 
 **Moving around:** scroll to zoom about the cursor; drag with the middle or right mouse button (or
-Alt+left-drag) to pan; press **F** to frame everything.
+Alt+left-drag) to pan; press **F** to frame everything. A right-click without dragging opens the Edit menu.
 
 ### Drawing pieces
 
@@ -199,6 +208,22 @@ edges, which makes it easy to see whether the two sides match.
 
 A new piece takes the material and fabric of the garment's first piece, and is placed in front of the avatar's
 chest in 3D.
+
+### Measuring with the Ruler
+
+![The Ruler across a skirt panel in 2D, and across the shoulders in 3D](images/ruler.png)
+
+Pick the **Ruler** (**M**).
+
+- **In the 2D view**, drag from one place to another. The line shows a tick at every grid square, and the label
+  gives the distance and its angle. An end that comes near a pattern point catches on it, so measuring from
+  corner to corner is exact. Hold **Shift** to keep the line to 15° steps.
+- **In the 3D view**, click a point on the cloth or the avatar, then click a second one; the far end follows the
+  pointer until you do. You can also drag from the first point to the second. The distance is straight across,
+  not along the surface. Dragging from empty space still orbits the camera.
+
+The ruler stays until you measure again, click empty space, press **Esc**, or pick another tool. It never
+changes the pattern.
 
 ### Shaping pieces
 
@@ -239,6 +264,10 @@ the UVs), not the 3D placement. The **Edit** menu also has **Duplicate** (Ctrl+D
 - **Select:** click a point; **Ctrl+click** (or Shift+click) adds or removes one; drag a box over empty space
   to select every point inside it, across pieces. **Ctrl+A** selects every point of the active garment.
   Click empty space to clear the selection.
+- **Select a whole shape:** double-click inside a piece. This works from the **Select** and **Edit Points**
+  tools too, and switches to Transform Points with every point of that piece selected, ready to move, turn
+  or scale. **Ctrl+double-click** adds another piece's points to the selection. (In Edit Points, a double-click
+  on an edge still adds a point there.)
 - **Move:** handles appear in the middle of the selected points. Drag the red arrow to move them left–right
   only, the green arrow up–down only, or the white square to move them freely. You can also just drag any
   selected point. Hold **Shift** on a free drag to keep to one axis.
@@ -293,6 +322,9 @@ simulation pulls each stitch shut.
 | Pan | Shift+drag, or drag with the middle or right button |
 | Zoom | Scroll |
 | Select a piece | Click it (Ctrl+click adds to the selection). Click empty space to deselect |
+| Edit menu | Right-click without dragging |
+| Front / side / back | **1** / **3** / **Ctrl+1** (on the number row or the keypad) |
+| Orthographic on or off | **5** (number row or keypad), or the **Ortho** button |
 
 ### View buttons
 
@@ -301,11 +333,17 @@ simulation pulls each stitch shut.
 | # | Button | What it does |
 | --- | --- | --- |
 | 1–3 | **Front / Side / Back** | Jump to a standard camera angle. |
-| 4 | **Checker** | Replace fabric colours with a checker texture, to judge UVs and texel density. |
-| 5 | **Wire** | Draw the outline of every face, to see the topology. |
-| 6 | **Pinch** | Drag the cloth itself to tug it into place (see [Pinching the cloth](#pinching-the-cloth)). |
-| 7 | **Gizmo** | Show or hide the move, rotate and scale handles. **Q / W / E / R** choose which of them are shown. |
-| 8 | **Avatar** | Show or hide the avatar. Hidden, it still collides with the cloth. |
+| 4 | **Ortho** | Switch between a perspective and an orthographic camera (see below). |
+| 5 | **Checker** | Replace fabric colours with a checker texture, to judge UVs and texel density. |
+| 6 | **Wire** | Draw the outline of every face, to see the topology. |
+| 7 | **Pinch** | Drag the cloth itself to tug it into place (see [Pinching the cloth](#pinching-the-cloth)). |
+| 8 | **Gizmo** | Show or hide the move, rotate and scale handles. **Q / W / E / R** choose which of them are shown. |
+| 9 | **Avatar** | Show or hide the avatar. Hidden, it still collides with the cloth. |
+
+**Orthographic view.** With **Ortho** on (or **5**, or **View ▸ 3D: Orthographic**) the camera has no
+perspective: things further away are not drawn smaller, so the two sides of a garment, or a sleeve and the
+body, can be compared by eye. Together with **Front** and **Side** it gives flat, technical-drawing views.
+Orbiting, panning, zooming, the handles, Pinch and the Ruler all work the same in both cameras.
 
 ### Moving, rotating and scaling pieces
 
@@ -544,13 +582,13 @@ in the 3D view to see how a texture will sit on the cloth:
 
 The **Avatar** menu chooses what garments are draped on:
 
-| Choice | Use it for |
-| --- | --- |
-| **Mannequin** | The built-in figure, about 1.67 m tall. It has the proportions of the MakeHuman base mesh. |
-| **MakeHuman Base Mesh** | Making clothes for MakeHuman characters. Requires the base mesh to be linked in Preferences. Starts as MakeHuman's neutral default character. |
-| **MakeHuman Body Shape…** | Change that character's gender, age, muscle, weight, height and proportions (see below). |
-| **Load OBJ…** | Your own character. The OBJ must be in metres, Y up, facing +Z; it is stood on the ground automatically. |
-| **None** | Simulating cloth with nothing to collide with but the ground. |
+| Choice                    | Use it for                                                                                                                                    |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Mannequin**             | The built-in figure, about 1.67 m tall. It has the proportions of the MakeHuman base mesh.                                                    |
+| **MakeHuman Base Mesh**   | Making clothes for MakeHuman characters. Requires the base mesh to be linked in Preferences. Starts as MakeHuman's neutral default character. |
+| **MakeHuman Body Shape…** | Change that character's gender, age, muscle, weight, height and proportions (see below).                                                      |
+| **Load OBJ…**             | Your own character. The OBJ must be in metres, Y up, facing +Z; it is stood on the ground automatically.                                      |
+| **None**                  | Simulating cloth with nothing to collide with but the ground.                                                                                 |
 
 Loading an avatar takes a second or two while its collision data is prepared. If you press Simulate during
 that time, simulation starts as soon as the avatar is ready.
@@ -658,25 +696,48 @@ MakeHuman's body.
 
 ## Preferences
 
-**File ▸ Preferences…**
+**File ▸ Preferences…** (**Ctrl+,**). The settings are grouped into pages, listed down the left side.
 
-![Preferences](images/dialog-prefs.png)
+![Preferences, General page](images/dialog-prefs.png)
 
-| Setting | Meaning |
-| --- | --- |
-| **User data folder** | MakeHuman's own data folder, the one containing `data/clothes` (for example `~/makehuman/v1py3`). |
-| **Base mesh** | MakeHuman's `base.obj`, found in its `data/3dobjs` folder. |
-| **Launch command** | Optional. If set, MakeHuman is started after *Send to MakeHuman* when it is not already running. |
-| **Author name** | Written into exported MakeHuman assets. |
-| **Detect Automatically** | Looks for MakeHuman in the usual places and fills in the two paths. |
-| **Renderer** | *Automatic* uses the GPU and falls back to CPU rendering when no GPU driver is found or the GPU failed to start last time. *GPU* and *CPU* force one or the other. Takes effect on the next start. |
-| **Grid size** | The size of one square of the ground grid in the 3D view. 10 cm by default, 4 in with imperial units. |
-| **Snap step** | The step a piece snaps to when you hold Shift while dragging a move arrow in the 3D view. Starts the same as the grid size; set it smaller for finer steps. |
-| **Measurements** | *Metric* shows centimetres, metres, millimetres and g/m². *Imperial* shows inches, oz/yd² and feet and inches for the avatar height, and the grids change to 4 in squares with a stronger line every foot. Applies immediately. Only the interface changes: garment files and exports are the same either way. |
-| **Texture size for texel density** | The texture resolution assumed by the texel density read-outs. |
+| Page | Setting | Meaning |
+| --- | --- | --- |
+| General | **Measurements** | *Metric* shows centimetres, metres, millimetres and g/m². *Imperial* shows inches, oz/yd² and feet and inches for the avatar height, and the grids change to 4 in squares with a stronger line every foot. Only the interface changes: garment files and exports are the same either way. |
+| General | **Author name** | Written into exported MakeHuman assets. |
+| Viewport | **Renderer** | *Automatic* uses the GPU and falls back to CPU rendering when no GPU driver is found or the GPU failed to start last time. *GPU* and *CPU* force one or the other. Takes effect on the next start. |
+| Viewport | **Grid size** | The size of one square of the ground grid in the 3D view. 10 cm by default, 4 in with imperial units. |
+| Viewport | **Snap step** | The step a piece snaps to when you hold Shift while dragging a move arrow in the 3D view. Starts the same as the grid size; set it smaller for finer steps. |
+| MakeHuman | **User data folder** | MakeHuman's own data folder, the one containing `data/clothes` (for example `~/makehuman/v1py3`). |
+| MakeHuman | **Base mesh** | MakeHuman's `base.obj`, found in its `data/3dobjs` folder. |
+| MakeHuman | **Launch command** | Optional. If set, MakeHuman is started after *Send to MakeHuman* when it is not already running. |
+| MakeHuman | **Detect Automatically** | Looks for MakeHuman in the usual places and fills in the two paths. |
+| Textures | **Texture size for texel density** | The texture resolution assumed by the texel density read-outs. |
+| Keyboard | Every shortcut | See [Keyboard shortcuts](#keyboard-shortcuts) below. |
 
-The renderer in use is shown in the bottom-right corner of the 3D view. You can also force it for one run by
-starting Seamstress with `--cpu` or `--gpu`.
+Nothing changes until you press **Save**; **Cancel** leaves everything as it was. The renderer in use is shown
+in the bottom-right corner of the 3D view. You can also force it for one run by starting Seamstress with
+`--cpu` or `--gpu`.
+
+### Keyboard shortcuts
+
+![Preferences, Keyboard page](images/dialog-prefs-keyboard.png)
+
+The **Keyboard** page lists every command that can have a key, grouped like the menus: files, editing, tools,
+handles, view and simulation, including commands that have no key to begin with (such as **Mirror Piece** or
+**3D: Wireframe**).
+
+- **To change a key**, click the button showing it, then press the new key with any of Ctrl, Alt, Shift or
+  Meta. **Escape** stops listening without changing anything.
+- **✕** leaves the command without a key. **↺** puts back its default, and **Reset All** puts back every
+  default.
+- **Search** finds a command by name or by key: type `ctrl+d` to see what Ctrl+D does.
+- A key given to two commands turns red and is listed under the table. Such a key does nothing until one of
+  the two is changed, so fix it before saving.
+
+The new keys work as soon as you press **Save**, and the menus, tooltips and right-click menu show them.
+They are kept in Seamstress's settings file (`~/.config/Seamstress/settings.json` on Linux), which stores only
+the keys you changed. Keys without Ctrl, Alt or Meta are ignored while you type in a text box, so typing a
+name never switches tools.
 
 ---
 
@@ -684,13 +745,18 @@ starting Seamstress with `--cpu` or `--gpu`.
 
 ### Keys
 
+These are the defaults. All of them can be changed under [Preferences ▸ Keyboard](#keyboard-shortcuts).
+
 | Key | Action |
 | --- | --- |
 | V / A / T / S | Select / Edit Points / Transform Points / Sew |
 | Q / W / E / R | Handles: all / move only / rotate only / scale only (both views) |
 | P / B / O | Polygon / Rectangle / Ellipse |
+| M | Ruler |
 | U | Switch the 2D view between pattern and UV layout |
 | F | Frame everything in the 2D view |
+| 1 / 3 / Ctrl+1 | 3D view from the front / side / back (number row or keypad) |
+| 5 | Orthographic 3D view on or off (number row or keypad) |
 | G | Turn Pinch on or off in the 3D view |
 | Space | Start or stop simulation |
 | Enter | Finish the polygon being drawn |
@@ -703,6 +769,8 @@ starting Seamstress with `--cpu` or `--gpu`.
 | Ctrl+A | Select every piece of the active garment |
 | Ctrl+N / Ctrl+O | New project / open |
 | Ctrl+S / Ctrl+Shift+S | Save / save as |
+| Ctrl+, | Preferences |
+| Ctrl+Q | Quit |
 
 ### Mouse
 
@@ -715,9 +783,11 @@ starting Seamstress with `--cpu` or `--gpu`.
 | Shift + drag a move arrow | — | Snap the piece to the grid along that axis |
 | Shift + drag a point (Edit Points) | Snap the point to the grid | — |
 | Middle or right drag | Pan | Pan |
+| Right-click | Edit menu | Edit menu |
 | Alt + left drag | Pan | — |
 | Scroll | Zoom about the cursor | Zoom |
-| Double-click | Finish a polygon; add a point (Edit Points) | — |
+| Double-click | Finish a polygon; add a point on an edge (Edit Points); select every point of a piece | — |
+| Drag (Ruler) | Measure; the ends catch on pattern points | Click or drag between two points on the cloth or avatar |
 | Drag on empty space (Transform Points) | Box-select points | — |
 
 ---
@@ -748,7 +818,7 @@ drag that part of the cloth to where it should sit.
 **A texture shows as missing.** The image file was moved. Choose it again with **…** in the Material section.
 
 **The 3D view is blank or the application will not start.** Start it with `--cpu` to use CPU rendering, or
-choose *CPU* under **Preferences ▸ Renderer**.
+choose *CPU* under **Preferences ▸ Viewport ▸ Renderer**.
 
 ---
 

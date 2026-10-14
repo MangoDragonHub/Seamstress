@@ -1,4 +1,5 @@
 using System.Numerics;
+using Seamstress.Core;
 using Seamstress.Core.Editing;
 using Seamstress.Core.Geometry;
 using Seamstress.Core.IO;
@@ -431,6 +432,127 @@ public class DocumentTests
         Assert.True(Vector2.Distance(Corner(), new Vector2(52, 45)) < 1e-3f);
         ws.History.Undo();
         Assert.True(Vector2.Distance(Corner(), new Vector2(60, 50)) < 1e-3f);
+    }
+
+    [Fact]
+    public void RulerMeasuresAndCatchesOnPoints()
+    {
+        var ws = new Workspace();
+        var editor = new PatternEditor(ws);
+        editor.Tool = PatternTool.Rectangle;
+        editor.PointerDown(new Vector2(0, 0), 1, false);
+        editor.PointerMove(new Vector2(30, 40), 1);
+        editor.PointerUp(new Vector2(30, 40));
+
+        // From near one corner to near the opposite one: both ends land on the corners.
+        editor.Tool = PatternTool.Ruler;
+        editor.PointerDown(new Vector2(0.4f, -0.3f), 1, false);
+        editor.PointerMove(new Vector2(29.6f, 40.5f), 1);
+        editor.PointerUp(new Vector2(29.6f, 40.5f));
+        Assert.Contains("\"ruler\":[0,0,30,40,50]", editor.SceneJson(2048));
+        Assert.Empty(ws.Document.Garments[0].Pieces.Skip(1));          // measuring never edits
+
+        // Away from points it follows the pointer; Shift keeps it to 15° steps.
+        editor.Constrain = true;
+        editor.PointerDown(new Vector2(100, 0), 1, false);
+        editor.PointerMove(new Vector2(110, 0.8f), 1);
+        Assert.Contains("\"ruler\":[100,0,110.032,0,10.032]", editor.SceneJson(2048));
+        editor.PointerUp(new Vector2(110, 0.8f));
+        editor.Constrain = false;
+
+        // A click clears it, and so does leaving the tool.
+        editor.PointerDown(new Vector2(200, 200), 1, false);
+        editor.PointerUp(new Vector2(200, 200));
+        Assert.Null(editor.Ruler);
+        editor.PointerDown(new Vector2(100, 0), 1, false);
+        editor.PointerMove(new Vector2(120, 0), 1);
+        editor.PointerUp(new Vector2(120, 0));
+        editor.Tool = PatternTool.Select;
+        Assert.Null(editor.Ruler);
+    }
+
+    [Fact]
+    public void DoubleClickingAPieceSelectsAllItsPoints()
+    {
+        var ws = new Workspace();
+        var editor = new PatternEditor(ws);
+        editor.Tool = PatternTool.Rectangle;
+        foreach (var (from, to) in new[] { (new Vector2(0, 0), new Vector2(30, 40)), (new Vector2(50, 0), new Vector2(80, 40)) })
+        {
+            editor.PointerDown(from, 1, false);
+            editor.PointerMove(to, 1);
+            editor.PointerUp(to);
+        }
+        var first = ws.Document.Garments[0].Pieces[0];
+        var second = ws.Document.Garments[0].Pieces[1];
+
+        // From the Select tool: the first click selects the piece, the double-click takes all its points.
+        editor.Tool = PatternTool.Select;
+        editor.PointerDown(new Vector2(10, 10), 1, false);
+        editor.PointerUp(new Vector2(10, 10));
+        editor.DoubleClick(new Vector2(10, 10), 1);
+        Assert.Equal(PatternTool.TransformPoints, editor.Tool);
+        Assert.Equal(Enumerable.Range(0, 4).Select(i => (first.Id, i)), editor.SelectedPoints.OrderBy(p => p.Index));
+        Assert.Equal(first.Points[0].Position, ws.Document.Garments[0].Pieces[0].Points[0].Position);   // nothing moved
+
+        // Ctrl adds the next piece's points; a plain double-click replaces them.
+        editor.DoubleClick(new Vector2(60, 10), 1, additive: true);
+        Assert.Equal(8, editor.SelectedPoints.Count);
+        editor.DoubleClick(new Vector2(60, 10), 1);
+        Assert.All(editor.SelectedPoints, p => Assert.Equal(second.Id, p.PieceId));
+        Assert.Equal(4, editor.SelectedPoints.Count);
+
+        // In Edit Points a double-click on an edge still adds a point rather than selecting.
+        editor.Tool = PatternTool.EditPoints;
+        editor.DoubleClick(new Vector2(15, 0), 1);
+        Assert.Equal(PatternTool.EditPoints, editor.Tool);
+        Assert.Equal(5, ws.Document.Garments[0].Pieces[0].Points.Count);
+    }
+
+    [Fact]
+    public void KeyBindingsKeepOnlyChangesAndFindClashes()
+    {
+        Assert.Equal("Ctrl+Shift+S", KeyBindings.Normalize("shift+ctrl+s"));
+        Assert.Equal("Ctrl++", KeyBindings.Normalize("ctrl++"));
+        Assert.Equal("Num+5", KeyBindings.Normalize("keypad+5"));
+        Assert.Equal("Escape", KeyBindings.Normalize("esc"));
+        Assert.Equal("", KeyBindings.Normalize("Hyper+X"));
+
+        // Every command has a unique id, and the defaults never clash with each other.
+        var commands = KeyBindings.Commands;
+        Assert.Equal(commands.Count, commands.Select(c => c.Id).Distinct().Count());
+        Assert.Empty(KeyBindings.Conflicts(commands.ToDictionary(c => c.Id, c => c.Defaults)));
+        Assert.All(commands.SelectMany(c => c.Defaults), k => Assert.Equal(k, KeyBindings.Normalize(k)));
+
+        // Only changed commands are stored; giving M to Select clashes with the Ruler.
+        var settings = new AppSettings();
+        var chosen = commands.ToDictionary(c => c.Id, c => c.Defaults);
+        chosen["tool.select"] = new[] { "m" };
+        chosen["edit.mirror"] = new[] { "Ctrl+M" };
+        KeyBindings.Save(settings, chosen);
+        Assert.Equal(new[] { "edit.mirror", "tool.select" }, settings.Shortcuts.Keys.OrderBy(k => k));
+        Assert.Equal(new[] { "M" }, KeyBindings.For(settings, "tool.select"));
+        Assert.Equal(new[] { "Ctrl+Z" }, KeyBindings.For(settings, "edit.undo"));
+        var clash = Assert.Single(KeyBindings.Conflicts(chosen));
+        Assert.Equal("M", clash.Key);
+        Assert.Equal(new[] { "Select", "Ruler" }, clash.Commands);
+
+        // A command left without keys is remembered as such, and settings survive a save and load.
+        chosen["tool.select"] = Array.Empty<string>();
+        KeyBindings.Save(settings, chosen);
+        Assert.Empty(KeyBindings.For(settings, "tool.select"));
+        string path = Path.Combine(Path.GetTempPath(), "seamstress-keys-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            settings.Save(path);
+            var loaded = AppSettings.Load(path);
+            Assert.Empty(KeyBindings.For(loaded, "tool.select"));
+            Assert.Equal(new[] { "Ctrl+M" }, KeyBindings.For(loaded, "edit.mirror"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]

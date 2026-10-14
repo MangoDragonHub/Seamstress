@@ -13,7 +13,11 @@ Marvelous Designer.
   sew edges together with the Sew tool. Seams are colour-coded, with dots marking the ends that meet.
 - **3D view** – shows the sewn pieces on an avatar. Orbit, pan, zoom, click to select, and drag the arrows and
   rings on a selected piece to move and rotate it. **Pinch** lets you drag the cloth itself, during or after
-  simulation, to tug bunched-up areas into place.
+  simulation, to tug bunched-up areas into place. **Ortho** switches to an orthographic camera.
+- **Measuring** – click an edge to read its length, or use the **Ruler** to measure between any two points
+  in the pattern or on the cloth and avatar in 3D.
+- **Keyboard** – every shortcut can be changed in Preferences, and right-clicking either view opens the Edit
+  menu.
 - **Simulation** – the Simulate button sews and drapes the *active* garment only. Other garments stay as
   they are unless you link them (⇄ in the layers panel) or tick **All garments**. Cloth collides with the
   avatar, with itself and with the other garments, so a shirt settles over a skirt instead of through it.
@@ -121,10 +125,15 @@ the finished garment stays put and the new one drapes over it.
 | U | Toggle UV layout | Ctrl+G | Group selected pieces |
 | F | Frame all in 2D | Esc / Enter | Cancel / finish the current tool |
 | T | Transform points | Q / W / E / R | Handles: all / move / rotate / scale |
+| M | Ruler (2D and 3D) | 5 | Orthographic 3D view on / off |
+| 1 / 3 / Ctrl+1 | 3D front / side / back | Right-click | Edit menu |
+
+Every key can be changed under **File ▸ Preferences ▸ Keyboard**. Double-click a piece in the 2D view to select
+all of its points.
 
 ## MakeHuman
 
-**File ▸ Preferences** links Seamstress to MakeHuman: its user data folder (the one containing
+**File ▸ Preferences ▸ MakeHuman** links Seamstress to MakeHuman: its user data folder (the one containing
 `data/clothes`) and its base mesh (`data/3dobjs/base.obj`). *Detect Automatically* looks in the usual places.
 
 To make clothes for MakeHuman characters:
@@ -143,7 +152,7 @@ The built-in mannequin has the base mesh's proportions, so the bundled templates
 
 The 3D view uses Qt Quick 3D on the GPU. It switches to CPU software rendering when no GPU driver is found,
 when the GPU renderer failed to start on the previous launch, or when asked to (`--cpu`, or
-*Preferences ▸ Renderer*). `--gpu` forces the GPU. The active renderer is shown in the corner of the 3D view.
+*Preferences ▸ Viewport ▸ Renderer*). `--gpu` forces the GPU. The active renderer is shown in the corner of the 3D view.
 
 ## Project file format
 

@@ -85,7 +85,7 @@ ApplicationWindow {
             const dialog = view.indexOf("prefs") >= 0 ? preferences : view.indexOf("export") >= 0 ? exportOptions
                          : view.indexOf("makehuman") >= 0 ? makeHumanDialog
                          : view.indexOf("bodyshape") >= 0 ? bodyShape : null
-            const target = dialog ? dialog.contentItem.parent : rootLayout
+            const target = dialog ? dialog.contentItem.parent : view.indexOf("contextmenu") >= 0 ? contextMenu.contentItem.parent : rootLayout
             target.grabToImage(function(result) {
                 result.saveToFile(App.startupScreenshot)
                 window.closing = true
@@ -99,7 +99,9 @@ ApplicationWindow {
         running: App.startupScreenshot !== ""
         onTriggered: {
             const view = App.startupView
-            if (view.indexOf("prefs") >= 0) preferences.open()
+            // "--view prefskeyboard" (or prefsviewport, …) opens Preferences on that page.
+            if (view.indexOf("prefs") >= 0) preferences.openPage(preferences.pages.find(p => view.indexOf("prefs" + p.toLowerCase()) >= 0) || "General")
+            if (view.indexOf("contextmenu") >= 0) contextMenu.popup(patternView, patternView.width * 0.45, patternView.height * 0.35)
             if (view.indexOf("export") >= 0) { window.pendingExport = "fbx"; exportOptions.open() }
             if (view.indexOf("makehuman") >= 0) makeHumanDialog.open()
             if (view.indexOf("bodyshape") >= 0) bodyShape.open()
@@ -132,34 +134,76 @@ ApplicationWindow {
     }
 
     // ------------------------------------------------------------------ shortcuts
-    Shortcut { sequences: [StandardKey.New]; onActivated: newAction.trigger() }
-    Shortcut { sequences: [StandardKey.Open]; onActivated: openAction.trigger() }
-    Shortcut { sequences: [StandardKey.Save]; onActivated: saveAction.trigger() }
-    Shortcut { sequence: "Ctrl+Shift+S"; onActivated: saveAsAction.trigger() }
-    Shortcut { sequences: [StandardKey.Undo]; onActivated: App.undo() }
-    Shortcut { sequences: ["Ctrl+Shift+Z", "Ctrl+Y"]; onActivated: App.redo() }
-    Shortcut { sequences: ["Delete", "Backspace"]; onActivated: App.deleteSelection() }
-    Shortcut { sequence: "Ctrl+D"; onActivated: App.duplicate() }
-    Shortcut { sequence: "Ctrl+G"; onActivated: App.groupSelection() }
-    Shortcut { sequence: "Ctrl+A"; onActivated: App.selectAll() }
-    Shortcut { sequence: "Space"; onActivated: App.toggleSimulation() }
-    Shortcut { sequence: "Escape"; enabled: !window.typing; onActivated: App.cancelTool() }
-    Shortcut { sequences: ["Return", "Enter"]; enabled: !window.typing; onActivated: App.confirmTool() }
-    Shortcut { sequence: "V"; onActivated: App.tool = "Select" }
-    Shortcut { sequence: "A"; onActivated: App.tool = "EditPoints" }
-    // Which handles the gizmos show, in both views.
-    Shortcut { sequence: "Q"; onActivated: App.gizmoMode = "Full" }
-    Shortcut { sequence: "W"; onActivated: App.gizmoMode = "Move" }
-    Shortcut { sequence: "E"; onActivated: App.gizmoMode = "Rotate" }
-    Shortcut { sequence: "T"; onActivated: App.tool = "TransformPoints" }
-    Shortcut { sequence: "S"; onActivated: App.tool = "Sew" }
-    Shortcut { sequence: "P"; onActivated: App.tool = "Polygon" }
-    Shortcut { sequence: "R"; onActivated: App.gizmoMode = "Scale" }
-    Shortcut { sequence: "B"; onActivated: App.tool = "Rectangle" }
-    Shortcut { sequence: "O"; onActivated: App.tool = "Ellipse" }
-    Shortcut { sequence: "U"; onActivated: App.uvMode = !App.uvMode }
-    Shortcut { sequence: "F"; onActivated: patternView.frameAll() }
-    Shortcut { sequence: "G"; onActivated: viewport.pinchMode = !viewport.pinchMode }
+    // The keys come from App.keyBindingsJson() and can be changed in Preferences ▸ Keyboard; this table says what
+    // each command does.
+    readonly property var commands: ({
+        "file.new": () => newAction.trigger(),
+        "file.open": () => openAction.trigger(),
+        "file.save": () => saveAction.trigger(),
+        "file.saveAs": () => saveAsAction.trigger(),
+        "file.preferences": () => preferences.open(),
+        "file.quit": () => window.close(),
+        "edit.undo": () => App.undo(),
+        "edit.redo": () => App.redo(),
+        "edit.selectAll": () => App.selectAll(),
+        "edit.duplicate": () => App.duplicate(),
+        "edit.delete": () => App.deleteSelection(),
+        "edit.mirror": () => App.mirror(),
+        "edit.rotateLeft": () => App.rotate(90),
+        "edit.rotateRight": () => App.rotate(-90),
+        "edit.straighten": () => App.straightenEdges(),
+        "edit.group": () => App.groupSelection(),
+        "edit.reverseSeam": () => App.reverseSeam(),
+        "tool.select": () => App.tool = "Select",
+        "tool.editPoints": () => App.tool = "EditPoints",
+        "tool.transformPoints": () => App.tool = "TransformPoints",
+        "tool.sew": () => App.tool = "Sew",
+        "tool.polygon": () => App.tool = "Polygon",
+        "tool.rectangle": () => App.tool = "Rectangle",
+        "tool.ellipse": () => App.tool = "Ellipse",
+        "tool.ruler": () => App.tool = "Ruler",
+        "tool.confirm": () => App.confirmTool(),
+        "tool.cancel": () => { viewport.clearRuler(); App.cancelTool() },
+        "handles.full": () => App.gizmoMode = "Full",
+        "handles.move": () => App.gizmoMode = "Move",
+        "handles.rotate": () => App.gizmoMode = "Rotate",
+        "handles.scale": () => App.gizmoMode = "Scale",
+        "view.uv": () => App.uvMode = !App.uvMode,
+        "view.frame": () => patternView.frameAll(),
+        "view.ortho": () => viewport.orthographic = !viewport.orthographic,
+        "view.front": () => viewport.setView(0, -5),
+        "view.side": () => viewport.setView(90, -5),
+        "view.back": () => viewport.setView(180, -5),
+        "view.checker": () => viewport.displayMode = viewport.displayMode === "checker" ? "shaded" : "checker",
+        "view.wireframe": () => viewport.wireframe = !viewport.wireframe,
+        "view.pinch": () => viewport.pinchMode = !viewport.pinchMode,
+        "view.handles": () => viewport.showGizmo = !viewport.showGizmo,
+        "view.avatar": () => viewport.showAvatar = !viewport.showAvatar,
+        "sim.toggle": () => App.toggleSimulation(),
+        "sim.reset": () => App.resetArrangement(),
+    })
+    function run(id) { if (commands[id]) commands[id]() }
+    readonly property var bindings: { App.keysRevision; return JSON.parse(App.keyBindingsJson()) }
+    // The first key of a command, for tooltips: " (V)", or nothing when it has no key.
+    function keyHint(id) { App.keysRevision; const k = App.keyText(id); return k === "" ? "" : " (" + k + ")" }
+    // Set while Preferences listens for a new key, so pressing it does not also run its command.
+    readonly property bool recordingKey: preferences.recording
+
+    Item {
+        Repeater {
+            model: window.bindings
+            delegate: Item {
+                id: holder
+                required property var modelData
+                Shortcut {
+                    // While typing, keys without Ctrl, Alt or Meta belong to the text box.
+                    sequences: window.typing ? holder.modelData.keys.filter(k => /(^|\+)(Ctrl|Alt|Meta)\+/.test(k)) : holder.modelData.keys
+                    enabled: !window.recordingKey && sequences.length > 0
+                    onActivated: window.run(holder.modelData.id)
+                }
+            }
+        }
+    }
 
     Action { id: newAction; text: "&New"; onTriggered: window.guard(() => App.newDocument()) }
     Action { id: openAction; text: "&Open…"; onTriggered: window.guard(() => openDialog.open()) }
@@ -184,8 +228,8 @@ ApplicationWindow {
             Layout.fillWidth: true
             Menu {
                 title: "&File"
-                MenuItem { action: newAction }
-                MenuItem { action: openAction }
+                KeyMenuItem { action: newAction; command: "file.new" }
+                KeyMenuItem { action: openAction; command: "file.open" }
                 Menu {
                     id: recentMenu
                     title: "Open &Recent"
@@ -205,8 +249,8 @@ ApplicationWindow {
                     }
                 }
                 MenuSeparator {}
-                MenuItem { action: saveAction }
-                MenuItem { action: saveAsAction }
+                KeyMenuItem { action: saveAction; command: "file.save" }
+                KeyMenuItem { action: saveAsAction; command: "file.saveAs" }
                 MenuSeparator {}
                 Menu {
                     title: "&Export"
@@ -217,27 +261,11 @@ ApplicationWindow {
                     MenuItem { text: "Send to &MakeHuman"; onTriggered: makeHumanDialog.open() }
                 }
                 MenuSeparator {}
-                MenuItem { text: "&Preferences…"; onTriggered: preferences.open() }
+                KeyMenuItem { text: "&Preferences…"; command: "file.preferences"; onTriggered: preferences.open() }
                 MenuSeparator {}
-                MenuItem { text: "&Quit"; onTriggered: window.close() }
+                KeyMenuItem { text: "&Quit"; command: "file.quit"; onTriggered: window.close() }
             }
-            Menu {
-                title: "&Edit"
-                MenuItem { text: App.undoText; enabled: App.canUndo; onTriggered: App.undo() }
-                MenuItem { text: App.redoText; enabled: App.canRedo; onTriggered: App.redo() }
-                MenuSeparator {}
-                MenuItem { text: "Select All in Garment"; onTriggered: App.selectAll() }
-                MenuItem { text: "Duplicate"; onTriggered: App.duplicate() }
-                MenuItem { text: "Delete"; onTriggered: App.deleteSelection() }
-                MenuSeparator {}
-                MenuItem { text: "Mirror Piece"; onTriggered: App.mirror() }
-                MenuItem { text: "Rotate 90° Left"; onTriggered: App.rotate(90) }
-                MenuItem { text: "Rotate 90° Right"; onTriggered: App.rotate(-90) }
-                MenuItem { text: "Straighten Curved Edges"; onTriggered: App.straightenEdges() }
-                MenuSeparator {}
-                MenuItem { text: "Group Selected Pieces"; onTriggered: App.groupSelection() }
-                MenuItem { text: "Reverse Seam Direction"; onTriggered: App.reverseSeam() }
-            }
+            EditMenu {}
             Menu {
                 id: garmentMenu
                 title: "&Garment"
@@ -257,7 +285,7 @@ ApplicationWindow {
             }
             Menu {
                 title: "&Simulation"
-                MenuItem { text: App.simulating ? "Stop Simulation" : "Simulate"; onTriggered: App.toggleSimulation() }
+                KeyMenuItem { text: App.simulating ? "Stop Simulation" : "Simulate"; command: "sim.toggle"; onTriggered: App.toggleSimulation() }
                 MenuItem {
                     text: "Simulate All Garments"
                     checkable: true
@@ -265,7 +293,7 @@ ApplicationWindow {
                     onTriggered: App.simulateAll = checked
                 }
                 MenuSeparator {}
-                MenuItem { text: "Reset Arrangement"; onTriggered: App.resetArrangement() }
+                KeyMenuItem { text: "Reset Arrangement"; command: "sim.reset"; onTriggered: App.resetArrangement() }
             }
             Menu {
                 title: "&Avatar"
@@ -278,21 +306,26 @@ ApplicationWindow {
             Menu {
                 title: "&View"
                 MenuItem { text: "2D: Pattern"; checkable: true; checked: !App.uvMode; onTriggered: App.uvMode = false }
-                MenuItem { text: "2D: UV Layout"; checkable: true; checked: App.uvMode; onTriggered: App.uvMode = true }
-                MenuItem { text: "Frame All in 2D"; onTriggered: patternView.frameAll() }
+                KeyMenuItem { text: "2D: UV Layout"; command: "view.uv"; checkable: true; checked: App.uvMode; onTriggered: App.uvMode = true }
+                KeyMenuItem { text: "Frame All in 2D"; command: "view.frame"; onTriggered: patternView.frameAll() }
                 MenuSeparator {}
-                MenuItem { text: "3D: Checker (Texel Density)"; checkable: true; checked: viewport.displayMode === "checker"; onTriggered: viewport.displayMode = checked ? "checker" : "shaded" }
-                MenuItem { text: "3D: Wireframe (Topology)"; checkable: true; checked: viewport.wireframe; onTriggered: viewport.wireframe = checked }
-                MenuItem { text: "3D: Pinch Cloth"; checkable: true; checked: viewport.pinchMode; onTriggered: viewport.pinchMode = checked }
-                MenuItem { text: "3D: Show Handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
+                KeyMenuItem { text: "3D: Orthographic"; command: "view.ortho"; checkable: true; checked: viewport.orthographic; onTriggered: viewport.orthographic = checked }
+                KeyMenuItem { text: "3D: Front"; command: "view.front"; onTriggered: viewport.setView(0, -5) }
+                KeyMenuItem { text: "3D: Side"; command: "view.side"; onTriggered: viewport.setView(90, -5) }
+                KeyMenuItem { text: "3D: Back"; command: "view.back"; onTriggered: viewport.setView(180, -5) }
+                MenuSeparator {}
+                KeyMenuItem { text: "3D: Checker (Texel Density)"; command: "view.checker"; checkable: true; checked: viewport.displayMode === "checker"; onTriggered: viewport.displayMode = checked ? "checker" : "shaded" }
+                KeyMenuItem { text: "3D: Wireframe (Topology)"; command: "view.wireframe"; checkable: true; checked: viewport.wireframe; onTriggered: viewport.wireframe = checked }
+                KeyMenuItem { text: "3D: Pinch Cloth"; command: "view.pinch"; checkable: true; checked: viewport.pinchMode; onTriggered: viewport.pinchMode = checked }
+                KeyMenuItem { text: "3D: Show Handles"; command: "view.handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
                 Menu {
                     title: "Handles"
-                    MenuItem { text: "Move, Rotate and Scale\tQ"; checkable: true; checked: App.gizmoMode === "Full"; onTriggered: App.gizmoMode = "Full" }
-                    MenuItem { text: "Move\tW"; checkable: true; checked: App.gizmoMode === "Move"; onTriggered: App.gizmoMode = "Move" }
-                    MenuItem { text: "Rotate\tE"; checkable: true; checked: App.gizmoMode === "Rotate"; onTriggered: App.gizmoMode = "Rotate" }
-                    MenuItem { text: "Scale\tR"; checkable: true; checked: App.gizmoMode === "Scale"; onTriggered: App.gizmoMode = "Scale" }
+                    KeyMenuItem { text: "Move, Rotate and Scale"; command: "handles.full"; checkable: true; checked: App.gizmoMode === "Full"; onTriggered: App.gizmoMode = "Full" }
+                    KeyMenuItem { text: "Move"; command: "handles.move"; checkable: true; checked: App.gizmoMode === "Move"; onTriggered: App.gizmoMode = "Move" }
+                    KeyMenuItem { text: "Rotate"; command: "handles.rotate"; checkable: true; checked: App.gizmoMode === "Rotate"; onTriggered: App.gizmoMode = "Rotate" }
+                    KeyMenuItem { text: "Scale"; command: "handles.scale"; checkable: true; checked: App.gizmoMode === "Scale"; onTriggered: App.gizmoMode = "Scale" }
                 }
-                MenuItem { text: "3D: Show Avatar"; checkable: true; checked: viewport.showAvatar; onTriggered: viewport.showAvatar = checked }
+                KeyMenuItem { text: "3D: Show Avatar"; command: "view.avatar"; checkable: true; checked: viewport.showAvatar; onTriggered: viewport.showAvatar = checked }
                 MenuItem { text: "3D: Show Sewing Threads"; checkable: true; checked: viewport.showThreads; onTriggered: viewport.showThreads = checked }
             }
             Menu {
@@ -313,22 +346,25 @@ ApplicationWindow {
                 component ToolChoice: ToolButton {
                     property string tool: ""
                     property string tip: ""
+                    property string command: ""
                     checkable: true
                     checked: App.tool === tool && !App.uvMode
                     enabled: !App.uvMode || tool === "Select"
                     onClicked: App.tool = tool
                     ToolTip.visible: hovered
                     ToolTip.delay: 500
-                    ToolTip.text: tip
+                    ToolTip.text: tip + window.keyHint(command)
                 }
-                ToolChoice { text: "Select"; tool: "Select"; tip: "Select and move pieces (V)" }
-                ToolChoice { text: "Edit Points"; tool: "EditPoints"; tip: "Move points, curve edges, add points (A)" }
-                ToolChoice { text: "Transform Points"; tool: "TransformPoints"; tip: "Select points and move or rotate them with handles (T)" }
-                ToolChoice { text: "Sew"; tool: "Sew"; tip: "Click two edges to sew them together (S)" }
+                ToolChoice { text: "Select"; tool: "Select"; command: "tool.select"; tip: "Select and move pieces" }
+                ToolChoice { text: "Edit Points"; tool: "EditPoints"; command: "tool.editPoints"; tip: "Move points, curve edges, add points" }
+                ToolChoice { text: "Transform Points"; tool: "TransformPoints"; command: "tool.transformPoints"; tip: "Select points and move, rotate or scale them with handles" }
+                ToolChoice { text: "Sew"; tool: "Sew"; command: "tool.sew"; tip: "Click two edges to sew them together" }
                 ToolSeparator {}
-                ToolChoice { text: "Polygon"; tool: "Polygon"; tip: "Draw a piece corner by corner (P)" }
-                ToolChoice { text: "Rectangle"; tool: "Rectangle"; tip: "Drag out a rectangular piece (B)" }
-                ToolChoice { text: "Ellipse"; tool: "Ellipse"; tip: "Drag out an elliptical piece (O)" }
+                ToolChoice { text: "Polygon"; tool: "Polygon"; command: "tool.polygon"; tip: "Draw a piece corner by corner" }
+                ToolChoice { text: "Rectangle"; tool: "Rectangle"; command: "tool.rectangle"; tip: "Drag out a rectangular piece" }
+                ToolChoice { text: "Ellipse"; tool: "Ellipse"; command: "tool.ellipse"; tip: "Drag out an elliptical piece" }
+                ToolSeparator {}
+                ToolChoice { text: "Ruler"; tool: "Ruler"; command: "tool.ruler"; tip: "Measure distances in the 2D view, or between two points on the cloth or avatar in the 3D view" }
                 ToolSeparator {}
                 ToolButton { text: "↶"; font.pixelSize: 18; enabled: App.canUndo; onClicked: App.undo(); ToolTip.visible: hovered; ToolTip.text: App.undoText }
                 ToolButton { text: "↷"; font.pixelSize: 18; enabled: App.canRedo; onClicked: App.redo(); ToolTip.visible: hovered; ToolTip.text: App.redoText }
@@ -339,7 +375,7 @@ ApplicationWindow {
                     checked: App.uvMode
                     onClicked: App.uvMode = checked
                     ToolTip.visible: hovered
-                    ToolTip.text: "Switch the 2D view between the pattern and its UV layout (U)"
+                    ToolTip.text: "Switch the 2D view between the pattern and its UV layout" + window.keyHint("view.uv")
                 }
 
                 Item { Layout.fillWidth: true }
@@ -362,7 +398,7 @@ ApplicationWindow {
                     onClicked: App.toggleSimulation()
                     ToolTip.visible: hovered
                     ToolTip.delay: 500
-                    ToolTip.text: "Sew and drape the active garment (Space)"
+                    ToolTip.text: "Sew and drape the active garment" + window.keyHint("sim.toggle")
                 }
                 Button {
                     text: "Reset"
@@ -390,11 +426,13 @@ ApplicationWindow {
                 orientation: Qt.Horizontal
                 Viewport3D {
                     id: viewport
+                    onContextMenuRequested: contextMenu.popup()
                     SplitView.preferredWidth: 520
                     SplitView.minimumWidth: 200
                 }
                 PatternView {
                     id: patternView
+                    onContextMenuRequested: contextMenu.popup()
                     SplitView.fillWidth: true
                     SplitView.minimumWidth: 200
                 }
@@ -566,5 +604,6 @@ ApplicationWindow {
     }
 
     PreferencesDialog { id: preferences }
+    EditMenu { id: contextMenu }
     BodyShapeDialog { id: bodyShape }
 }

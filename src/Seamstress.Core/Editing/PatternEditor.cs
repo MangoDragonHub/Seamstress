@@ -24,6 +24,7 @@ public enum PatternTool
     Polygon,
     Rectangle,
     Ellipse,
+    Ruler,
 }
 
 /// <summary>
@@ -32,7 +33,7 @@ public enum PatternTool
 /// </summary>
 public sealed class PatternEditor
 {
-    private enum Drag { None, Pieces, Point, Control, Bend, Shape, Uv, PointsMove, PointsRotate, PointsScale, Marquee }
+    private enum Drag { None, Pieces, Point, Control, Bend, Shape, Uv, PointsMove, PointsRotate, PointsScale, Marquee, Ruler }
 
     /// <summary>Sizes of the 2D handles in screen pixels: the length of the arrows and the radius of the ring.</summary>
     public const float GizmoArrow = 64, GizmoRing = 88;
@@ -69,6 +70,8 @@ public sealed class PatternEditor
     private Vector2 _pointsPivot;
     private Vector2? _marqueeEnd;
     private bool _constrain;
+    private bool _onHandle;                 // the last press landed on one of the 2D handles
+    private Vector2? _rulerStart, _rulerEnd;
 
     /// <summary>Raised when something only the 2D view shows (hover, draft shape, tool) changed.</summary>
     public event Action? Changed;
@@ -121,6 +124,8 @@ public sealed class PatternEditor
                 BuildShape(_dragLast);
             else if ((_drag is Drag.Point or Drag.Control) && _dragMoved)
                 DragPoint(_dragLast);
+            else if (_drag == Drag.Ruler && _dragMoved)
+                _rulerEnd = RulerPoint(_dragLast, _rulerTolerance, _rulerStart);
             else if (_tool == PatternTool.Polygon && _draft.Count > 0 && _draftCursor != null)
                 _draftCursor = PolygonPoint(_draftCursorRaw);
             else
@@ -137,6 +142,54 @@ public sealed class PatternEditor
 
     private Vector2 SnapToGrid(Vector2 world)
         => GridStep > 0 ? new Vector2(MathF.Round(world.X / GridStep), MathF.Round(world.Y / GridStep)) * GridStep : world;
+
+    private float _rulerTolerance;
+
+    /// <summary>
+    /// Where a ruler end goes: onto a pattern point when it is near one, otherwise under the pointer. With Shift the
+    /// far end keeps to 15° steps from the near one.
+    /// </summary>
+    private Vector2 RulerPoint(Vector2 world, float tolerance, Vector2? from)
+    {
+        if (HitPoint(world, tolerance) is { } point)
+            return point.Piece.Points[point.Index].Position + point.Piece.Origin;
+        if (_constrain && from is { } a)
+        {
+            var d = world - a;
+            const float angleStep = MathF.PI / 12;
+            float angle = MathF.Round(MathF.Atan2(d.Y, d.X) / angleStep) * angleStep;
+            return a + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * d.Length();
+        }
+        return world;
+    }
+
+    /// <summary>The two ends of the ruler in pattern centimetres, or null when nothing is being measured.</summary>
+    public (Vector2 A, Vector2 B)? Ruler => _rulerStart is { } a && _rulerEnd is { } b ? (a, b) : null;
+
+    /// <summary>
+    /// Double-click on a piece: switches to Transform Points with every point of the piece selected, so the whole
+    /// shape can be moved, turned or scaled. Ctrl or Shift adds them to the points already selected.
+    /// </summary>
+    private bool SelectPiecePoints(Vector2 world, bool additive)
+    {
+        if (HitPiece(world) is not { } piece)
+            return false;
+        if (_workspace.History.InTransaction)
+            _workspace.History.Cancel();
+        _drag = Drag.None;
+        var keep = additive && _tool == PatternTool.TransformPoints ? _points.ToList() : new List<(string, int)>();
+        Tool = PatternTool.TransformPoints;
+        _points.Clear();
+        _points.AddRange(keep);
+        for (int i = 0; i < piece.Points.Count; i++)
+        {
+            if (!_points.Contains((piece.Id, i)))
+                _points.Add((piece.Id, i));
+        }
+        _workspace.SelectPiece(piece.Id, additive);
+        Changed?.Invoke();
+        return true;
+    }
 
     /// <summary>Moves the point or curve control being dragged in Edit Points; Shift puts it on the grid.</summary>
     private void DragPoint(Vector2 world)
@@ -180,13 +233,14 @@ public sealed class PatternEditor
         ? "UV layout of the active garment: drag a piece to move it in texture space. The checker shows texel density."
         : _tool switch
         {
-            PatternTool.Select => "Click a piece to select it, drag to move. Use the handles to move, rotate or scale it (Q/W/E/R). Click an edge to see its length. Ctrl+click adds to the selection.",
-            PatternTool.EditPoints => "Drag a point to move it, drag an edge to curve it, double-click an edge to add a point, Delete removes the selected point. Hold Shift to snap to the grid. Click an edge to see its length.",
-            PatternTool.TransformPoints => "Click a point to select it, Ctrl+click to add, or drag a box around several. Drag an arrow to move them, the ring to rotate them, a box to scale them (Q/W/E/R choose the handles).",
+            PatternTool.Select => "Click a piece to select it, drag to move. Use the handles to move, rotate or scale it (Q/W/E/R). Click an edge to see its length. Ctrl+click adds to the selection. Double-click a piece to select all its points.",
+            PatternTool.EditPoints => "Drag a point to move it, drag an edge to curve it, double-click an edge to add a point (or inside the piece to select all its points), Delete removes the selected point. Hold Shift to snap to the grid. Click an edge to see its length.",
+            PatternTool.TransformPoints => "Click a point to select it, Ctrl+click to add, drag a box around several, or double-click a piece for all of its points. Drag an arrow to move them, the ring to rotate them, a box to scale them (Q/W/E/R choose the handles).",
             PatternTool.Sew => _pendingEdge == null ? "Click the first edge to sew." : "Click the edge to sew it to. Esc cancels.",
             PatternTool.Polygon => _draft.Count == 0 ? "Click to place the first corner." : "Click to add corners; click the first corner, double-click or press Enter to finish. Hold Shift to snap the side's angle and length.",
             PatternTool.Rectangle => "Drag to draw a rectangular piece. Hold Shift for a square.",
             PatternTool.Ellipse => "Drag to draw an elliptical piece. Hold Shift for a circle.",
+            PatternTool.Ruler => "Drag to measure a distance; the ends catch on pattern points. Hold Shift to keep to 15° steps. Click to clear.",
             _ => "",
         };
 
@@ -439,6 +493,7 @@ public sealed class PatternEditor
         if (PointsCentre() is not { } centre)
             return false;
         float pixel = _pointsPixel = tolerance / 9f;
+        _onHandle = true;
         int count = GizmoTargets().Count;
         var d = (world - centre) / pixel;
         bool On(float x, float y) => MathF.Abs(d.X - x) <= 8 && MathF.Abs(d.Y - y) <= 8;
@@ -458,7 +513,10 @@ public sealed class PatternEditor
         else if (ShowsRotate(count) && MathF.Abs(d.Length() - GizmoRing) <= 7)
             BeginPointsDrag(Drag.PointsRotate, 0, centre);
         else
+        {
+            _onHandle = false;
             return false;
+        }
         // Whole pieces are moved by their origin, which keeps their draped shape in the 3D view.
         if (_tool == PatternTool.Select && _drag == Drag.PointsMove)
             _drag = Drag.Pieces;
@@ -504,6 +562,7 @@ public sealed class PatternEditor
         _dragStart = _dragLast = world;
         _dragMoved = false;
         _drag = Drag.None;
+        _onHandle = false;
 
         if (_uvMode)
         {
@@ -641,6 +700,13 @@ public sealed class PatternEditor
             case PatternTool.Ellipse:
                 _drag = Drag.Shape;
                 break;
+            case PatternTool.Ruler:
+                // Each drag measures afresh; a click without dragging clears the ruler.
+                _rulerTolerance = tolerance;
+                _rulerStart = _rulerEnd = RulerPoint(world, tolerance, null);
+                _drag = Drag.Ruler;
+                Changed?.Invoke();
+                break;
         }
     }
 
@@ -748,6 +814,10 @@ public sealed class PatternEditor
                 _marqueeEnd = world;
                 Changed?.Invoke();
                 return;
+            case Drag.Ruler:
+                _rulerEnd = RulerPoint(world, tolerance, _rulerStart);
+                Changed?.Invoke();
+                return;
         }
 
         if (_uvMode)
@@ -819,6 +889,11 @@ public sealed class PatternEditor
                 if (_dragMoved)
                     _workspace.History.Commit();
                 break;
+            case Drag.Ruler:
+                if (!_dragMoved)
+                    _rulerStart = _rulerEnd = null;
+                Changed?.Invoke();
+                break;
             case Drag.Marquee:
                 {
                     if (_dragMoved && _marqueeEnd is { } end)
@@ -851,7 +926,7 @@ public sealed class PatternEditor
         }
     }
 
-    public void DoubleClick(Vector2 world, float tolerance)
+    public void DoubleClick(Vector2 world, float tolerance, bool additive = false)
     {
         if (_uvMode)
             return;
@@ -868,6 +943,11 @@ public sealed class PatternEditor
                 _workspace.History.Cancel();
             _drag = Drag.None;
             _workspace.InsertPoint(edge.Piece.Id, edge.Edge, edge.Closest);
+        }
+        else if ((_tool is PatternTool.Select or PatternTool.EditPoints or PatternTool.TransformPoints)
+                 && !_onHandle && HitPoint(world, tolerance) == null)
+        {
+            SelectPiecePoints(world, additive);
         }
     }
 
@@ -901,6 +981,7 @@ public sealed class PatternEditor
         _measured.Clear();
         _points.Clear();
         _marqueeEnd = null;
+        _rulerStart = _rulerEnd = null;
         Changed?.Invoke();
     }
 
@@ -1080,6 +1161,10 @@ public sealed class PatternEditor
             }
             sb.Append(']');
         }
+
+        // The ruler: both ends and the distance between them.
+        if (!_uvMode && Ruler is { } ruler)
+            sb.Append(inv, $",\"ruler\":[{ruler.A.X:0.###},{ruler.A.Y:0.###},{ruler.B.X:0.###},{ruler.B.Y:0.###},{Vector2.Distance(ruler.A, ruler.B):0.###}]");
 
         if (_draft.Count > 0)
         {

@@ -54,7 +54,7 @@ def label(d, x, y, text, color="#ffe066", size=17, anchor="lm"):
 im = load("overview")
 outline(im, [
     (2, 2, 392, 30, 1, (372, 16)),
-    (6, 34, 602, 67, 2, (580, 50)),
+    (6, 34, 732, 67, 2, (754, 50)),
     (1548, 34, 1916, 67, 3, (1570, 50)),
     (2, 72, 280, 1016, 4, (140, 560)),
     (284, 72, 801, 1016, 5, (312, 132)),
@@ -65,19 +65,19 @@ outline(im, [
 save(im, "overview-annotated")
 
 # 2. Toolbar close-up with a number on every tool
-tb = load("overview").crop((0, 30, 680, 70)).resize((1360, 80), Image.LANCZOS)
-canvas = Image.new("RGB", (1360, 130), "#1e1f22"); canvas.paste(tb, (0, 0))
+tb = load("overview").crop((0, 30, 740, 69)).resize((1480, 78), Image.LANCZOS)
+canvas = Image.new("RGB", (1480, 128), "#1e1f22"); canvas.paste(tb, (0, 0))
 d = ImageDraw.Draw(canvas)
-for i, x in enumerate([36, 101, 200, 280, 348, 417, 481, 540, 573, 635]):
-    badge(d, x * 2, 104, i + 1, COLORS[i % len(COLORS)], 15)
+for i, x in enumerate([36, 101, 199, 279, 347, 417, 481, 548, 604, 637, 699]):
+    badge(d, x * 2, 103, i + 1, COLORS[i % len(COLORS)], 15)
 save(canvas, "toolbar")
 
 # 3. 3D view buttons
-vb = load("overview").crop((438, 74, 801, 102)).resize((1089, 84), Image.LANCZOS)
-canvas = Image.new("RGB", (1089, 134), "#1e1f22"); canvas.paste(vb, (0, 0))
+vb = load("overview").crop((384, 74, 801, 102)).resize((1251, 84), Image.LANCZOS)
+canvas = Image.new("RGB", (1251, 134), "#1e1f22"); canvas.paste(vb, (0, 0))
 d = ImageDraw.Draw(canvas)
-for i, x in enumerate([452, 491, 529, 594, 641, 682, 726, 774]):
-    badge(d, (x - 438) * 3, 108, i + 1, COLORS[i % len(COLORS)], 15)
+for i, x in enumerate([407, 445, 483, 525, 593, 640, 681, 726, 773]):
+    badge(d, (x - 384) * 3, 108, i + 1, COLORS[i % len(COLORS)], 15)
 save(canvas, "view-buttons")
 
 # 4. Workflow: arranged, then simulated

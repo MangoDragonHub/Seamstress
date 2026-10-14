@@ -232,6 +232,17 @@ public partial class AppController
                 _editor.PointerUp(point.Position + shaped.Origin);
             }
         }
+        if (options.View.Contains("ruler") && _workspace.Document.AllPieces().FirstOrDefault() is { Points.Count: >= 3 } ruled)
+        {
+            // For documentation screenshots: the Ruler from the first piece's first point to its third.
+            _editor.Tool = PatternTool.Ruler;
+            var from = ruled.Points[0].Position + ruled.Origin;
+            var to = ruled.Points[2].Position + ruled.Origin;
+            _editor.PointerDown(from, 0.5f, false);
+            _editor.PointerMove((from + to) / 2, 0.5f);
+            _editor.PointerMove(to, 0.5f);
+            _editor.PointerUp(to);
+        }
         // For documentation screenshots: "--view gizmoscale" (or gizmomove, gizmorotate) shows only those handles.
         foreach (var mode in Enum.GetValues<GizmoMode>())
         {

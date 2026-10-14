@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Qt.Quick;
 using Seamstress.Core;
 using Seamstress.Core.Editing;
@@ -204,6 +205,50 @@ public partial class AppController : INotifyPropertyChanged
         }
     }
 
+    // ---------------------------------------------------------------- keyboard shortcuts
+
+    private int _keysRevision;
+    /// <summary>Goes up whenever the shortcuts change, so the interface reads them again.</summary>
+    public int KeysRevision { get => _keysRevision; private set { _keysRevision = value; Notify(); } }
+
+    /// <summary>Every command as {id, group, name, keys, defaults}, in menu order.</summary>
+    public string KeyBindingsJson()
+        => JsonSerializer.Serialize(KeyBindings.Commands.Select(c => new
+        {
+            id = c.Id,
+            group = c.Group,
+            name = c.Name,
+            keys = KeyBindings.For(_settings, c.Id),
+            defaults = c.Defaults,
+        }));
+
+    /// <summary>The first key of a command, for menus and tooltips; empty when it has none.</summary>
+    public string KeyText(string id) => KeyBindings.For(_settings, id).FirstOrDefault() ?? "";
+
+    private static Dictionary<string, string[]> ParseKeys(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, string[]>>(json) ?? new();
+        }
+        catch (JsonException)
+        {
+            return new();
+        }
+    }
+
+    /// <summary>Keys given to more than one command in a set of choices ({id: [keys]}), as [{key, names}].</summary>
+    public string KeyConflicts(string json)
+        => JsonSerializer.Serialize(KeyBindings.Conflicts(ParseKeys(json)).Select(c => new { key = c.Key, names = c.Commands }));
+
+    /// <summary>Stores the shortcuts chosen in Preferences ({id: [keys]}).</summary>
+    public void SaveKeyBindings(string json)
+    {
+        KeyBindings.Save(_settings, ParseKeys(json));
+        TrySaveSettings();
+        KeysRevision++;
+    }
+
     // ---------------------------------------------------------------- 2D viewport
 
     public string PatternScene() => _editor.SceneJson(_settings.TextureResolution);
@@ -244,8 +289,31 @@ public partial class AppController : INotifyPropertyChanged
 
     public void PointerUp(double x, double y) => _editor.PointerUp(new Vector2((float)x, (float)y));
 
-    public void DoubleClick(double x, double y, double tolerance)
-        => _editor.DoubleClick(new Vector2((float)x, (float)y), (float)tolerance);
+    public void DoubleClick(double x, double y, double tolerance, bool additive)
+    {
+        var before = _editor.Tool;
+        _editor.DoubleClick(new Vector2((float)x, (float)y), (float)tolerance, additive);
+        // Double-clicking a piece switches to Transform Points.
+        if (_editor.Tool != before)
+        {
+            Notify(nameof(Tool));
+            StatusText = _editor.Hint;
+        }
+    }
+
+    /// <summary>Right-click in the 2D view: the piece under the pointer becomes the selection unless it already belongs to it.</summary>
+    public void ContextSelect(double x, double y)
+    {
+        if (_editor.HitPiece(new Vector2((float)x, (float)y)) is { } piece && !_workspace.SelectedPieces.Contains(piece.Id))
+            _workspace.SelectPiece(piece.Id);
+    }
+
+    /// <summary>Right-click in the 3D view, as <see cref="ContextSelect"/>.</summary>
+    public void ContextSelectIn3D(string pieceId)
+    {
+        if (!string.IsNullOrEmpty(pieceId) && !_workspace.SelectedPieces.Contains(pieceId))
+            _workspace.SelectPiece(pieceId);
+    }
 
     public void CancelTool()
     {

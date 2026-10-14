@@ -30,6 +30,30 @@ Item {
     property real distance: 3.2
     property vector3d target: Qt.vector3d(0, 0.95, 0)
 
+    // Orthographic: no perspective, so sizes can be compared across the garment. It frames the same area the
+    // perspective camera sees at the orbit centre, so switching keeps the garment where it was.
+    property bool orthographic: false
+    readonly property real fieldOfView: 35
+    readonly property real magnification: Math.max(1, view.height) / Math.max(1e-6, 2 * distance * Math.tan(fieldOfView * Math.PI / 360))
+    readonly property var activeCamera: orthographic ? orthoCamera : camera
+
+    // Right-click without dragging: the Edit menu.
+    signal contextMenuRequested()
+
+    // Ruler (the Ruler tool): two points on the cloth or the avatar, in metres. With only the first end placed,
+    // the second follows the pointer until the next click.
+    readonly property bool measuring: App.tool === "Ruler" && !App.uvMode
+    property bool rulerPlaced: false
+    property bool rulerOpen: false
+    property vector3d rulerA: Qt.vector3d(0, 0, 0)
+    property vector3d rulerB: Qt.vector3d(0, 0, 0)
+    function clearRuler() { rulerPlaced = false; rulerOpen = false; rulerCanvas.requestPaint() }
+    onMeasuringChanged: if (!measuring) clearRuler()
+    function rulerText() {
+        const cm = rulerA.minus(rulerB).length() * 100
+        return App.imperial ? (cm / 2.54).toFixed(2) + " in" : cm.toFixed(1) + " cm"
+    }
+
     ListModel { id: pieceModel }
 
     function refresh() {
@@ -73,6 +97,13 @@ Item {
         if (App.startupView.indexOf("checker") >= 0) displayMode = "checker"
         if (App.startupView.indexOf("wire") >= 0) wireframe = true
         if (App.startupView.indexOf("pinch") >= 0) pinchMode = true
+        if (App.startupView.indexOf("ortho") >= 0) orthographic = true
+        if (App.startupView.indexOf("ruler") >= 0) {
+            // For documentation screenshots: across the shoulders of the mannequin.
+            rulerA = Qt.vector3d(-0.19, 1.42, 0.02)
+            rulerB = Qt.vector3d(0.19, 1.42, 0.02)
+            rulerPlaced = true
+        }
         refresh()
     }
     Connections {
@@ -83,7 +114,7 @@ Item {
     View3D {
         id: view
         anchors.fill: parent
-        camera: camera
+        camera: root.activeCamera
 
         environment: SceneEnvironment {
             clearColor: "#24262b"
@@ -106,7 +137,15 @@ Item {
                 z: root.distance
                 clipNear: 0.02
                 clipFar: 80
-                fieldOfView: 35
+                fieldOfView: root.fieldOfView
+            }
+            OrthographicCamera {
+                id: orthoCamera
+                z: 20
+                clipNear: 0.02
+                clipFar: 80
+                horizontalMagnification: root.magnification
+                verticalMagnification: root.magnification
             }
         }
 
@@ -116,6 +155,7 @@ Item {
 
         Model {
             visible: root.showAvatar && root.avatarSource !== ""
+            pickable: true      // for the ruler
             source: root.avatarSource
             materials: PrincipledMaterial { baseColor: "#b8aaa0"; roughness: 0.75 }
         }
@@ -180,14 +220,15 @@ Item {
     View3D {
         id: gizmoView
         anchors.fill: parent
-        camera: gizmoCamera
-        visible: root.hasGizmo && root.showGizmo && !App.simulating && !root.pinchMode
+        camera: root.orthographic ? gizmoOrtho : gizmoCamera
+        visible: root.hasGizmo && root.showGizmo && !App.simulating && !root.pinchMode && !root.measuring
         environment: SceneEnvironment { backgroundMode: SceneEnvironment.Transparent; antialiasingMode: SceneEnvironment.MSAA }
 
         Node {
             position: root.target
             eulerRotation: Qt.vector3d(root.pitch, root.yaw, 0)
-            PerspectiveCamera { id: gizmoCamera; z: root.distance; clipNear: 0.02; clipFar: 80; fieldOfView: 35 }
+            PerspectiveCamera { id: gizmoCamera; z: root.distance; clipNear: 0.02; clipFar: 80; fieldOfView: root.fieldOfView }
+            OrthographicCamera { id: gizmoOrtho; z: 20; clipNear: 0.02; clipFar: 80; horizontalMagnification: root.magnification; verticalMagnification: root.magnification }
         }
 
         component Handle: Model {
@@ -226,6 +267,41 @@ Item {
         }
     }
 
+    // The ruler, drawn over the scene so the garment never hides it.
+    Canvas {
+        id: rulerCanvas
+        anchors.fill: parent
+        visible: root.rulerPlaced && root.measuring
+        renderStrategy: Canvas.Cooperative
+        readonly property var cameraState: [root.yaw, root.pitch, root.distance, root.target, root.orthographic, width, height]
+        onCameraStateChanged: Qt.callLater(requestPaint)
+        onVisibleChanged: if (visible) requestPaint()
+        onPaint: {
+            const ctx = getContext("2d")
+            ctx.reset()
+            if (!root.rulerPlaced)
+                return
+            const a = view.mapFrom3DScene(root.rulerA), b = view.mapFrom3DScene(root.rulerB)
+            ctx.strokeStyle = "#ffd447"; ctx.lineWidth = 2
+            ctx.setLineDash(root.rulerOpen ? [6, 4] : [])
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
+            ctx.setLineDash([])
+            ctx.fillStyle = "#ffd447"; ctx.strokeStyle = "#1b1c1f"; ctx.lineWidth = 1
+            for (const p of [a, b]) {
+                ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+            }
+            const text = root.rulerText()
+            ctx.font = "bold 11px sans-serif"
+            ctx.textAlign = "center"
+            const w = ctx.measureText(text).width + 12, mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - 16
+            ctx.fillStyle = Qt.rgba(0.07, 0.07, 0.09, 0.88)
+            ctx.strokeStyle = "#ffd447"
+            ctx.beginPath(); ctx.roundedRect(Math.round(mx - w / 2) + 0.5, Math.round(my - 9) + 0.5, w, 18, 4, 4); ctx.fill(); ctx.stroke()
+            ctx.fillStyle = "#ffe58a"
+            ctx.fillText(text, mx, my + 4)
+        }
+    }
+
     MouseArea {
         id: mouse
         anchors.fill: parent
@@ -233,7 +309,8 @@ Item {
         property real lastX: 0
         property real lastY: 0
         property real travelled: 0
-        property int mode: 0   // 1 orbit, 2 pan, 3 dragging a handle, 4 pinching cloth
+        property int mode: 0   // 1 orbit, 2 pan, 3 dragging a handle, 4 pinching cloth, 5 placing a ruler end
+        hoverEnabled: root.rulerOpen
         property vector3d pinchStart: Qt.vector3d(0, 0, 0)
         property real pinchScale: 0
         cursorShape: mode === 4 ? Qt.ClosedHandCursor : (root.pinchMode ? Qt.OpenHandCursor : Qt.ArrowCursor)
@@ -314,8 +391,25 @@ Item {
                     pinchStart = hit.scenePosition
                     // Metres per pixel at the depth of the grabbed point, so the cloth stays under the cursor.
                     const depth = hit.scenePosition.minus(camera.scenePosition).dotProduct(camera.forward)
-                    pinchScale = 2 * depth * Math.tan(camera.fieldOfView * Math.PI / 360) / view.height
+                    pinchScale = root.orthographic ? 1 / root.magnification : 2 * depth * Math.tan(camera.fieldOfView * Math.PI / 360) / view.height
                     mode = 4
+                    return
+                }
+            }
+            if (e.button === Qt.LeftButton && root.measuring && !(e.modifiers & Qt.ShiftModifier)) {
+                // Ruler: press on a surface to place an end. Dragging from empty space still orbits.
+                const hit = view.pick(e.x, e.y)
+                if (hit.objectHit) {
+                    if (root.rulerOpen) {
+                        root.rulerB = hit.scenePosition
+                        root.rulerOpen = false
+                    } else {
+                        root.rulerA = root.rulerB = hit.scenePosition
+                        root.rulerPlaced = true
+                        root.rulerOpen = true
+                    }
+                    mode = 5
+                    rulerCanvas.requestPaint()
                     return
                 }
             }
@@ -327,9 +421,16 @@ Item {
             travelled += Math.abs(dx) + Math.abs(dy)
             if (mode === 3) {
                 dragHandle(e.x, e.y, (e.modifiers & Qt.ShiftModifier) !== 0)
+            } else if (mode === 5 || (mode === 0 && root.rulerOpen)) {
+                // The far end of the ruler follows the pointer across any surface.
+                const hit = view.pick(e.x, e.y)
+                if (hit.objectHit) {
+                    root.rulerB = hit.scenePosition
+                    rulerCanvas.requestPaint()
+                }
             } else if (mode === 4) {
                 const mx = (e.x - pressX) * pinchScale, my = (pressY - e.y) * pinchScale
-                const r = camera.right, u = camera.up
+                const r = root.activeCamera.right, u = root.activeCamera.up
                 App.pinchMove(pinchStart.x + r.x * mx + u.x * my, pinchStart.y + r.y * mx + u.y * my, pinchStart.z + r.z * mx + u.z * my)
             } else if (mode === 1) {
                 root.yaw -= dx * 0.4
@@ -337,7 +438,7 @@ Item {
             } else if (mode === 2) {
                 // Slide the orbit centre in the camera plane; scale by distance so the scene follows the cursor.
                 const k = root.distance * 0.0016
-                const r = camera.right, u = camera.up
+                const r = root.activeCamera.right, u = root.activeCamera.up
                 root.target = Qt.vector3d(root.target.x - (r.x * dx - u.x * dy) * k,
                                           root.target.y - (r.y * dx - u.y * dy) * k,
                                           root.target.z - (r.z * dx - u.z * dy) * k)
@@ -349,6 +450,16 @@ Item {
                 activePart = ""
             } else if (mode === 4) {
                 App.pinchEnd()
+            } else if (mode === 5) {
+                // A drag places both ends at once; a click leaves the far end following the pointer.
+                if (travelled >= 4)
+                    root.rulerOpen = false
+            } else if (travelled < 4 && e.button === Qt.RightButton) {
+                const hit = view.pick(e.x, e.y)
+                App.contextSelectIn3D(hit.objectHit && hit.objectHit.pid ? hit.objectHit.pid : "")
+                root.contextMenuRequested()
+            } else if (travelled < 4 && e.button === Qt.LeftButton && root.measuring) {
+                root.clearRuler()      // a click on empty space
             } else if (travelled < 4 && e.button === Qt.LeftButton) {
                 // A click without dragging selects the piece under the cursor.
                 const hit = view.pick(e.x, e.y)
@@ -384,6 +495,15 @@ Item {
         ViewButton { text: "Front"; onClicked: root.setView(0, -5) }
         ViewButton { text: "Side"; onClicked: root.setView(90, -5) }
         ViewButton { text: "Back"; onClicked: root.setView(180, -5) }
+        ViewButton {
+            text: "Ortho"
+            checkable: true
+            checked: root.orthographic
+            onToggled: root.orthographic = checked
+            ToolTip.visible: hovered
+            readonly property string key: { App.keysRevision; return App.keyText("view.ortho") }
+            ToolTip.text: "Orthographic view: no perspective, so parts of the garment can be compared in size" + (key !== "" ? " (" + key + ")" : "")
+        }
         ToolSeparator { implicitHeight: 22 }
         ViewButton {
             text: "Checker"
@@ -407,7 +527,7 @@ Item {
             checked: root.pinchMode
             onToggled: root.pinchMode = checked
             ToolTip.visible: hovered
-            ToolTip.text: "Drag the cloth itself to tug it into place, during or after simulation (G)"
+            ToolTip.text: "Drag the cloth itself to tug it into place, during or after simulation"
         }
         ViewButton {
             text: "Gizmo"
@@ -426,13 +546,16 @@ Item {
     }
 
     Label {
-        anchors { left: parent.left; bottom: parent.bottom; margins: 8 }
+        anchors { left: parent.left; right: rendererLabel.left; bottom: parent.bottom; margins: 8 }
+        elide: Text.ElideRight
         opacity: 0.55
         font.pixelSize: 11
-        text: root.pinchMode ? "Pinch: drag the cloth to pull it  ·  Drag elsewhere: orbit  ·  Shift-drag: pan  ·  Wheel: zoom"
-                            : "Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap"
+        text: root.measuring ? "Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Drag elsewhere: orbit"
+            : root.pinchMode ? "Pinch: drag the cloth to pull it  ·  Drag elsewhere: orbit  ·  Shift-drag: pan  ·  Wheel: zoom"
+                            : "Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap"
     }
     Label {
+        id: rendererLabel
         anchors { right: parent.right; bottom: parent.bottom; margins: 8 }
         opacity: 0.55
         font.pixelSize: 11

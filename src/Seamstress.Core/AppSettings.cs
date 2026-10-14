@@ -32,13 +32,22 @@ public sealed class AppSettings
     /// <summary>The grid size and snap step used until the user chooses their own.</summary>
     public static double DefaultGridStep(bool imperial) => imperial ? 10.16 : 10;
 
+    /// <summary>Keyboard shortcuts the user changed, by command id (see <see cref="KeyBindings"/>); the rest keep their defaults.</summary>
+    public Dictionary<string, string[]> Shortcuts { get; set; } = new();
+
     public string Author { get; set; } = "";
     public List<string> RecentFiles { get; set; } = new();
 
     public static string DefaultPath
         => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Seamstress", "settings.json");
 
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    // Relaxed escaping keeps keys such as "Ctrl+S" readable in the file.
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     public static AppSettings Load(string? path = null)
     {
