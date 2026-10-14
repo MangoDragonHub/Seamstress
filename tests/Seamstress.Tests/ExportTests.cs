@@ -212,6 +212,14 @@ public class ExportTests : IDisposable
         var lines = File.ReadAllLines(result.MhcloPath);
         Assert.Contains("basemesh hm08", lines);
         int start = Array.IndexOf(lines, "verts 0") + 1;
+
+        // MakeHuman's loader crashes on a bare "author"/"license"/"homepage" line, so they must be comments, and
+        // MakeHuman 1.2 only understands them without a colon after the key.
+        var header = lines.Take(start).ToArray();
+        Assert.Contains("# author tester", header);
+        Assert.Contains("# license CC0", header);
+        Assert.DoesNotContain(header, l => l.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.TrimEnd(':')
+                                           is "author" or "license" or "homepage");
         Assert.Equal(result.VertexCount, lines.Length - start);
         var objVerts = File.ReadAllLines(Path.ChangeExtension(result.MhcloPath, ".obj")).Where(l => l.StartsWith("v ")).ToArray();
         Assert.Equal(result.VertexCount, objVerts.Length);
@@ -229,5 +237,21 @@ public class ExportTests : IDisposable
             var expected = new Vector3(float.Parse(o[1], inv), float.Parse(o[2], inv), float.Parse(o[3], inv));
             Assert.True(Vector3.Distance(rebuilt, expected) < 0.002f, $"vertex {i}: {rebuilt} vs {expected}");
         }
+
+        // A chosen name, author and licence: MakeHuman lists the asset under that name, and the folder and files
+        // are named after it with anything unsafe for a file name replaced.
+        var clothes = Path.Combine(_folder, "clothes");
+        var named = MakeHumanExporter.Export(mesh, avatar.MakeHuman!, clothes, " Jane  Doe ", "CC-BY", "Summer Skirt/v2");
+        Assert.Equal(Path.Combine(clothes, "summer_skirt_v2"), named.Folder);
+        Assert.Equal(MakeHumanExporter.AssetFolder(clothes, "Summer Skirt/v2"), named.Folder);
+        Assert.Equal(Path.Combine(named.Folder, "summer_skirt_v2.mhclo"), named.MhcloPath);
+        var head = File.ReadLines(named.MhcloPath).TakeWhile(l => l != "verts 0").ToList();
+        Assert.Contains("# author Jane Doe", head);
+        Assert.Contains("# license CC-BY", head);
+        Assert.Contains("name Summer Skirt/v2", head);
+        Assert.Contains("obj_file summer_skirt_v2.obj", head);
+        Assert.True(File.Exists(Path.Combine(named.Folder, "summer_skirt_v2.mhmat")));
+        // A different name is a different asset: it gets its own id, so MakeHuman lists both.
+        Assert.NotEqual(lines.First(l => l.StartsWith("uuid ")), head.First(l => l.StartsWith("uuid ")));
     }
 }

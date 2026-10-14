@@ -846,8 +846,21 @@ public partial class AppController : INotifyPropertyChanged
 
     public bool MakeHumanLinked => Directory.Exists(_settings.MakeHumanUserFolder) && File.Exists(_settings.MakeHumanBaseMesh);
 
+    /// <summary>The name the Send to MakeHuman dialog suggests: the active garment's.</summary>
+    public string ActiveGarmentName() => _workspace.ActiveGarment?.Name ?? "";
+
+    /// <summary>Where an asset of this name would be written, and whether one is there already ({folder, exists}).</summary>
+    public string MakeHumanAssetInfo(string assetName)
+    {
+        if (_settings.MakeHumanClothesFolder is not { } clothes)
+            return JsonSerializer.Serialize(new { folder = "", exists = false });
+        string folder = MakeHumanExporter.AssetFolder(clothes, assetName);
+        return JsonSerializer.Serialize(new { folder, exists = Directory.Exists(folder) });
+    }
+
     /// <summary>Writes the active garment into MakeHuman's clothes library, bound to the base mesh.</summary>
-    public bool SendToMakeHuman()
+    /// <param name="assetName">The name MakeHuman lists it under; empty uses the garment's name.</param>
+    public bool SendToMakeHuman(string assetName)
     {
         try
         {
@@ -858,11 +871,12 @@ public partial class AppController : INotifyPropertyChanged
             if (_avatar?.MakeHuman is not { } baseMesh)
                 throw new InvalidOperationException("Garments are fitted to MakeHuman's base mesh.\n\nChoose Avatar ▸ MakeHuman Base Mesh, simulate the garment on it, then send it again.");
             var scene = BuildExport(weld: true, activeOnly: true);
-            var result = MakeHumanExporter.Export(scene.Meshes[0], baseMesh, clothes, _settings.Author);
+            string name = string.IsNullOrWhiteSpace(assetName) ? garment.Name : assetName.Trim();
+            var result = MakeHumanExporter.Export(scene.Meshes[0], baseMesh, clothes, _settings.Author, _settings.MakeHumanLicense, name);
             string launched = "";
             if (!string.IsNullOrWhiteSpace(_settings.MakeHumanCommand) && Startup.AllowLaunch)
                 launched = LaunchMakeHuman() ? " MakeHuman is starting." : "";
-            StatusText = $"Sent “{garment.Name}” to MakeHuman ({result.VertexCount:N0} vertices): {result.Folder}.{launched}";
+            StatusText = $"Sent “{name}” to MakeHuman ({result.VertexCount:N0} vertices): {result.Folder}.{launched}";
             LastMakeHumanFolder = result.Folder;
             return true;
         }
@@ -910,7 +924,14 @@ public partial class AppController : INotifyPropertyChanged
     public string SettingRenderer => _settings.Renderer;
     public int SettingTextureResolution => _settings.TextureResolution;
     public string SettingAuthor => _settings.Author;
+    public string SettingMakeHumanLicense => _settings.MakeHumanLicense;
     public string SettingUnits => _settings.Units;
+
+    /// <summary>The author written into MakeHuman assets when none is set: the login name.</summary>
+    public string DefaultAuthor => Environment.UserName;
+
+    /// <summary>Licences offered in Preferences, separated by "|"; any other text can be typed.</summary>
+    public string MakeHumanLicenses() => string.Join('|', MakeHumanExporter.Licenses);
 
     /// <summary>True when lengths are shown in inches. "--units" overrides the saved preference for one run.</summary>
     public bool Imperial => (Startup.Units ?? _settings.Units) == "imperial";
@@ -921,8 +942,8 @@ public partial class AppController : INotifyPropertyChanged
     /// <summary>Step that Shift-dragging a move handle snaps to, in centimetres.</summary>
     public double SnapStepCm => _settings.SnapStep > 0 ? _settings.SnapStep : AppSettings.DefaultGridStep(Imperial);
 
-    public void SavePreferences(string userFolder, string baseMesh, string command, string renderer, int textureResolution, string author, string units,
-        double gridSizeCm, double snapStepCm)
+    public void SavePreferences(string userFolder, string baseMesh, string command, string renderer, int textureResolution, string author, string license,
+        string units, double gridSizeCm, double snapStepCm)
     {
         bool baseChanged = _settings.MakeHumanBaseMesh != LocalPath(baseMesh.Trim());
         _settings.MakeHumanUserFolder = LocalPath(userFolder.Trim());
@@ -931,6 +952,7 @@ public partial class AppController : INotifyPropertyChanged
         _settings.Renderer = renderer is "gpu" or "cpu" ? renderer : "auto";
         _settings.TextureResolution = Math.Clamp(textureResolution, 64, 16384);
         _settings.Author = author.Trim();
+        _settings.MakeHumanLicense = string.IsNullOrWhiteSpace(license) ? "CC0" : license.Trim();
         _settings.Units = units == "imperial" ? "imperial" : "metric";
         // A value equal to the default is stored as "default", so it follows the units if they change later.
         double standard = AppSettings.DefaultGridStep(_settings.Units == "imperial");
@@ -970,6 +992,7 @@ public partial class AppController : INotifyPropertyChanged
         Notify(nameof(SettingRenderer));
         Notify(nameof(SettingTextureResolution));
         Notify(nameof(SettingAuthor));
+        Notify(nameof(SettingMakeHumanLicense));
         Notify(nameof(SettingUnits));
         Notify(nameof(Imperial));
         Notify(nameof(GridSizeCm));

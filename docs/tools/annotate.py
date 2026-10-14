@@ -54,7 +54,7 @@ def label(d, x, y, text, color="#ffe066", size=17, anchor="lm"):
 im = load("overview")
 outline(im, [
     (2, 2, 392, 30, 1, (372, 16)),
-    (6, 34, 732, 67, 2, (754, 50)),
+    (6, 34, 796, 67, 2, (818, 50)),
     (1548, 34, 1916, 67, 3, (1570, 50)),
     (2, 72, 280, 1016, 4, (140, 560)),
     (284, 72, 801, 1016, 5, (312, 132)),
@@ -65,10 +65,10 @@ outline(im, [
 save(im, "overview-annotated")
 
 # 2. Toolbar close-up with a number on every tool
-tb = load("overview").crop((0, 30, 740, 69)).resize((1480, 78), Image.LANCZOS)
-canvas = Image.new("RGB", (1480, 128), "#1e1f22"); canvas.paste(tb, (0, 0))
+tb = load("overview").crop((0, 30, 800, 69)).resize((1600, 78), Image.LANCZOS)
+canvas = Image.new("RGB", (1600, 128), "#1e1f22"); canvas.paste(tb, (0, 0))
 d = ImageDraw.Draw(canvas)
-for i, x in enumerate([36, 101, 199, 279, 347, 417, 481, 548, 604, 637, 699]):
+for i, x in enumerate([36, 108, 213, 300, 375, 452, 523, 597, 660, 693, 762]):
     badge(d, x * 2, 103, i + 1, COLORS[i % len(COLORS)], 15)
 save(canvas, "toolbar")
 

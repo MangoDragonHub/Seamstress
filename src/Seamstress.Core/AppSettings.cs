@@ -35,7 +35,11 @@ public sealed class AppSettings
     /// <summary>Keyboard shortcuts the user changed, by command id (see <see cref="KeyBindings"/>); the rest keep their defaults.</summary>
     public Dictionary<string, string[]> Shortcuts { get; set; } = new();
 
+    /// <summary>Written into MakeHuman assets as their author; empty uses the login name.</summary>
     public string Author { get; set; } = "";
+
+    /// <summary>Licence written into MakeHuman assets, e.g. "CC0" or "CC-BY".</summary>
+    public string MakeHumanLicense { get; set; } = "CC0";
     public List<string> RecentFiles { get; set; } = new();
 
     public static string DefaultPath

@@ -26,6 +26,8 @@ Dialog {
         baseMesh.text = App.settingMakeHumanBaseMesh
         command.text = App.settingMakeHumanCommand
         author.text = App.settingAuthor
+        license.editText = App.settingMakeHumanLicense
+        license.currentIndex = license.find(App.settingMakeHumanLicense)
         renderer.currentIndex = Math.max(0, ["auto", "gpu", "cpu"].indexOf(App.settingRenderer))
         resolution.currentIndex = Math.max(0, resolution.model.indexOf(App.settingTextureResolution))
         units.currentIndex = App.settingUnits === "imperial" ? 1 : 0
@@ -57,7 +59,7 @@ Dialog {
     onAccepted: {
         App.savePreferences(userFolder.text, baseMesh.text, command.text,
                             ["auto", "gpu", "cpu"][renderer.currentIndex], resolution.model[resolution.currentIndex], author.text,
-                            units.currentIndex === 1 ? "imperial" : "metric", typedCm(gridSize), typedCm(snapStep))
+                            license.editText, units.currentIndex === 1 ? "imperial" : "metric", typedCm(gridSize), typedCm(snapStep))
         App.saveKeyBindings(JSON.stringify(keyboard.chosen()))
     }
 
@@ -118,18 +120,6 @@ Dialog {
                             Layout.columnSpan: 2
                             text: "Changes the units shown and typed in the interface. Garment files and exports are not affected."
                         }
-                    }
-                }
-                GroupBox {
-                    title: "Exported Files"
-                    Layout.fillWidth: true
-                    GridLayout {
-                        anchors.fill: parent
-                        columns: 2
-                        columnSpacing: 8
-                        rowSpacing: 8
-                        Label { text: "Author name" }
-                        TextField { id: author; Layout.fillWidth: true; selectByMouse: true; placeholderText: "written into exported assets" }
                     }
                 }
                 Item { Layout.fillHeight: true }
@@ -225,6 +215,20 @@ Dialog {
                         TextField { id: command; Layout.fillWidth: true; selectByMouse: true; placeholderText: "optional, e.g. python3 /opt/makehuman/makehuman.py" }
                         Item {}
 
+                        Label { text: "Author name" }
+                        TextField { id: author; Layout.fillWidth: true; selectByMouse: true; placeholderText: App.defaultAuthor + " (your login name) when empty" }
+                        Item {}
+
+                        Label { text: "License" }
+                        // Pick a common licence or type any other.
+                        ComboBox {
+                            id: license
+                            Layout.fillWidth: true
+                            editable: true
+                            model: App.makeHumanLicenses().split("|")
+                        }
+                        Item {}
+
                         Item {}
                         RowLayout {
                             Layout.columnSpan: 2
@@ -242,7 +246,9 @@ Dialog {
                         Note {
                             Layout.columnSpan: 3
                             text: "“Send to MakeHuman” writes garments into <user data folder>/data/clothes and fits them to the base mesh. "
-                                + "If a launch command is set, MakeHuman is started after sending when it is not already running."
+                                + "If a launch command is set, MakeHuman is started after sending when it is not already running. "
+                                + "The author and license are written into every asset sent, and MakeHuman shows them in its clothes library. "
+                                + "CC0 lets anyone use the asset freely; the CC-BY licenses ask for credit, and SA, NC and ND add share-alike, non-commercial and no-derivatives conditions."
                         }
                     }
                 }

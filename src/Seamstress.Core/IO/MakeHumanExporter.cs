@@ -16,13 +16,29 @@ public static class MakeHumanExporter
 
     public sealed record Result(string Folder, string MhcloPath, int VertexCount);
 
+    /// <summary>Licences offered for exported assets; any other text can be typed too.</summary>
+    public static readonly string[] Licenses = { "CC0", "CC-BY", "CC-BY-SA", "CC-BY-NC", "CC-BY-ND", "AGPL3" };
+
+    /// <summary>The folder an asset of this name is written to, inside MakeHuman's "data/clothes" folder.</summary>
+    public static string AssetFolder(string clothesFolder, string assetName)
+        => Path.Combine(clothesFolder, ExportScene.SafeName(DisplayName(assetName)).ToLowerInvariant());
+
+    /// <summary>The name MakeHuman shows: the asset name on one line, without surrounding spaces.</summary>
+    private static string DisplayName(string assetName) => OneLine(assetName) is { Length: > 0 } n ? n : "Garment";
+
+    private static string OneLine(string? text) => string.Join(' ', (text ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
     /// <param name="clothesFolder">MakeHuman's "data/clothes" folder inside its user data directory.</param>
-    public static Result Export(ExportMesh mesh, MakeHumanBase baseMesh, string clothesFolder, string? author = null)
+    /// <param name="assetName">The name MakeHuman lists the asset under; the folder and files are named after it.
+    /// Null uses the garment's name.</param>
+    public static Result Export(ExportMesh mesh, MakeHumanBase baseMesh, string clothesFolder, string? author = null,
+        string? license = null, string? assetName = null)
     {
         if (mesh.Parts.Count == 0 || mesh.Positions.Length == 0)
             throw new InvalidOperationException("The garment has no geometry to send.");
-        string name = ExportScene.SafeName(mesh.Name);
-        string folder = Path.Combine(clothesFolder, name.ToLowerInvariant());
+        string displayName = DisplayName(assetName ?? mesh.Name);
+        string name = ExportScene.SafeName(displayName);
+        string folder = AssetFolder(clothesFolder, displayName);
         Directory.CreateDirectory(folder);
         string fileBase = name.ToLowerInvariant();
         var inv = CultureInfo.InvariantCulture;
@@ -61,11 +77,14 @@ public static class MakeHumanExporter
 
         var locator = new TriangleLocator(baseMesh.Vertices, baseMesh.BodyTriangles);
         var clo = new StringBuilder();
+        // Author and licence go in comments: MakeHuman (1.2 and later) fails to load a file with a bare "author" or
+        // "license" line, because that branch of its loader passes a list where it expects text. No colon after
+        // the key either: 1.2 reads "# author: x" as a property called "author:" and drops it.
         clo.Append("# Exported by Seamstress\n");
-        clo.Append("author ").Append(string.IsNullOrWhiteSpace(author) ? Environment.UserName : author).Append('\n');
-        clo.Append("license CC0\n");
+        clo.Append("# author ").Append(OneLine(author) is { Length: > 0 } who ? who : Environment.UserName).Append('\n');
+        clo.Append("# license ").Append(OneLine(license) is { Length: > 0 } terms ? terms : "CC0").Append('\n');
         clo.Append("basemesh hm08\n");
-        clo.Append("name ").Append(mesh.Name).Append('\n');
+        clo.Append("name ").Append(displayName).Append('\n');
         clo.Append("uuid ").Append(StableUuid(name)).Append('\n');
         clo.Append("tag Seamstress\n");
         clo.Append("version 110\n");
@@ -97,7 +116,7 @@ public static class MakeHumanExporter
         var material = mesh.Parts[0].Material;
         var (r, g, b2) = ExportScene.ParseColor(material.Color);
         var mat = new StringBuilder();
-        mat.Append("# Material for ").Append(mesh.Name).Append(" (exported by Seamstress)\n\n");
+        mat.Append("# Material for ").Append(displayName).Append(" (exported by Seamstress)\n\n");
         mat.Append("name ").Append(name).Append('\n');
         mat.Append("description ").Append(material.Name).Append("\n\n");
         mat.Append("ambientColor 0.5 0.5 0.5\n");

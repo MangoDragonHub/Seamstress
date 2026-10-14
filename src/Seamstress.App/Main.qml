@@ -355,20 +355,42 @@ ApplicationWindow {
                     ToolTip.delay: 500
                     ToolTip.text: tip + window.keyHint(command)
                 }
+                // A short, faint line between the buttons of one group, and a taller, brighter one with more room
+                // around it between groups.
+                component ButtonDivider: Rectangle {
+                    implicitWidth: 1
+                    implicitHeight: 16
+                    Layout.leftMargin: 2
+                    Layout.rightMargin: 2
+                    color: palette.mid
+                }
+                component GroupDivider: Rectangle {
+                    implicitWidth: 1
+                    implicitHeight: 26
+                    Layout.leftMargin: 10
+                    Layout.rightMargin: 10
+                    color: palette.light
+                }
+
                 ToolChoice { text: "Select"; tool: "Select"; command: "tool.select"; tip: "Select and move pieces" }
+                ButtonDivider {}
                 ToolChoice { text: "Edit Points"; tool: "EditPoints"; command: "tool.editPoints"; tip: "Move points, curve edges, add points" }
+                ButtonDivider {}
                 ToolChoice { text: "Transform Points"; tool: "TransformPoints"; command: "tool.transformPoints"; tip: "Select points and move, rotate or scale them with handles" }
+                ButtonDivider {}
                 ToolChoice { text: "Sew"; tool: "Sew"; command: "tool.sew"; tip: "Click two edges to sew them together" }
-                ToolSeparator {}
+                GroupDivider {}
                 ToolChoice { text: "Polygon"; tool: "Polygon"; command: "tool.polygon"; tip: "Draw a piece corner by corner" }
+                ButtonDivider {}
                 ToolChoice { text: "Rectangle"; tool: "Rectangle"; command: "tool.rectangle"; tip: "Drag out a rectangular piece" }
+                ButtonDivider {}
                 ToolChoice { text: "Ellipse"; tool: "Ellipse"; command: "tool.ellipse"; tip: "Drag out an elliptical piece" }
-                ToolSeparator {}
+                GroupDivider {}
                 ToolChoice { text: "Ruler"; tool: "Ruler"; command: "tool.ruler"; tip: "Measure distances in the 2D view, or between two points on the cloth or avatar in the 3D view" }
-                ToolSeparator {}
+                GroupDivider {}
                 ToolButton { text: "↶"; font.pixelSize: 18; enabled: App.canUndo; onClicked: App.undo(); ToolTip.visible: hovered; ToolTip.text: App.undoText }
                 ToolButton { text: "↷"; font.pixelSize: 18; enabled: App.canRedo; onClicked: App.redo(); ToolTip.visible: hovered; ToolTip.text: App.redoText }
-                ToolSeparator {}
+                GroupDivider {}
                 ToolButton {
                     text: App.uvMode ? "UV Layout" : "Pattern"
                     checkable: true
@@ -554,25 +576,81 @@ ApplicationWindow {
         modal: true
         anchors.centerIn: parent
         standardButtons: Dialog.Ok | Dialog.Cancel
+        // Where the asset goes and whether that replaces one already there, for the name being typed.
+        property var target: ({ folder: "", exists: false })
+        function check() { target = JSON.parse(App.makeHumanAssetInfo(assetName.text)) }
+        onAboutToShow: {
+            assetName.text = App.activeGarmentName()
+            check()
+            if (App.makeHumanLinked)
+                assetName.forceActiveFocus()
+        }
+        Component.onCompleted: standardButton(Dialog.Ok).text = "Send"
         ColumnLayout {
             spacing: 10
             Label {
-                Layout.preferredWidth: 440
+                visible: !App.makeHumanLinked
+                Layout.preferredWidth: 460
                 wrapMode: Text.WordWrap
-                text: App.makeHumanLinked
-                    ? "The active garment will be written to MakeHuman's clothes library:\n" + App.settingMakeHumanUserFolder + "/data/clothes\n\nIt is fitted to the MakeHuman base mesh, so it follows the character when you change body shape. In MakeHuman it appears under Geometries ▸ Clothes."
-                    : "MakeHuman is not linked yet. Choose its user data folder and base mesh in Preferences first."
+                text: "MakeHuman is not linked yet. Choose its user data folder and base mesh in Preferences first."
+            }
+            GridLayout {
+                visible: App.makeHumanLinked
+                columns: 2
+                columnSpacing: 10
+                rowSpacing: 8
+                Label { text: "Asset name" }
+                TextField {
+                    id: assetName
+                    Layout.preferredWidth: 340
+                    selectByMouse: true
+                    placeholderText: "the name MakeHuman lists it under"
+                    onTextChanged: makeHumanDialog.check()
+                    onAccepted: makeHumanDialog.accept()
+                }
+                Label { text: "Saved in"; opacity: 0.75 }
+                Label {
+                    Layout.preferredWidth: 340
+                    text: makeHumanDialog.target.folder
+                    elide: Text.ElideMiddle
+                    opacity: 0.75
+                    ToolTip.visible: savedIn.hovered
+                    ToolTip.text: text
+                    HoverHandler { id: savedIn }
+                }
+                Label { text: "Author"; opacity: 0.75 }
+                Label { text: App.settingAuthor !== "" ? App.settingAuthor : App.defaultAuthor; opacity: 0.75 }
+                Label { text: "License"; opacity: 0.75 }
+                Label { text: App.settingMakeHumanLicense; opacity: 0.75 }
+            }
+            Label {
+                visible: App.makeHumanLinked && makeHumanDialog.target.exists
+                Layout.preferredWidth: 460
+                wrapMode: Text.WordWrap
+                color: "#ffb469"
+                text: "An asset with this name is already there. Sending replaces it; choose another name to keep both."
+            }
+            Label {
+                visible: App.makeHumanLinked
+                Layout.preferredWidth: 460
+                wrapMode: Text.WordWrap
+                opacity: 0.65
+                font.pixelSize: 11
+                text: "The garment is fitted to the MakeHuman base mesh, so it follows the character when you change body shape. In MakeHuman it appears under Geometries ▸ Clothes. Author and license are set in Preferences ▸ MakeHuman."
             }
             Label {
                 visible: App.makeHumanLinked && App.avatarType !== "MakeHuman"
-                Layout.preferredWidth: 440
+                Layout.preferredWidth: 460
                 wrapMode: Text.WordWrap
                 color: "#ffb469"
                 text: "The avatar is not the MakeHuman base mesh. Switch to Avatar ▸ MakeHuman Base Mesh and simulate the garment on it before sending."
             }
-            Button { visible: !App.makeHumanLinked; text: "Open Preferences…"; onClicked: { makeHumanDialog.close(); preferences.open() } }
+            RowLayout {
+                Button { visible: !App.makeHumanLinked; text: "Open Preferences…"; onClicked: { makeHumanDialog.close(); preferences.openPage("MakeHuman") } }
+                Button { visible: App.makeHumanLinked; text: "Change Author or License…"; flat: true; onClicked: { makeHumanDialog.close(); preferences.openPage("MakeHuman") } }
+            }
         }
-        onAccepted: if (App.makeHumanLinked) App.sendToMakeHuman()
+        onAccepted: if (App.makeHumanLinked) App.sendToMakeHuman(assetName.text)
     }
 
     MessageDialog {

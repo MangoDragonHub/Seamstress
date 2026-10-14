@@ -144,7 +144,8 @@ To make clothes for MakeHuman characters:
 3. **File ▸ Export ▸ Send to MakeHuman** writes `<name>.mhclo`, `.obj` and `.mhmat` into
    `<user data>/data/clothes/<name>/`. Every vertex is bound to the base mesh, so the garment follows the
    character when its body shape changes. It appears in MakeHuman under *Geometries ▸ Clothes* (restart
-   MakeHuman if it is running).
+   MakeHuman if it is running). A dialog lets you choose the asset name first; the author and license written into
+   the asset are set under *Preferences ▸ MakeHuman*.
 
 The built-in mannequin has the base mesh's proportions, so the bundled templates fit both.
 

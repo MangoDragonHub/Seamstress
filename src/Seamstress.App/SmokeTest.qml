@@ -189,6 +189,12 @@ QtObject {
         check("context menu opens", contextMenu.visible)
         contextMenu.close()
 
+        // Send to MakeHuman suggests the garment's name and says where the asset would go (nothing is written here).
+        check("send dialog suggests the garment name", App.activeGarmentName() !== "")
+        const info = JSON.parse(App.makeHumanAssetInfo("Summer Skirt/v2"))
+        check("send dialog names the asset folder", info.folder === "" || /summer_skirt_v2$/.test(info.folder))
+        check("licences offered", App.makeHumanLicenses().split("|").indexOf("CC-BY") >= 0 && App.settingMakeHumanLicense !== "")
+
         // Keyboard shortcuts come from the registry, and a key on two commands is reported.
         const bindings = JSON.parse(App.keyBindingsJson())
         check("shortcut registry", bindings.length > 40 && App.keyText("tool.ruler") !== "" && bindings.every(b => window.commands[b.id] !== undefined))

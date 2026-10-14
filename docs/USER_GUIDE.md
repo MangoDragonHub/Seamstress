@@ -683,11 +683,20 @@ character when its body shape changes.
 2. Choose **Avatar ▸ MakeHuman Base Mesh**, and optionally set its body with **MakeHuman Body Shape…**.
 3. Build the garment and simulate it on that avatar.
 4. Select the garment and choose **File ▸ Export ▸ Send to MakeHuman**.
+5. Check the **Asset name** (it starts as the garment's name) and press **Send**.
 
-This writes `<name>.mhclo`, `<name>.obj` and `<name>.mhmat` (plus the texture, if any) into
-`<MakeHuman user folder>/data/clothes/<name>/`. In MakeHuman the garment appears under
-**Geometries ▸ Clothes**; restart MakeHuman if it was already running. Sending a garment with the same name
-again replaces the earlier one.
+![Send to MakeHuman, with the asset name, where it is saved, and its author and license](images/dialog-makehuman.png)
+
+The asset name is what MakeHuman lists the garment under. The folder and files are named after it, with
+spaces and other characters that are awkward in file names replaced by `_`, so *Summer Skirt* is written as
+`summer_skirt.mhclo`, `summer_skirt.obj` and `summer_skirt.mhmat` (plus the texture, if any) in
+`<MakeHuman user folder>/data/clothes/summer_skirt/`. The dialog shows that folder as you type, and warns
+when an asset of that name is already there: sending replaces it, while a different name keeps both. In
+MakeHuman the garment appears under **Geometries ▸ Clothes**; restart MakeHuman if it was already running.
+
+Every asset carries the **author** and **license** set in **Preferences ▸ MakeHuman**, and MakeHuman shows
+them in its clothes library. The files load in MakeHuman 1.2, 1.3 and the current development version, and in
+MakeHuman 2 (which shows the author but not the license).
 
 Seamstress refuses to send while a different avatar is in use, because the garment would not be fitted to
 MakeHuman's body.
@@ -698,18 +707,19 @@ MakeHuman's body.
 
 **File ▸ Preferences…** (**Ctrl+,**). The settings are grouped into pages, listed down the left side.
 
-![Preferences, General page](images/dialog-prefs.png)
+![Preferences, MakeHuman page](images/dialog-prefs.png)
 
 | Page | Setting | Meaning |
 | --- | --- | --- |
 | General | **Measurements** | *Metric* shows centimetres, metres, millimetres and g/m². *Imperial* shows inches, oz/yd² and feet and inches for the avatar height, and the grids change to 4 in squares with a stronger line every foot. Only the interface changes: garment files and exports are the same either way. |
-| General | **Author name** | Written into exported MakeHuman assets. |
 | Viewport | **Renderer** | *Automatic* uses the GPU and falls back to CPU rendering when no GPU driver is found or the GPU failed to start last time. *GPU* and *CPU* force one or the other. Takes effect on the next start. |
 | Viewport | **Grid size** | The size of one square of the ground grid in the 3D view. 10 cm by default, 4 in with imperial units. |
 | Viewport | **Snap step** | The step a piece snaps to when you hold Shift while dragging a move arrow in the 3D view. Starts the same as the grid size; set it smaller for finer steps. |
 | MakeHuman | **User data folder** | MakeHuman's own data folder, the one containing `data/clothes` (for example `~/makehuman/v1py3`). |
 | MakeHuman | **Base mesh** | MakeHuman's `base.obj`, found in its `data/3dobjs` folder. |
 | MakeHuman | **Launch command** | Optional. If set, MakeHuman is started after *Send to MakeHuman* when it is not already running. |
+| MakeHuman | **Author name** | Written into every asset sent to MakeHuman. Left empty, your login name is used. |
+| MakeHuman | **License** | The license written into every asset sent: pick *CC0* (anyone may use it freely), *CC-BY* (credit required), *CC-BY-SA*, *CC-BY-NC*, *CC-BY-ND* or *AGPL3*, or type any other. |
 | MakeHuman | **Detect Automatically** | Looks for MakeHuman in the usual places and fills in the two paths. |
 | Textures | **Texture size for texel density** | The texture resolution assumed by the texel density read-outs. |
 | Keyboard | Every shortcut | See [Keyboard shortcuts](#keyboard-shortcuts) below. |
