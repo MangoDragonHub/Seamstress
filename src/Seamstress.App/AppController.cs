@@ -593,6 +593,7 @@ public partial class AppController : INotifyPropertyChanged
     }
     public void Duplicate() => _workspace.DuplicateSelection();
     public void Mirror() => _workspace.MirrorSelection();
+    public void InvertNormals() => _workspace.InvertNormals();
     public void Rotate(double degrees) => _workspace.RotateSelection((float)degrees);
     public void SelectAll()
     {

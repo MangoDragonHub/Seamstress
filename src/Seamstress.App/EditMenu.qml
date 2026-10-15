@@ -15,6 +15,7 @@ Menu {
     KeyMenuItem { text: "Rotate 90° Left"; command: "edit.rotateLeft"; onTriggered: App.rotate(90) }
     KeyMenuItem { text: "Rotate 90° Right"; command: "edit.rotateRight"; onTriggered: App.rotate(-90) }
     KeyMenuItem { text: "Straighten Curved Edges"; command: "edit.straighten"; onTriggered: App.straightenEdges() }
+    KeyMenuItem { text: "Invert Normals"; command: "edit.invertNormals"; onTriggered: App.invertNormals() }
     MenuSeparator {}
     KeyMenuItem { text: "Group Selected Pieces"; command: "edit.group"; onTriggered: App.groupSelection() }
     KeyMenuItem { text: "Reverse Seam Direction"; command: "edit.reverseSeam"; onTriggered: App.reverseSeam() }

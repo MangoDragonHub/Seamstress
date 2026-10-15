@@ -22,6 +22,8 @@ Item {
     property bool pinchMode: false
     property bool showAvatar: true
     property bool showThreads: true
+    // Normal direction: each face's front (the side its normal points to) blue, its back red.
+    property bool showNormals: false
     property string avatarSource: ""
     property string threadSource: ""
 
@@ -98,6 +100,7 @@ Item {
         if (App.startupView.indexOf("wire") >= 0) wireframe = true
         if (App.startupView.indexOf("pinch") >= 0) pinchMode = true
         if (App.startupView.indexOf("ortho") >= 0) orthographic = true
+        if (App.startupView.indexOf("normals") >= 0) showNormals = true
         if (App.startupView.indexOf("ruler") >= 0) {
             // For documentation screenshots: across the shoulders of the mannequin.
             rulerA = Qt.vector3d(-0.19, 1.42, 0.02)
@@ -178,7 +181,9 @@ Item {
 
                 source: meshUrl
                 pickable: true
-                materials: PrincipledMaterial {
+                materials: root.showNormals ? [frontFaces] : [fabric]
+                PrincipledMaterial {
+                    id: fabric
                     baseColor: pieceItem.checker ? "#ffffff" : (pieceItem.tex !== "" ? "#ffffff" : pieceItem.tint)
                     baseColorMap: pieceItem.textured ? fabricTexture : null
                     roughness: pieceItem.rough
@@ -187,6 +192,25 @@ Item {
                     alphaMode: pieceItem.alpha < 0.999 ? PrincipledMaterial.Blend : PrincipledMaterial.Opaque
                     cullMode: Material.NoCulling
                     emissiveFactor: pieceItem.sel ? Qt.vector3d(0.16, 0.12, 0.02) : Qt.vector3d(0, 0, 0)
+                }
+                // Normal direction: this model draws only the front of each face, the one inside only the back.
+                // A little glow keeps the shape readable where the light falls on the other side.
+                PrincipledMaterial {
+                    id: frontFaces
+                    baseColor: "#3f78e0"
+                    roughness: 0.8
+                    cullMode: Material.BackFaceCulling
+                    emissiveFactor: pieceItem.sel ? Qt.vector3d(0.16, 0.28, 0.55) : Qt.vector3d(0.08, 0.14, 0.3)
+                }
+                Model {
+                    visible: root.showNormals
+                    source: pieceItem.meshUrl
+                    materials: PrincipledMaterial {
+                        baseColor: "#e04848"
+                        roughness: 0.8
+                        cullMode: Material.FrontFaceCulling
+                        emissiveFactor: pieceItem.sel ? Qt.vector3d(0.6, 0.16, 0.16) : Qt.vector3d(0.32, 0.08, 0.08)
+                    }
                 }
                 Texture {
                     id: fabricTexture
@@ -478,10 +502,21 @@ Item {
     }
 
     Label {
+        id: viewTitle
         anchors { left: parent.left; top: parent.top; margins: 8 }
         text: "3D Garment"
         font.bold: true
         opacity: 0.75
+    }
+    // Key for the normal direction colours.
+    RowLayout {
+        visible: root.showNormals
+        anchors { left: parent.left; top: viewTitle.bottom; leftMargin: 8; topMargin: 6 }
+        spacing: 6
+        Rectangle { implicitWidth: 12; implicitHeight: 12; radius: 2; color: "#3f78e0" }
+        Label { text: "Front (normal side)"; font.pixelSize: 11; opacity: 0.85 }
+        Rectangle { implicitWidth: 12; implicitHeight: 12; radius: 2; color: "#e04848"; Layout.leftMargin: 8 }
+        Label { text: "Back"; font.pixelSize: 11; opacity: 0.85 }
     }
 
     RowLayout {

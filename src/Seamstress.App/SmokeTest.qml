@@ -189,6 +189,16 @@ QtObject {
         check("context menu opens", contextMenu.visible)
         contextMenu.close()
 
+        // Normals: shown in the 3D view, inverted from Properties as one undo step.
+        viewport.showNormals = true
+        check("normal direction shown", viewport.showNormals)
+        viewport.showNormals = false
+        check("normals start as drawn", selection().piece.flippedNormals === 0)
+        App.invertNormals()
+        check("invert normals", selection().piece.flippedNormals === selection().piece.count && App.undoText === "Undo Invert normals")
+        App.undo()
+        check("invert normals undone", selection().piece.flippedNormals === 0)
+
         // Send to MakeHuman suggests the garment's name and says where the asset would go (nothing is written here).
         check("send dialog suggests the garment name", App.activeGarmentName() !== "")
         const info = JSON.parse(App.makeHumanAssetInfo("Summer Skirt/v2"))

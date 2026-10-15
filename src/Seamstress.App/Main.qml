@@ -176,6 +176,8 @@ ApplicationWindow {
         "view.back": () => viewport.setView(180, -5),
         "view.checker": () => viewport.displayMode = viewport.displayMode === "checker" ? "shaded" : "checker",
         "view.wireframe": () => viewport.wireframe = !viewport.wireframe,
+        "view.normals": () => viewport.showNormals = !viewport.showNormals,
+        "edit.invertNormals": () => App.invertNormals(),
         "view.pinch": () => viewport.pinchMode = !viewport.pinchMode,
         "view.handles": () => viewport.showGizmo = !viewport.showGizmo,
         "view.avatar": () => viewport.showAvatar = !viewport.showAvatar,
@@ -316,6 +318,7 @@ ApplicationWindow {
                 MenuSeparator {}
                 KeyMenuItem { text: "3D: Checker (Texel Density)"; command: "view.checker"; checkable: true; checked: viewport.displayMode === "checker"; onTriggered: viewport.displayMode = checked ? "checker" : "shaded" }
                 KeyMenuItem { text: "3D: Wireframe (Topology)"; command: "view.wireframe"; checkable: true; checked: viewport.wireframe; onTriggered: viewport.wireframe = checked }
+                KeyMenuItem { text: "3D: Normal Direction"; command: "view.normals"; checkable: true; checked: viewport.showNormals; onTriggered: viewport.showNormals = checked }
                 KeyMenuItem { text: "3D: Pinch Cloth"; command: "view.pinch"; checkable: true; checked: viewport.pinchMode; onTriggered: viewport.pinchMode = checked }
                 KeyMenuItem { text: "3D: Show Handles"; command: "view.handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
                 Menu {

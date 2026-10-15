@@ -105,7 +105,7 @@ save(g, "gizmo")
 # 7. Panels
 save(load("layered").crop((0, 72, 281, 345)).resize((562, 546), Image.LANCZOS), "layers")
 save(load("overview").crop((1590, 72, 1920, 345)), "properties-topology")
-save(load("overview").crop((1590, 345, 1920, 890)), "properties-arrangement-fabric")
+save(load("overview").crop((1590, 345, 1920, 945)), "properties-arrangement-fabric")
 save(load("bottom").crop((1590, 72, 1920, 1016)), "properties-material-uv")
 
 # 8. Features

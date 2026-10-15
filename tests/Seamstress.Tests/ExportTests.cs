@@ -197,6 +197,48 @@ public class ExportTests : IDisposable
     }
 
     [Fact]
+    public void InvertedNormalsFaceTheOtherWay()
+    {
+        var piece = _ws.Document.Garments[0].Pieces[0];
+        var mesh = _ws.MeshFor(_ws.Document.Garments[0]).Find(piece.Id)!;
+        var drape = piece.Drape;
+        var before = Scene(weld: false).Meshes[0];
+        var part = before.Parts.First(p => p.Name == piece.Name);
+
+        _ws.SelectPiece(piece.Id);
+        _ws.InvertNormals();
+        piece = _ws.Document.Garments[0].Pieces[0];
+        Assert.True(piece.FlipNormals);
+        Assert.Same(drape, piece.Drape);                                    // the draped shape is kept
+        Assert.Same(mesh, _ws.MeshFor(_ws.Document.Garments[0]).Find(piece.Id));   // the simulation mesh is untouched
+
+        // Every exported triangle and face of that piece is wound the other way; other pieces are unchanged.
+        var after = Scene(weld: false).Meshes[0];
+        var flipped = after.Parts.First(p => p.Name == piece.Name);
+        for (int t = 0; t < part.PositionIndices.Length; t += 3)
+        {
+            Assert.Equal(part.PositionIndices[t], flipped.PositionIndices[t]);
+            Assert.Equal(part.PositionIndices[t + 1], flipped.PositionIndices[t + 2]);
+            Assert.Equal(part.PositionIndices[t + 2], flipped.PositionIndices[t + 1]);
+        }
+        var lastFace = part.FacePositionIndices[^3..];
+        Assert.Equal(new[] { lastFace[0], lastFace[2], lastFace[1] }, flipped.FacePositionIndices[^3..]);
+        Assert.Equal(before.Parts[1].PositionIndices, after.Parts[1].PositionIndices);
+        // So the vertex normals of the piece point the opposite way.
+        int v = part.PositionIndices[0];
+        Assert.True(Vector3.Dot(before.Normals[v], after.Normals[v]) < -0.99f);
+
+        // Saved with the project, one undo step, and inverting again restores the original.
+        var reloaded = GarmentFile.Deserialize(GarmentFile.Serialize(_ws.Document));
+        Assert.True(reloaded.Garments[0].Pieces[0].FlipNormals);
+        Assert.False(reloaded.Garments[0].Pieces[1].FlipNormals);
+        Assert.Equal("Invert normals", _ws.History.UndoName);
+        _ws.History.Undo();
+        Assert.False(_ws.Document.Garments[0].Pieces[0].FlipNormals);
+        Assert.Equal(part.PositionIndices, Scene(weld: false).Meshes[0].Parts.First(p => p.Name == piece.Name).PositionIndices);
+    }
+
+    [Fact]
     public void MakeHumanAssetReproducesTheGarment()
     {
         var settings = new AppSettings();

@@ -186,7 +186,7 @@ internal sealed class ViewportSync : IDisposable
             {
                 var piece = garment.FindPiece(mesh.Pieces[i].PieceId)!;
                 positions[i] = Mesher.CurrentPositions(piece, mesh.Pieces[i]);
-                normals[i] = Mesher.ComputeNormals(positions[i], mesh.Pieces[i].Triangles);
+                normals[i] = Mesher.ComputeNormals(positions[i], mesh.Pieces[i].ShownTriangles(piece.FlipNormals));
             }
             // Shade across closed seams as one surface; draw a thread for stitches that are still apart.
             foreach (var stitch in mesh.Stitches)
@@ -256,13 +256,14 @@ internal sealed class ViewportSync : IDisposable
                 hash.Add(piece.Uv.Rotation);
                 hash.Add(layout.UnitsPerCm);
                 hash.Add(layout.Min);
+                hash.Add(piece.FlipNormals);
                 bool usesDrape = piece.Drape != null && piece.DrapeKey == pieceMesh.Key;
                 int signature = hash.ToHashCode();
                 if (entry.Url.Length == 0 || entry.Key != pieceMesh.Key || entry.Hash != signature
                     || !ReferenceEquals(entry.Drape, usesDrape ? piece.Drape : null))
                 {
                     string file = NextFile("p" + piece.Id, entry.Files);
-                    QtMesh.WriteTriangles(file, positions[i], normals[i], layout.Map(piece, pieceMesh), pieceMesh.Triangles);
+                    QtMesh.WriteTriangles(file, positions[i], normals[i], layout.Map(piece, pieceMesh), pieceMesh.ShownTriangles(piece.FlipNormals));
                     entry.Url = ToUrl(file);
                     entry.Key = pieceMesh.Key;
                     entry.Hash = signature;

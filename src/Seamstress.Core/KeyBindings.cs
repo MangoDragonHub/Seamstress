@@ -27,6 +27,7 @@ public static class KeyBindings
         new("edit.rotateLeft", "Edit", "Rotate 90° Left", Array.Empty<string>()),
         new("edit.rotateRight", "Edit", "Rotate 90° Right", Array.Empty<string>()),
         new("edit.straighten", "Edit", "Straighten Curved Edges", Array.Empty<string>()),
+        new("edit.invertNormals", "Edit", "Invert Normals", Array.Empty<string>()),
         new("edit.group", "Edit", "Group Selected Pieces", new[] { "Ctrl+G" }),
         new("edit.reverseSeam", "Edit", "Reverse Seam Direction", Array.Empty<string>()),
 
@@ -54,6 +55,7 @@ public static class KeyBindings
         new("view.back", "View", "3D: Back", new[] { "Ctrl+1", "Ctrl+Num+1" }),
         new("view.checker", "View", "3D: Checker", Array.Empty<string>()),
         new("view.wireframe", "View", "3D: Wireframe", Array.Empty<string>()),
+        new("view.normals", "View", "3D: Normal Direction", Array.Empty<string>()),
         new("view.pinch", "View", "3D: Pinch Cloth", new[] { "G" }),
         new("view.handles", "View", "3D: Show Handles", Array.Empty<string>()),
         new("view.avatar", "View", "3D: Show Avatar", Array.Empty<string>()),

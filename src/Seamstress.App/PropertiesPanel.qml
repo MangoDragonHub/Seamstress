@@ -275,6 +275,21 @@ Pane {
                     font.pixelSize: 11
                     text: "Where the piece sits in 3D; you can also drag the arrows and rings in the 3D view. Wrap curls the flat piece around an arm or leg."
                 }
+                InfoRow {
+                    readonly property int flipped: root.sel.piece ? root.sel.piece.flippedNormals : 0
+                    readonly property int count: root.sel.piece ? root.sel.piece.count : 0
+                    label: "Normals"
+                    value: flipped === 0 ? "As drawn" : flipped === count ? (count === 1 ? "Inverted" : "All inverted")
+                                                                         : flipped + " of " + count + " inverted"
+                }
+                Button {
+                    Layout.fillWidth: true
+                    text: "Invert Normals"
+                    onClicked: App.invertNormals()
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 500
+                    ToolTip.text: "Turn the faces of the selected pieces to point the other way. Use View ▸ 3D: Normal Direction to see which way they face: blue is the front, red the back."
+                }
             }
 
             // ---- Fabric --------------------------------------------------------------

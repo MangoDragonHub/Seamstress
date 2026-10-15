@@ -113,6 +113,8 @@ public partial class AppController
             sb.Append(",\"posX\":").Append(N(piece.Placement.Position.X)).Append(",\"posY\":").Append(N(piece.Placement.Position.Y)).Append(",\"posZ\":").Append(N(piece.Placement.Position.Z));
             sb.Append(",\"rotX\":").Append(N(piece.Placement.Rotation.X)).Append(",\"rotY\":").Append(N(piece.Placement.Rotation.Y)).Append(",\"rotZ\":").Append(N(piece.Placement.Rotation.Z));
             sb.Append(",\"curvature\":").Append(N(piece.Placement.Curvature));
+            // How many of the selected pieces have their normals inverted.
+            sb.Append(",\"flippedNormals\":").Append(pieces.Count(p => p.FlipNormals)).Append(",\"count\":").Append(pieces.Count);
             sb.Append(",\"particleDistance\":").Append(N(piece.ParticleDistance ?? 0));
             sb.Append(",\"area\":").Append(N(pieces.Sum(Outline.Area)));
             sb.Append(",\"faces\":").Append(pieces.Sum(p => _workspace.MeshFor(doc.GarmentOfPiece(p.Id)!).Find(p.Id)?.FaceCount ?? 0));
@@ -260,5 +262,8 @@ public partial class AppController
             else if (doc.Garments.FirstOrDefault(g => g.Name == options.SelectPiece) is { } garment)
                 _workspace.SelectLayer(garment.Id);
         }
+        // For documentation screenshots: "--view invert" turns the selected pieces' normals the other way.
+        if (options.View.Contains("invert"))
+            _workspace.InvertNormals();
     }
 }

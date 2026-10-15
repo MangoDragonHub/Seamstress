@@ -335,7 +335,7 @@ simulation pulls each stitch shut.
 | 1–3 | **Front / Side / Back** | Jump to a standard camera angle. |
 | 4 | **Ortho** | Switch between a perspective and an orthographic camera (see below). |
 | 5 | **Checker** | Replace fabric colours with a checker texture, to judge UVs and texel density. |
-| 6 | **Wire** | Draw the outline of every face, to see the topology. |
+| 6 | **Wire** | Draw the outline of every face, to see the topology. (**View ▸ 3D: Normal Direction**, which has no button, colours the front and back of the faces; see [Normal direction](#normal-direction).) |
 | 7 | **Pinch** | Drag the cloth itself to tug it into place (see [Pinching the cloth](#pinching-the-cloth)). |
 | 8 | **Gizmo** | Show or hide the move, rotate and scale handles. **Q / W / E / R** choose which of them are shown. |
 | 9 | **Avatar** | Show or hide the avatar. Hidden, it still collides with the cloth. |
@@ -344,6 +344,22 @@ simulation pulls each stitch shut.
 perspective: things further away are not drawn smaller, so the two sides of a garment, or a sleeve and the
 body, can be compared by eye. Together with **Front** and **Side** it gives flat, technical-drawing views.
 Orbiting, panning, zooming, the handles, Pinch and the Ruler all work the same in both cameras.
+
+### Normal direction
+
+Every face of a piece has a front and a back; its **normal** points out of the front. Game engines and other
+3D programs often draw only the front of a face, or light it from that side, so a garment exported with some
+pieces facing inwards can show holes or dark patches there.
+
+![Normal direction: the shirt faces outwards in blue; the left sleeve, inverted, shows its red back](images/normals.png)
+
+Turn on **View ▸ 3D: Normal Direction** to colour every piece by the side you are looking at: **blue** is the
+front, **red** the back. On a finished garment the outside should be blue all over. A piece that shows red
+from outside faces the wrong way: select it and press **Invert Normals** under **3D Arrangement** in
+Properties (also in the Edit menu and the right-click menu). This turns its faces round without changing its
+shape, its drape or the simulation, and it is one undo step. With several pieces selected each one is turned
+round, and Properties shows how many of them are inverted. The setting is saved with the project and applies
+to every export: OBJ, glTF, FBX and Send to MakeHuman.
 
 ### Moving, rotating and scaling pieces
 
@@ -504,6 +520,8 @@ apply immediately; dragging a slider counts as a single undo step.
 | **Position X / Y / Z** | Centre of the piece in metres. X is left–right, Y is up, Z is front–back (positive is in front of the avatar). |
 | **Rotation X / Y / Z** | Orientation in degrees. A back piece is typically rotated 180° about Y so it faces away. |
 | **Wrap** | Curls the piece around its vertical axis by this many degrees, for sleeves and trouser legs. |
+| **Normals** | Which way the piece's faces point: *As drawn*, *Inverted*, or how many of the selected pieces are inverted. |
+| **Invert Normals** | Turns the faces of the selected pieces round (see [Normal direction](#normal-direction)). |
 
 **Fabric Physics** — per piece, so one garment can mix fabrics.
 

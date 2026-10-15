@@ -153,18 +153,19 @@ public sealed class ExportScene
             var piece = garment.FindPiece(pieceMesh.PieceId)!;
             if (!piece.Visible && !options.IncludeHidden)
                 continue;
-            var positionIndices = new int[pieceMesh.Triangles.Length];
-            var uvIndices = new int[pieceMesh.Triangles.Length];
+            var triangles = pieceMesh.ShownTriangles(piece.FlipNormals);
+            var positionIndices = new int[triangles.Length];
+            var uvIndices = new int[triangles.Length];
             for (int k = 0; k < positionIndices.Length; k++)
             {
-                uvIndices[k] = offsets[i] + pieceMesh.Triangles[k];
+                uvIndices[k] = offsets[i] + triangles[k];
                 positionIndices[k] = remap[uvIndices[k]];
             }
             allTriangles.AddRange(positionIndices);
             var sizes = new List<int>();
             var facePositions = new List<int>();
             var faceUvs = new List<int>();
-            foreach (var face in pieceMesh.Faces())
+            foreach (var face in pieceMesh.Faces(piece.FlipNormals))
             {
                 sizes.Add(face.Length);
                 foreach (int v in face)

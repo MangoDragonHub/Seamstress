@@ -200,6 +200,12 @@ public sealed class PatternPiece
 
     public UvAdjust Uv { get; set; } = new();
 
+    /// <summary>
+    /// The piece's faces point the other way: it is shown and exported with the opposite winding, so its normals
+    /// face the other side of the cloth. The simulation is not affected.
+    /// </summary>
+    public bool FlipNormals { get; set; }
+
     /// <summary>Simulated vertex positions (x,y,z triples in metres), valid only for the mesh identified by <see cref="DrapeKey"/>.</summary>
     public float[]? Drape { get; set; }
 
@@ -219,6 +225,7 @@ public sealed class PatternPiece
         MaterialId = MaterialId,
         ParticleDistance = ParticleDistance,
         Uv = Uv.Clone(),
+        FlipNormals = FlipNormals,
         Drape = Drape, // drape arrays are replaced, never mutated in place, so sharing is safe
         DrapeKey = DrapeKey,
     };

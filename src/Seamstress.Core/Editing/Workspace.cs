@@ -562,6 +562,22 @@ public sealed class Workspace
     }
 
     /// <summary>Mirrors the selected pieces left-to-right. Seams stay attached to the same edges.</summary>
+    /// <summary>
+    /// Turns the selected pieces' normals to face the other side of the cloth, as one undo step. Each piece is
+    /// flipped from its own state, so a selection with mixed directions stays mixed. The drape is kept.
+    /// </summary>
+    public void InvertNormals()
+    {
+        var ids = SelectedPieces.ToHashSet();
+        if (ids.Count == 0)
+            return;
+        History.Execute(ids.Count == 1 ? "Invert normals" : "Invert normals of " + ids.Count + " pieces", doc =>
+        {
+            foreach (var piece in doc.AllPieces().Where(p => ids.Contains(p.Id)))
+                piece.FlipNormals = !piece.FlipNormals;
+        });
+    }
+
     public void MirrorSelection()
     {
         var ids = SelectedPieces.ToHashSet();

@@ -172,6 +172,8 @@ public static class GarmentFile
             w.WriteNumber("particleDistance", distance);
         w.WritePropertyName("uv");
         w.WriteRawValue($"{{ \"offset\": {V(p.Uv.Offset)}, \"scale\": {N(p.Uv.Scale)}, \"rotation\": {N(p.Uv.Rotation)} }}");
+        if (p.FlipNormals)
+            w.WriteBoolean("flipNormals", true);
 
         if (p.Drape != null && p.DrapeKey != null)
         {
@@ -355,6 +357,7 @@ public static class GarmentFile
         piece.MaterialId = Str(p, "material");
         if (p.TryGetProperty("particleDistance", out var pd) && pd.ValueKind == JsonValueKind.Number)
             piece.ParticleDistance = Math.Clamp(pd.GetSingle(), 0.3f, 20f);
+        piece.FlipNormals = p.TryGetProperty("flipNormals", out var flip) && flip.ValueKind == JsonValueKind.True;
         if (p.TryGetProperty("uv", out var uv) && uv.ValueKind == JsonValueKind.Object)
         {
             piece.Uv.Offset = Vec2(uv, "offset", Vector2.Zero);

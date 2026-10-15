@@ -13,7 +13,9 @@ Marvelous Designer.
   sew edges together with the Sew tool. Seams are colour-coded, with dots marking the ends that meet.
 - **3D view** – shows the sewn pieces on an avatar. Orbit, pan, zoom, click to select, and drag the arrows and
   rings on a selected piece to move and rotate it. **Pinch** lets you drag the cloth itself, during or after
-  simulation, to tug bunched-up areas into place. **Ortho** switches to an orthographic camera.
+  simulation, to tug bunched-up areas into place. **Ortho** switches to an orthographic camera. **View ▸ 3D:
+  Normal Direction** colours the front and back of every face, and **Invert Normals** (Properties) turns a
+  piece that faces the wrong way.
 - **Measuring** – click an edge to read its length, or use the **Ruler** to measure between any two points
   in the pattern or on the cloth and avatar in 3D.
 - **Keyboard** – every shortcut can be changed in Preferences, and right-clicking either view opens the Edit

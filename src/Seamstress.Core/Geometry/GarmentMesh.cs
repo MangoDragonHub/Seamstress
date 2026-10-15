@@ -36,17 +36,38 @@ public sealed class PieceMesh
     public int FaceCount => Polygons?.Length ?? TriangleCount;
     public int QuadCount => Polygons?.Count(p => p.Length == 4) ?? 0;
 
-    /// <summary>Every face of the exported topology as its vertex indices, counter-clockwise.</summary>
-    public IEnumerable<int[]> Faces()
+    /// <summary>
+    /// Every face of the exported topology as its vertex indices: counter-clockwise, or clockwise when the piece's
+    /// normals are flipped.
+    /// </summary>
+    public IEnumerable<int[]> Faces(bool flipped = false)
     {
         if (Polygons != null)
         {
             foreach (var polygon in Polygons)
-                yield return polygon;
+                yield return flipped ? polygon.Reverse().ToArray() : polygon;
             yield break;
         }
         for (int t = 0; t < Triangles.Length; t += 3)
-            yield return new[] { Triangles[t], Triangles[t + 1], Triangles[t + 2] };
+            yield return flipped ? new[] { Triangles[t], Triangles[t + 2], Triangles[t + 1] } : new[] { Triangles[t], Triangles[t + 1], Triangles[t + 2] };
+    }
+
+    /// <summary>
+    /// The triangles as they are shown and exported. The simulation always uses <see cref="Triangles"/>; a piece
+    /// with flipped normals is drawn with each triangle wound the other way.
+    /// </summary>
+    public int[] ShownTriangles(bool flipped)
+    {
+        if (!flipped)
+            return Triangles;
+        var result = new int[Triangles.Length];
+        for (int t = 0; t < Triangles.Length; t += 3)
+        {
+            result[t] = Triangles[t];
+            result[t + 1] = Triangles[t + 2];
+            result[t + 2] = Triangles[t + 1];
+        }
+        return result;
     }
 }
 
