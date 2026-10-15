@@ -31,6 +31,24 @@ jobs:
             dist/Seamstress-x86_64.AppImage
           if-no-files-found: error
 
+  # Cross-compiled on a regular x86_64 runner, in the container build.sh sets up (podman is preinstalled); the
+  # tests run in the x86_64 job, since the code they cover is the same on both processors.
+  linux-arm64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package for ARM64
+        run: ./build.sh --arch arm64 package --install-qt
+      - name: AppImage for ARM64
+        run: ./build.sh --arch arm64 appimage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Seamstress-linux-arm64
+          path: |
+            dist/Seamstress-aarch64.AppImage
+            dist/Seamstress-linux-arm64.tar.gz
+          if-no-files-found: error
+
   windows:
     runs-on: windows-latest
     steps:
@@ -48,4 +66,21 @@ jobs:
         with:
           name: Seamstress-windows
           path: dist/Seamstress-win-x64.zip
+          if-no-files-found: error
+
+  # Cross-compiled for Windows on ARM with Qt's ARM64 build for MSVC and Visual Studio's ARM64 compiler.
+  windows-arm64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Package for ARM64
+        shell: pwsh
+        run: ./build.ps1 package -Arch arm64 -InstallQt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Seamstress-windows-arm64
+          path: dist/Seamstress-win-arm64.zip
           if-no-files-found: error

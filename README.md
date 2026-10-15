@@ -49,6 +49,7 @@ There is one script per platform; both take the same commands.
 | Build and start the app | `./build.sh run` | `.\build.ps1 run` |
 | Package | `./build.sh package` / `appimage` / `flatpak` | `.\build.ps1 package` |
 | Remove build output | `./build.sh clean` | `.\build.ps1 clean` |
+| Build for 64-bit ARM | `--arch arm64` | `-Arch arm64` |
 
 ### Linux
 
@@ -78,6 +79,36 @@ Packages, all written to `dist/`:
 An AppImage or tarball runs on distributions at least as new as the one it was built on, so build releases on an
 older distribution (the CI workflow uses Ubuntu 22.04).
 
+### Linux on ARM64 (Raspberry Pi 4/5, RK3399 and other boards)
+
+The ARM64 build needs a 64-bit distribution with glibc 2.38 or newer, because that is what Qt 6.11 for ARM64 is
+built against: Raspberry Pi OS based on Debian 13 "Trixie" (64-bit), Ubuntu 24.04 or newer, or Armbian/Debian 13
+on an RK3399 board. Raspberry Pi OS "Bookworm" (Debian 12) is too old, and 32-bit systems are not supported.
+
+There are two ways to make it:
+
+- **On the board itself**, exactly as above: `./build.sh --install-qt` downloads Qt for ARM64 into
+  `~/Qt/6.11.3/gcc_arm64`, and every command, including `test` and `run`, works there.
+- **On an x86_64 Linux PC**, with podman or docker installed (`sudo apt install podman`):
+
+  ```bash
+  ./build.sh --arch arm64 appimage --install-qt
+  ```
+
+  The first run creates a build container (Ubuntu 24.04 with a cross-compiler and the ARM64 libraries, about
+  1.7 GB) and downloads Qt for ARM64 next to the x86_64 Qt, whose tools the build uses. Nothing is emulated, so
+  it takes about as long as a normal build. `test` and `run` need the board.
+
+The packages are named for the processor: `Seamstress-linux-arm64/` and its `.tar.gz`,
+`Seamstress-aarch64.AppImage` and `Seamstress-aarch64.flatpak`. Cross-building the Flatpak needs no ARM64 runtime
+on the PC; on the board, `flatpak install --user Seamstress-aarch64.flatpak` fetches
+`org.freedesktop.Platform//24.08` from Flathub as usual.
+
+Seamstress draws with OpenGL, which the Pi's VideoCore GPU and the RK3399's Mali GPU (through Mesa's Panfrost
+driver) provide. If the GPU renderer does not start, Seamstress switches to the CPU renderer on the next launch
+by itself (see *Renderer*), and `--cpu` forces it. The cloth simulation runs on the CPU either way, so expect
+draping to be noticeably slower than on a desktop PC.
+
 ### Windows
 
 Install the [.NET SDK 8 or newer](https://dotnet.microsoft.com/download), then in PowerShell:
@@ -91,9 +122,24 @@ are installed the bridge uses them; if not, the script switches to the bridge's 
 `.\build.ps1 package` produces `dist\Seamstress-win-x64.zip`; the unzipped app needs the .NET 8 runtime installed.
 If PowerShell refuses to run the script, start it with `powershell -ExecutionPolicy Bypass -File build.ps1`.
 
-> The Windows path has not been run yet: it was written against the bridge's Windows package without a Windows
-> machine to try it on. `.github/workflows/build.yml` builds, tests and packages on both Windows and Linux on
-> every push, which is the quickest way to find out what, if anything, needs adjusting.
+**Windows on ARM** (Snapdragon laptops, Surface Pro X and similar): the bridge does not bring Qt for ARM64, so
+add `-InstallQt` to download it into `~\Qt` (or pass `-Qt <prefix>`):
+
+```powershell
+.\build.ps1 package -InstallQt                # on the ARM64 PC itself
+.\build.ps1 package -Arch arm64 -InstallQt    # on an x64 PC
+```
+
+Both produce `dist\Seamstress-win-arm64.zip`, which needs the ARM64 .NET 8 runtime on the target. Cross-building
+on an x64 PC uses Qt's *MSVC 2022 ARM64 (cross-compiled)* build together with the x64 MSVC 2022 Qt of the same
+version for its tools, and Visual Studio's *MSVC ARM64 build tools* component if Visual Studio is installed
+(without it the bridge's prebuilt ARM64 launcher is used). The x64 `Seamstress-win-x64.zip` also runs on Windows
+11 on ARM, through its x64 emulation.
+
+> The Windows path, ARM64 included, has not been run yet: it was written against the bridge's Windows packages
+> without a Windows machine to try it on. `.github/workflows/build.yml` builds, tests and packages on both Windows
+> and Linux, for x64 and ARM64, on every push, which is the quickest way to find out what, if anything, needs
+> adjusting.
 
 ### Without the scripts
 
@@ -189,7 +235,7 @@ and the optional `drape` block (the simulated shape) can be deleted to return a 
 | `src/Seamstress.App` | The Qt Quick application: QML views and the controller that connects them to the core. |
 | `tests/Seamstress.Tests` | Unit tests (`dotnet test`). |
 | `samples` | Example projects. |
-| `packaging` | Desktop entry, AppImage launcher and Flatpak manifest used by `build.sh`. |
+| `packaging` | Desktop entry, AppImage launcher and Flatpak manifest used by `build.sh`, and the container recipe and CMake toolchains for building on x64 for ARM64. |
 | `build.sh`, `build.ps1` | Build, test, run and package. |
 
 `Seamstress --smoke --screenshot <folder>/shot.png` runs an automated pass over the interface (draw, sew,

@@ -24,13 +24,20 @@
       >linux-$(QtBridgeTemplateArch)</QtBridgeTemplateRid>
     <QtBridgeTemplateRid Condition="'$(QtBridgeTemplateRid)' == '' and $([MSBuild]::IsOSPlatform('OSX'))"
       >osx-$(QtBridgeTemplateArch)</QtBridgeTemplateRid>
+    <!-- There is no linux-arm64 package. On Linux the bridge compiles the native host from source against the Qt in
+         QtDir, and the rest of the linux-x64 package is architecture-neutral (.NET assemblies and C++ headers), so
+         that package also serves ARM64 builds, native or cross-compiled. -->
+    <QtBridgeTemplateRid Condition="$(QtBridgeTemplateRid.StartsWith('linux-'))">linux-x64</QtBridgeTemplateRid>
     <QtBridgePackageId>$(QtBridgePackagePrefix).$(QtBridgeTemplateRid)</QtBridgePackageId>
   </PropertyGroup>
 
   <!-- On Linux and macOS the bridge builds against an installed Qt 6. Pass -p:QtDir=<qt prefix> (or set the QtDir
        environment variable); if neither is given, the Qt online-installer / aqt location below is tried. -->
   <PropertyGroup Condition="'$(QtDir)' == '' and '$(OS)' != 'Windows_NT'">
-    <QtDir Condition="Exists('$(HOME)/Qt/6.11.3/gcc_64/lib/cmake/Qt6/Qt6Config.cmake')">$(HOME)/Qt/6.11.3/gcc_64</QtDir>
+    <QtDir Condition="'$(QtBridgeTemplateArch)' == 'x64' and Exists('$(HOME)/Qt/6.11.3/gcc_64/lib/cmake/Qt6/Qt6Config.cmake')"
+      >$(HOME)/Qt/6.11.3/gcc_64</QtDir>
+    <QtDir Condition="'$(QtBridgeTemplateArch)' == 'arm64' and Exists('$(HOME)/Qt/6.11.3/gcc_arm64/lib/cmake/Qt6/Qt6Config.cmake')"
+      >$(HOME)/Qt/6.11.3/gcc_arm64</QtDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -43,5 +50,39 @@
     <None Include="*.qml" />
     <QtResource Include="icons/seamstress.svg" />
   </ItemGroup>
+
+  <!-- The native host the bridge generates gives .NET about one second to start, then quits with ".NET host not ready
+       after timeout". A Raspberry Pi 4 or an RK3399 board starting from an SD card can need longer, so the limit is
+       raised to 30 seconds. The wait still ends as soon as .NET is up or has exited.
+       The bridge rewrites main.cpp on every build because the edited file differs from what it generates; when the
+       edited result is the same as last time, the file gets its old time back so that it is not compiled again. -->
+  <Target Name="SeamstressLongerHostStartup" AfterTargets="QtBridgeGenerate" BeforeTargets="QtBridgeBuild"
+    Condition="'$(QtGenSourceCode)' == 'true' and Exists('$(ProjectQtNativeSourceDir)/cpp/main.cpp')">
+    <PropertyGroup>
+      <_SeamstressHostMain>$(ProjectQtNativeSourceDir)/cpp/main.cpp</_SeamstressHostMain>
+      <_SeamstressHostLast>$(ProjectDir)$(IntermediateOutputPath)seamstress-host-main.cpp</_SeamstressHostLast>
+      <_SeamstressHostSource>$([System.IO.File]::ReadAllText('$(_SeamstressHostMain)'))</_SeamstressHostSource>
+      <_SeamstressHostLimit>constexpr int maxTries = 10000;</_SeamstressHostLimit>
+    </PropertyGroup>
+    <Warning Condition="!$(_SeamstressHostSource.Contains('$(_SeamstressHostLimit)')) and !$(_SeamstressHostSource.Contains('maxTries = 300000;'))"
+      Text="Seamstress: the bridge's generated host changed; its .NET start-up timeout was not raised." />
+    <WriteLinesToFile Condition="$(_SeamstressHostSource.Contains('$(_SeamstressHostLimit)'))"
+      File="$(_SeamstressHostMain)" Overwrite="true"
+      Lines="$([MSBuild]::Escape($(_SeamstressHostSource.Replace('$(_SeamstressHostLimit)', 'constexpr int maxTries = 300000;'))))" />
+    <GetFileHash Files="$(_SeamstressHostMain)">
+      <Output TaskParameter="Hash" PropertyName="_SeamstressHostHash" />
+    </GetFileHash>
+    <GetFileHash Condition="Exists('$(_SeamstressHostLast)')" Files="$(_SeamstressHostLast)">
+      <Output TaskParameter="Hash" PropertyName="_SeamstressHostLastHash" />
+    </GetFileHash>
+    <PropertyGroup>
+      <_SeamstressHostUnchanged>false</_SeamstressHostUnchanged>
+      <_SeamstressHostUnchanged Condition="'$(_SeamstressHostHash)' == '$(_SeamstressHostLastHash)'">true</_SeamstressHostUnchanged>
+    </PropertyGroup>
+    <Touch Condition="'$(_SeamstressHostUnchanged)' == 'true'" Files="$(_SeamstressHostMain)"
+      Time="$([System.IO.File]::GetLastWriteTime('$(_SeamstressHostLast)').ToString('o'))" />
+    <Copy Condition="'$(_SeamstressHostUnchanged)' != 'true'" SourceFiles="$(_SeamstressHostMain)"
+      DestinationFiles="$(_SeamstressHostLast)" />
+  </Target>
 
 </Project>
