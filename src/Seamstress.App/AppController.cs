@@ -596,6 +596,21 @@ public partial class AppController : INotifyPropertyChanged
     public void Duplicate() => _workspace.DuplicateSelection();
     public void Mirror() => _workspace.MirrorSelection();
     public void InvertNormals() => _workspace.InvertNormals();
+
+    /// <summary>Cuts a hole in one selected piece in the shape of another selected piece lying inside it.</summary>
+    public void CutHole()
+    {
+        if (_workspace.PlanCutHole(out var problem) is not { } plan)
+        {
+            StatusText = problem ?? "";
+            return;
+        }
+        string name = plan.Target.Name;
+        var created = _workspace.CutHole();
+        StatusText = created.Count == 1
+            ? Lang.F("Cut a hole in “{0}”. The cut-out is the new piece “{1}”; sew either it or the piece you cut with to the hole's edges.", name, created[0].Name)
+            : Lang.F("Cut {0} holes in “{1}”. The cut-outs are new pieces; sew them or the pieces you cut with to the holes' edges.", created.Count, name);
+    }
     public void Rotate(double degrees) => _workspace.RotateSelection((float)degrees);
     public void SelectAll()
     {
@@ -640,9 +655,9 @@ public partial class AppController : INotifyPropertyChanged
     {
         foreach (var piece in _workspace.SelectedPieceObjects().ToList())
         {
-            for (int e = 0; e < piece.Points.Count; e++)
+            for (int e = 0; e < piece.EdgeCount; e++)
             {
-                if (piece.Points[e].Curve != null)
+                if (piece.PointAt(e).Curve != null)
                     _workspace.StraightenEdge(piece.Id, e);
             }
         }

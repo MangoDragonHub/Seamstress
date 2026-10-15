@@ -152,7 +152,7 @@ public sealed class PatternEditor
     private Vector2 RulerPoint(Vector2 world, float tolerance, Vector2? from)
     {
         if (HitPoint(world, tolerance) is { } point)
-            return point.Piece.Points[point.Index].Position + point.Piece.Origin;
+            return point.Piece.PointAt(point.Index).Position + point.Piece.Origin;
         if (_constrain && from is { } a)
         {
             var d = world - a;
@@ -181,7 +181,7 @@ public sealed class PatternEditor
         Tool = PatternTool.TransformPoints;
         _points.Clear();
         _points.AddRange(keep);
-        for (int i = 0; i < piece.Points.Count; i++)
+        for (int i = 0; i < piece.PointCount; i++)
         {
             if (!_points.Contains((piece.Id, i)))
                 _points.Add((piece.Id, i));
@@ -194,13 +194,13 @@ public sealed class PatternEditor
     /// <summary>Moves the point or curve control being dragged in Edit Points; Shift puts it on the grid.</summary>
     private void DragPoint(Vector2 world)
     {
-        if (Doc.FindPiece(_dragPiece) is not { } owner || _dragIndex >= owner.Points.Count)
+        if (Doc.FindPiece(_dragPiece) is not { } owner || _dragIndex >= owner.PointCount)
             return;
         var target = (_constrain ? SnapToGrid(world) : world) - owner.Origin;
         if (_drag == Drag.Point)
-            owner.Points[_dragIndex].Position = target;
+            owner.PointAt(_dragIndex).Position = target;
         else
-            owner.Points[_dragIndex].Curve = target;
+            owner.PointAt(_dragIndex).Curve = target;
         _workspace.History.NotifyLiveChange();
     }
 
@@ -264,7 +264,8 @@ public sealed class PatternEditor
     {
         foreach (var (_, piece) in VisiblePieces())
         {
-            if (Outline.Contains(Outline.Flatten(piece), world - piece.Origin))
+            // A hole shows what is underneath, so a click there goes through to it.
+            if (Outline.Contains(piece, world - piece.Origin))
                 return piece;
         }
         return null;
@@ -276,9 +277,9 @@ public sealed class PatternEditor
         float bestDistance = tolerance;
         foreach (var (_, piece) in VisiblePieces())
         {
-            for (int i = 0; i < piece.Points.Count; i++)
+            for (int i = 0; i < piece.PointCount; i++)
             {
-                float d = Vector2.Distance(piece.Points[i].Position + piece.Origin, world);
+                float d = Vector2.Distance(piece.PointAt(i).Position + piece.Origin, world);
                 if (d <= bestDistance)
                 {
                     bestDistance = d;
@@ -296,7 +297,7 @@ public sealed class PatternEditor
         foreach (var (_, piece) in VisiblePieces())
         {
             var local = world - piece.Origin;
-            for (int e = 0; e < piece.Points.Count; e++)
+            for (int e = 0; e < piece.EdgeCount; e++)
             {
                 var pts = Outline.FlattenEdge(piece, e);
                 for (int i = 1; i < pts.Count; i++)
@@ -317,9 +318,9 @@ public sealed class PatternEditor
     {
         foreach (var piece in _workspace.SelectedPieceObjects())
         {
-            for (int e = 0; e < piece.Points.Count; e++)
+            for (int e = 0; e < piece.EdgeCount; e++)
             {
-                if (piece.Points[e].Curve is { } c && Vector2.Distance(c + piece.Origin, world) <= tolerance)
+                if (piece.PointAt(e).Curve is { } c && Vector2.Distance(c + piece.Origin, world) <= tolerance)
                     return (piece, e);
             }
         }
@@ -357,7 +358,7 @@ public sealed class PatternEditor
                 continue;
             var layout = UvLayout.For(garment);
             var polygon = Outline.Flatten(piece).Select(p => layout.Map(piece, p)).ToList();
-            if (Outline.Contains(polygon, uv))
+            if (Outline.Contains(polygon, uv) && !Outline.FlattenHoles(piece).Any(h => Outline.Contains(h.Select(p => layout.Map(piece, p)).ToList(), uv)))
                 return piece;
         }
         return null;
@@ -370,7 +371,7 @@ public sealed class PatternEditor
     {
         get
         {
-            _points.RemoveAll(p => Doc.FindPiece(p.PieceId) is not { } piece || p.Index >= piece.Points.Count);
+            _points.RemoveAll(p => Doc.FindPiece(p.PieceId) is not { } piece || p.Index >= piece.PointCount);
             return _points;
         }
     }
@@ -405,7 +406,7 @@ public sealed class PatternEditor
         {
             if (!_workspace.SelectedPieces.Contains(piece.Id))
                 continue;
-            for (int i = 0; i < piece.Points.Count; i++)
+            for (int i = 0; i < piece.PointCount; i++)
                 all.Add((piece.Id, i));
         }
         return all;
@@ -420,7 +421,7 @@ public sealed class PatternEditor
         foreach (var (pieceId, index) in points)
         {
             var piece = Doc.FindPiece(pieceId)!;
-            sum += piece.Points[index].Position + piece.Origin;
+            sum += piece.PointAt(index).Position + piece.Origin;
         }
         return sum / points.Count;
     }
@@ -433,7 +434,7 @@ public sealed class PatternEditor
         _points.Clear();
         foreach (var piece in garment.Pieces.Where(p => Workspace.IsEffectivelyVisible(garment, p)))
         {
-            for (int i = 0; i < piece.Points.Count; i++)
+            for (int i = 0; i < piece.PointCount; i++)
                 _points.Add((piece.Id, i));
         }
         Changed?.Invoke();
@@ -461,9 +462,9 @@ public sealed class PatternEditor
         _pointStarts = chosen.Select(p =>
         {
             var piece = Doc.FindPiece(p.PieceId)!;
-            var point = piece.Points[p.Index];
+            var point = piece.PointAt(p.Index);
             // The curve of an edge comes along only when both of its ends do; otherwise it keeps its handle.
-            bool both = chosen.Contains((p.PieceId, (p.Index + 1) % piece.Points.Count));
+            bool both = chosen.Contains((p.PieceId, piece.NextPoint(p.Index)));
             return new PointStart(p.PieceId, p.Index, point.Position + piece.Origin, point.Curve + piece.Origin, both);
         }).ToList();
     }
@@ -472,11 +473,12 @@ public sealed class PatternEditor
     {
         foreach (var start in _pointStarts)
         {
-            if (Doc.FindPiece(start.PieceId) is not { } piece || start.Index >= piece.Points.Count)
+            if (Doc.FindPiece(start.PieceId) is not { } piece || start.Index >= piece.PointCount)
                 continue;
-            piece.Points[start.Index].Position = transform(start.World) - piece.Origin;
+            var point = piece.PointAt(start.Index);
+            point.Position = transform(start.World) - piece.Origin;
             if (start.MoveCurve && start.Curve is { } curve)
-                piece.Points[start.Index].Curve = transform(curve) - piece.Origin;
+                point.Curve = transform(curve) - piece.Origin;
         }
         _workspace.History.NotifyLiveChange();
     }
@@ -622,8 +624,7 @@ public sealed class PatternEditor
                         _dragPiece = point.Piece.Id;
                         _dragIndex = point.Index;
                         // The two edges that meet at the point change length as it moves.
-                        int count = point.Piece.Points.Count;
-                        Measure(new EdgeRef(point.Piece.Id, (point.Index + count - 1) % count), new EdgeRef(point.Piece.Id, point.Index));
+                        Measure(new EdgeRef(point.Piece.Id, point.Piece.PreviousPoint(point.Index)), new EdgeRef(point.Piece.Id, point.Index));
                     }
                     else if (HitControl(world, tolerance) is { } control)
                     {
@@ -756,12 +757,12 @@ public sealed class PatternEditor
                 DragPoint(world);
                 return;
             case Drag.Bend:
-                if (Doc.FindPiece(_dragPiece) is { } bent && _dragIndex < bent.Points.Count)
+                if (Doc.FindPiece(_dragPiece) is { } bent && _dragIndex < bent.EdgeCount)
                 {
                     // Choose the control point that makes the curve's midpoint follow the cursor.
                     var a = Outline.EdgeStart(bent, _dragIndex);
                     var b = Outline.EdgeEnd(bent, _dragIndex);
-                    bent.Points[_dragIndex].Curve = 2 * (world - bent.Origin) - (a + b) / 2;
+                    bent.PointAt(_dragIndex).Curve = 2 * (world - bent.Origin) - (a + b) / 2;
                     _workspace.History.NotifyLiveChange();
                 }
                 return;
@@ -902,9 +903,9 @@ public sealed class PatternEditor
                         var hi = Vector2.Max(_dragStart, end);
                         foreach (var (_, piece) in VisiblePieces())
                         {
-                            for (int i = 0; i < piece.Points.Count; i++)
+                            for (int i = 0; i < piece.PointCount; i++)
                             {
-                                var p = piece.Points[i].Position + piece.Origin;
+                                var p = piece.PointAt(i).Position + piece.Origin;
                                 if (p.X >= lo.X && p.X <= hi.X && p.Y >= lo.Y && p.Y <= hi.Y && !_points.Contains((piece.Id, i)))
                                     _points.Add((piece.Id, i));
                             }
@@ -1046,8 +1047,20 @@ public sealed class PatternEditor
                 sb.Append(",\"active\":").Append(garment.Id == _workspace.ActiveGarmentId ? "true" : "false");
                 sb.Append(",\"outline\":");
                 AppendPoints(sb, outline);
+                var holes = Outline.FlattenHoles(piece);
+                if (holes.Count > 0)
+                {
+                    sb.Append(",\"holes\":[");
+                    for (int h = 0; h < holes.Count; h++)
+                    {
+                        if (h > 0)
+                            sb.Append(',');
+                        AppendPoints(sb, holes[h].Select(Map));
+                    }
+                    sb.Append(']');
+                }
                 sb.Append(",\"points\":");
-                AppendPoints(sb, piece.Points.Select(p => Map(p.Position)));
+                AppendPoints(sb, piece.AllPoints().Select(p => Map(p.Position)));
                 var centre = outline.Aggregate(Vector2.Zero, (a, b) => a + b) / outline.Count;
                 sb.Append(inv, $",\"label\":[{centre.X:0.###},{centre.Y:0.###}]");
                 sb.Append(inv, $",\"density\":{layout.TexelDensity(piece, material, textureResolution):0.##}");
@@ -1059,9 +1072,9 @@ public sealed class PatternEditor
                 {
                     sb.Append(",\"controls\":[");
                     bool firstControl = true;
-                    for (int e = 0; e < piece.Points.Count; e++)
+                    for (int e = 0; e < piece.EdgeCount; e++)
                     {
-                        if (piece.Points[e].Curve is not { } c)
+                        if (piece.PointAt(e).Curve is not { } c)
                             continue;
                         if (!firstControl)
                             sb.Append(',');
@@ -1154,7 +1167,10 @@ public sealed class PatternEditor
                 if (piece == null || edge.Edge >= piece.EdgeCount || !seen.Add((edge.PieceId, edge.Edge)))
                     continue;
                 var at = EdgeMiddle(piece, edge.Edge);
-                var inward = piece.Points.Aggregate(Vector2.Zero, (sum, p) => sum + p.Position) / piece.Points.Count + piece.Origin - at;
+                // Towards the middle of the piece; for a hole, away from the hole, where the cloth is.
+                var inward = piece.InHole(edge.Edge)
+                    ? at - piece.Origin - piece.LoopOf(edge.Edge).Loop.Aggregate(Vector2.Zero, (sum, p) => sum + p.Position) / piece.LoopOf(edge.Edge).Loop.Count
+                    : piece.Points.Aggregate(Vector2.Zero, (sum, p) => sum + p.Position) / piece.Points.Count + piece.Origin - at;
                 inward = inward.LengthSquared() > 1e-8f ? Vector2.Normalize(inward) : Vector2.Zero;
                 sb.Append(firstMeasure ? "" : ",").Append(inv, $"{at.X:0.###},{at.Y:0.###},{Outline.EdgeLength(piece, edge.Edge):0.###},{inward.X:0.##},{inward.Y:0.##}");
                 firstMeasure = false;

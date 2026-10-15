@@ -10,7 +10,9 @@ Marvelous Designer.
 ## What it does
 
 - **2D pattern view** – draw pieces (polygon, rectangle, ellipse), move them, edit points, curve edges, and
-  sew edges together with the Sew tool. Seams are colour-coded, with dots marking the ends that meet.
+  sew edges together with the Sew tool. Seams are colour-coded, with dots marking the ends that meet. **Cut
+  Hole** (right-click menu) cuts one selected piece in the shape of another lying on it, for pocket openings
+  and the like; the cut-out becomes a new piece, and the hole's edges can be sewn like any other.
 - **3D view** – shows the sewn pieces on an avatar. Orbit, pan, zoom, click to select, and drag the arrows and
   rings on a selected piece to move and rotate it. **Pinch** lets you drag the cloth itself, during or after
   simulation, to tug bunched-up areas into place. **Ortho** switches to an orthographic camera. **View ▸ 3D:
@@ -224,7 +226,8 @@ Plain JSON, lengths in centimetres for patterns and metres for 3D placement:
 ```
 
 `curve` is the control point that bends the edge leaving that point. A seam joins `edge` *n* of one piece
-(the edge starting at point *n*, counting from 0) to an edge of another. Anything left out gets a default,
+(the edge starting at point *n*, counting from 0) to an edge of another. A piece's optional `holes` are written
+like its `points`, run clockwise, and number their points on from the outline's. Anything left out gets a default,
 and the optional `drape` block (the simulated shape) can be deleted to return a piece to its flat placement.
 
 ## Layout

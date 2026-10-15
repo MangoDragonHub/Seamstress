@@ -72,7 +72,9 @@ public sealed class Workspace
         {
             hash.Add(piece.Id);
             hash.Add(piece.ParticleDistance);
-            foreach (var point in piece.Points)
+            foreach (var (loop, start) in piece.Loops())
+                hash.Add(loop.Count);
+            foreach (var point in piece.AllPoints())
             {
                 hash.Add(point.Position);
                 hash.Add(point.Curve);
@@ -228,7 +230,7 @@ public sealed class Workspace
         if (SelectedPoint is { } point)
         {
             var piece = Document.FindPiece(point.PieceId);
-            if (piece == null || point.Index >= piece.Points.Count)
+            if (piece == null || point.Index >= piece.PointCount)
             {
                 SelectedPoint = null;
                 changed = true;
@@ -578,6 +580,278 @@ public sealed class Workspace
         });
     }
 
+    /// <summary>
+    /// What Cut Hole would do with the current selection: the piece to cut and the pieces whose shapes the holes take,
+    /// or why it cannot. The piece to cut is the one the others all lie inside.
+    /// </summary>
+    public (PatternPiece Target, List<PatternPiece> Cutters)? PlanCutHole(out string? problem)
+    {
+        var selected = SelectedPieceObjects().Where(p => p.Points.Count >= 3).ToList();
+        problem = null;
+        if (selected.Count < 2)
+        {
+            problem = Lang.T("Select two overlapping pieces to cut a hole: the piece to cut, and a piece inside it in the shape of the hole.");
+            return null;
+        }
+        // Outlines in the target's own coordinates.
+        static List<Vector2> Shape(PatternPiece piece, PatternPiece target)
+            => Outline.Flatten(piece).Select(p => p + piece.Origin - target.Origin).ToList();
+        foreach (var target in selected)
+        {
+            var cutters = selected.Where(p => p != target).ToList();
+            var outer = Outline.Flatten(target);
+            var holes = Outline.FlattenHoles(target);
+            bool Fits(List<Vector2> shape)
+                => shape.All(p => Outline.Contains(outer, p) && !holes.Any(h => Outline.Contains(h, p)))
+                   && !Outline.Crosses(shape, outer)
+                   && !holes.Any(h => Outline.Crosses(shape, h) || Outline.Contains(shape, h[0]));
+            var shapes = cutters.Select(c => Shape(c, target)).ToList();
+            if (!shapes.All(Fits))
+                continue;
+            for (int i = 0; i < shapes.Count; i++)
+            {
+                for (int j = i + 1; j < shapes.Count; j++)
+                {
+                    if (Outline.Crosses(shapes[i], shapes[j]) || Outline.Contains(shapes[i], shapes[j][0]) || Outline.Contains(shapes[j], shapes[i][0]))
+                    {
+                        problem = Lang.T("The pieces that cut holes must not overlap each other.");
+                        return null;
+                    }
+                }
+            }
+            return (target, cutters);
+        }
+        problem = Lang.T("To cut a hole, one selected piece must lie entirely inside the other, clear of its edges and of any hole it already has.");
+        return null;
+    }
+
+    /// <summary>
+    /// Cuts a hole in the selected piece that the other selected pieces lie inside, in the shape of each of them, as
+    /// one undo step. What is cut out becomes a new piece of the same fabric: laid out beside the cut piece in 2D,
+    /// and in 3D placed just behind the hole (draped like it, when the cut piece is draped), ready to be sewn in as a
+    /// pocket or facing. The pieces that gave the holes their shapes stay as they are. Returns the new pieces, which
+    /// become the selection; nothing is cut when <see cref="PlanCutHole"/> finds a problem.
+    /// </summary>
+    public List<PatternPiece> CutHole()
+    {
+        var created = new List<PatternPiece>();
+        if (PlanCutHole(out _) is not { } plan)
+            return created;
+        var (plannedTarget, plannedCutters) = plan;
+        string targetId = plannedTarget.Id;
+        var cutterIds = plannedCutters.Select(c => c.Id).ToList();
+        var garmentBefore = Document.GarmentOfPiece(targetId)!;
+        // The draped shape before the cut, to drape what is left of the piece and the cut-outs the same way.
+        var oldMesh = MeshFor(garmentBefore).Find(targetId);
+        bool draped = oldMesh != null && plannedTarget.Drape != null && plannedTarget.DrapeKey == oldMesh.Key;
+        var oldPositions = draped ? Mesher.CurrentPositions(plannedTarget, oldMesh!) : null;
+
+        History.Execute(cutterIds.Count == 1 ? Lang.T("Cut hole") : Lang.F("Cut {0} holes", cutterIds.Count), doc =>
+        {
+            var garment = doc.GarmentOfPiece(targetId)!;
+            var target = garment.FindPiece(targetId)!;
+            var offsets = new Dictionary<string, Vector2>();
+            foreach (var cutterId in cutterIds)
+            {
+                var cutter = doc.FindPiece(cutterId)!;
+                var shift = cutter.Origin - target.Origin;
+                var hole = Outline.Reversed(cutter.Points.Select(p => new PatternPoint
+                {
+                    Position = p.Position + shift,
+                    Curve = p.Curve + shift,
+                }).ToList());
+                if (Outline.SignedArea(hole.Select(p => p.Position).ToList()) > 0)
+                    hole = Outline.Reversed(hole);
+                target.Holes.Add(hole);
+
+                var piece = new PatternPiece
+                {
+                    Name = doc.UniqueName(Lang.F("{0} cut-out", target.Name)),
+                    GroupId = target.GroupId,
+                    Points = cutter.Points.Select(p => p.Clone()).ToList(),
+                    Physics = target.Physics.Clone(),
+                    MaterialId = target.MaterialId,
+                    ParticleDistance = target.ParticleDistance,
+                    FlipNormals = target.FlipNormals,
+                };
+                Outline.EnsureCounterClockwise(piece);
+                // Beside the cut piece in the pattern, level with its hole, in the first gap to the right that is
+                // wide enough.
+                var (cutMin, cutMax) = Outline.Bounds(piece);
+                var size = cutMax - cutMin;
+                float x = target.Origin.X + Outline.Bounds(target).Max.X + 8, y = cutter.Origin.Y + cutMin.Y;
+                for (bool moved = true; moved;)
+                {
+                    moved = false;
+                    foreach (var other in doc.AllPieces().Where(p => p.Points.Count >= 3))
+                    {
+                        var (lo, hi) = Outline.Bounds(other);
+                        lo += other.Origin;
+                        hi += other.Origin;
+                        if (x < hi.X + 4 && x + size.X > lo.X - 4 && y < hi.Y + 4 && y + size.Y > lo.Y - 4)
+                        {
+                            x = hi.X + 8;
+                            moved = true;
+                        }
+                    }
+                }
+                piece.Origin = new Vector2(x - cutMin.X, cutter.Origin.Y);
+                offsets[piece.Id] = shift;
+
+                // In 3D, where the hole is, a centimetre behind the cloth and following its wrap.
+                var (targetMin, targetMax) = Outline.Bounds(target);
+                var (position, rotation) = Mesher.ArrangedFrame(target, (cutMin + cutMax) / 2 + shift);
+                piece.Placement = new Placement
+                {
+                    Position = position - Vector3.TransformNormal(Vector3.UnitZ, rotation) * 0.01f,
+                    Rotation = ToEuler(rotation),
+                    Curvature = target.Placement.Curvature * (cutMax.X - cutMin.X) / MathF.Max(targetMax.X - targetMin.X, 1e-3f),
+                };
+                garment.Pieces.Insert(garment.Pieces.IndexOf(target) + 1 + created.Count, piece);
+                created.Add(piece);
+            }
+
+            if (oldMesh == null || oldPositions == null)
+                return;
+            var mesh = Mesher.Build(garment);
+            var normals = Mesher.ComputeNormals(oldPositions, oldMesh.Triangles);
+            var sampler = new SurfaceSampler(oldMesh, oldPositions, normals);
+            void Drape(PatternPiece piece, Vector2 shift, float behind)
+            {
+                if (mesh.Find(piece.Id) is not { } pieceMesh)
+                    return;
+                var drape = new float[pieceMesh.VertexCount * 3];
+                for (int i = 0; i < pieceMesh.VertexCount; i++)
+                {
+                    var (p, n) = sampler.At(pieceMesh.Points[i] + shift);
+                    p -= n * behind;
+                    drape[3 * i] = p.X;
+                    drape[3 * i + 1] = p.Y;
+                    drape[3 * i + 2] = p.Z;
+                }
+                piece.Drape = drape;
+                piece.DrapeKey = pieceMesh.Key;
+            }
+            Drape(target, Vector2.Zero, 0);
+            foreach (var piece in created)
+                Drape(piece, offsets[piece.Id], 0.01f);
+        });
+        SelectedPieces.Clear();
+        SelectedPoint = null;
+        SelectedSeamId = null;
+        foreach (var piece in created)
+            SelectedPieces.Add(piece.Id);
+        SelectionChanged?.Invoke();
+        return created;
+    }
+
+    /// <summary>
+    /// Reads positions off a piece's simulated surface by pattern position: the point of the surface that was at a
+    /// given place in the flat pattern, and the surface normal there.
+    /// </summary>
+    private sealed class SurfaceSampler
+    {
+        private readonly PieceMesh _mesh;
+        private readonly Vector3[] _positions;
+        private readonly Vector3[] _normals;
+        private readonly Dictionary<(int, int), List<int>> _cells = new();
+        private readonly Vector2 _min;
+        private readonly float _cell;
+
+        public SurfaceSampler(PieceMesh mesh, Vector3[] positions, Vector3[] normals)
+        {
+            _mesh = mesh;
+            _positions = positions;
+            _normals = normals;
+            var min = new Vector2(float.MaxValue);
+            var max = new Vector2(float.MinValue);
+            foreach (var p in mesh.Points)
+            {
+                min = Vector2.Min(min, p);
+                max = Vector2.Max(max, p);
+            }
+            _min = min;
+            _cell = MathF.Max(MathF.Max(max.X - min.X, max.Y - min.Y) / MathF.Max(1, MathF.Sqrt(mesh.TriangleCount)), 1e-3f);
+            for (int t = 0; t < mesh.TriangleCount; t++)
+            {
+                var a = mesh.Points[mesh.Triangles[3 * t]];
+                var b = mesh.Points[mesh.Triangles[3 * t + 1]];
+                var c = mesh.Points[mesh.Triangles[3 * t + 2]];
+                var (lo, hi) = (Cell(Vector2.Min(a, Vector2.Min(b, c))), Cell(Vector2.Max(a, Vector2.Max(b, c))));
+                for (int x = lo.X; x <= hi.X; x++)
+                {
+                    for (int y = lo.Y; y <= hi.Y; y++)
+                    {
+                        if (!_cells.TryGetValue((x, y), out var list))
+                            _cells[(x, y)] = list = new List<int>();
+                        list.Add(t);
+                    }
+                }
+            }
+        }
+
+        private (int X, int Y) Cell(Vector2 p) => ((int)MathF.Floor((p.X - _min.X) / _cell), (int)MathF.Floor((p.Y - _min.Y) / _cell));
+
+        public (Vector3 Position, Vector3 Normal) At(Vector2 at)
+        {
+            // The triangle the point is in, or the nearest one around it for a point just off the old outline.
+            var (cx, cy) = Cell(at);
+            int best = -1;
+            float bestScore = float.MinValue;
+            Vector3 bestWeights = default;
+            for (int ring = 0; ring <= 2 && bestScore < -1e-4f; ring++)
+            {
+                for (int x = cx - ring; x <= cx + ring; x++)
+                {
+                    for (int y = cy - ring; y <= cy + ring; y++)
+                    {
+                        if (!_cells.TryGetValue((x, y), out var list))
+                            continue;
+                        foreach (int t in list)
+                        {
+                            var w = Weights(t, at);
+                            float score = MathF.Min(w.X, MathF.Min(w.Y, w.Z));
+                            if (score > bestScore)
+                                (best, bestScore, bestWeights) = (t, score, w);
+                        }
+                    }
+                }
+            }
+            if (best < 0)
+            {
+                for (int t = 0; t < _mesh.TriangleCount; t++)
+                {
+                    var w = Weights(t, at);
+                    float score = MathF.Min(w.X, MathF.Min(w.Y, w.Z));
+                    if (score > bestScore)
+                        (best, bestScore, bestWeights) = (t, score, w);
+                }
+            }
+            if (best < 0)
+                return (Vector3.Zero, Vector3.UnitZ);
+            // Off the surface, use the nearest point of it.
+            var weights = Vector3.Max(bestWeights, Vector3.Zero);
+            weights /= MathF.Max(weights.X + weights.Y + weights.Z, 1e-9f);
+            int i0 = _mesh.Triangles[3 * best], i1 = _mesh.Triangles[3 * best + 1], i2 = _mesh.Triangles[3 * best + 2];
+            var position = _positions[i0] * weights.X + _positions[i1] * weights.Y + _positions[i2] * weights.Z;
+            var normal = _normals[i0] * weights.X + _normals[i1] * weights.Y + _normals[i2] * weights.Z;
+            return (position, normal.LengthSquared() > 1e-12f ? Vector3.Normalize(normal) : Vector3.UnitZ);
+        }
+
+        private Vector3 Weights(int t, Vector2 p)
+        {
+            var a = _mesh.Points[_mesh.Triangles[3 * t]];
+            var b = _mesh.Points[_mesh.Triangles[3 * t + 1]];
+            var c = _mesh.Points[_mesh.Triangles[3 * t + 2]];
+            float area = (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
+            if (MathF.Abs(area) < 1e-12f)
+                return new Vector3(-1e9f);
+            float wb = ((p.X - a.X) * (c.Y - a.Y) - (p.Y - a.Y) * (c.X - a.X)) / area;
+            float wc = ((b.X - a.X) * (p.Y - a.Y) - (b.Y - a.Y) * (p.X - a.X)) / area;
+            return new Vector3(1 - wb - wc, wb, wc);
+        }
+    }
+
     public void MirrorSelection()
     {
         var ids = SelectedPieces.ToHashSet();
@@ -591,29 +865,29 @@ public sealed class Workspace
                 {
                     var (min, max) = Outline.Bounds(piece);
                     float axis = min.X + max.X;
-                    int n = piece.Points.Count;
-                    // Mirroring flips the winding, so walk the outline backwards to stay counter-clockwise.
-                    var mirrored = new List<PatternPoint>(n);
-                    for (int i = 0; i < n; i++)
+                    var loops = piece.Loops().Select(l => (l.Start, l.Loop.Count)).ToList();
+                    // Mirroring flips the winding, so walk the outline and each hole backwards to keep their directions.
+                    List<PatternPoint> Mirror(List<PatternPoint> loop) => Outline.Reversed(loop).Select(p => new PatternPoint
                     {
-                        var source = piece.Points[(n - i) % n];
-                        var edgeOwner = piece.Points[(n - i - 1 + n) % n];
-                        mirrored.Add(new PatternPoint
-                        {
-                            Position = new Vector2(axis - source.Position.X, source.Position.Y),
-                            Curve = edgeOwner.Curve is { } c ? new Vector2(axis - c.X, c.Y) : null,
-                        });
+                        Position = new Vector2(axis - p.Position.X, p.Position.Y),
+                        Curve = p.Curve is { } c ? new Vector2(axis - c.X, c.Y) : null,
+                    }).ToList();
+                    piece.Points = Mirror(piece.Points);
+                    piece.Holes = piece.Holes.Select(Mirror).ToList();
+                    // Edge k of a loop of n (from its point k) became its edge n-1-k and now runs the other way, so a
+                    // seam to an edge that was not mirrored has to swap which ends it pairs up.
+                    int Mirrored(int edge)
+                    {
+                        var (start, count) = loops.First(l => edge >= l.Start && edge < l.Start + l.Count);
+                        return start + count - 1 - (edge - start);
                     }
-                    piece.Points = mirrored;
-                    // Edge k (from point k) became edge n-1-k and now runs the other way, so a seam to an
-                    // edge that was not mirrored has to swap which ends it pairs up.
                     foreach (var seam in garment.Seams)
                     {
                         bool a = seam.A.PieceId == piece.Id, b = seam.B.PieceId == piece.Id;
                         if (a)
-                            seam.A.Edge = n - 1 - seam.A.Edge;
+                            seam.A.Edge = Mirrored(seam.A.Edge);
                         if (b)
-                            seam.B.Edge = n - 1 - seam.B.Edge;
+                            seam.B.Edge = Mirrored(seam.B.Edge);
                         if (a != b)
                             seam.Reversed = !seam.Reversed;
                     }
@@ -641,7 +915,7 @@ public sealed class Workspace
                     var d = p - centre;
                     return centre + new Vector2(d.X * cos - d.Y * sin, d.X * sin + d.Y * cos);
                 }
-                foreach (var point in piece.Points)
+                foreach (var point in piece.AllPoints())
                 {
                     point.Position = Turn(point.Position);
                     if (point.Curve is { } c)
@@ -659,10 +933,11 @@ public sealed class Workspace
         {
             var garment = doc.GarmentOfPiece(pieceId);
             var piece = garment?.FindPiece(pieceId);
-            if (garment == null || piece == null || edge < 0 || edge >= piece.Points.Count)
+            if (garment == null || piece == null || edge < 0 || edge >= piece.EdgeCount)
                 return;
-            piece.Points[edge].Curve = null;
-            piece.Points.Insert(edge + 1, new PatternPoint { Position = localPosition });
+            var (loop, start) = piece.LoopOf(edge);
+            loop[edge - start].Curve = null;
+            loop.Insert(edge - start + 1, new PatternPoint { Position = localPosition });
             foreach (var seam in garment.Seams)
             {
                 if (seam.A.PieceId == pieceId && seam.A.Edge > edge)
@@ -674,62 +949,84 @@ public sealed class Workspace
         SelectPoint(pieceId, edge + 1);
     }
 
+    /// <summary>
+    /// Removes a point; the edges before and after it merge into one. The outline keeps at least three points, and a
+    /// hole that would be left with fewer goes altogether.
+    /// </summary>
     public void DeletePoint(string pieceId, int index)
     {
         var target = Document.FindPiece(pieceId);
-        if (target == null || target.Points.Count <= 3 || index < 0 || index >= target.Points.Count)
+        if (target == null || index < 0 || index >= target.PointCount || (!target.InHole(index) && target.Points.Count <= 3))
             return;
-        History.Execute(Lang.T("Delete point"), doc =>
+        History.Execute(target.InHole(index) && target.LoopOf(index).Loop.Count <= 3 ? Lang.T("Delete hole") : Lang.T("Delete point"), doc =>
         {
             var garment = doc.GarmentOfPiece(pieceId)!;
-            var piece = garment.FindPiece(pieceId)!;
-            int n = piece.Points.Count;
-            int previous = (index - 1 + n) % n;
-            // The edges before and after the point merge into one straight edge.
-            piece.Points[previous].Curve = null;
-            piece.Points.RemoveAt(index);
-            garment.Seams.RemoveAll(s => s.A.Matches(pieceId, index) || s.B.Matches(pieceId, index));
-            foreach (var seam in garment.Seams)
-            {
-                if (seam.A.PieceId == pieceId && seam.A.Edge > index)
-                    seam.A.Edge--;
-                if (seam.B.PieceId == pieceId && seam.B.Edge > index)
-                    seam.B.Edge--;
-            }
+            RemovePoints(garment, garment.FindPiece(pieceId)!, new[] { index });
         });
         SelectedPoint = null;
         SelectionChanged?.Invoke();
     }
 
-    /// <summary>Removes several points as one undo step. Every piece keeps at least three points.</summary>
+    /// <summary>
+    /// Removes several points as one undo step. The outline of every piece keeps at least three points; a hole goes
+    /// altogether when all its points are chosen, or when fewer than three would be left.
+    /// </summary>
     public void DeletePoints(IReadOnlyCollection<(string PieceId, int Index)> points)
     {
         if (points.Count == 0)
             return;
         History.Execute(points.Count == 1 ? Lang.T("Delete point") : Lang.T("Delete points"), doc =>
         {
-            // Highest index first, so the indices still to be removed stay valid.
-            foreach (var (pieceId, index) in points.Distinct().OrderByDescending(p => p.Index))
+            foreach (var group in points.GroupBy(p => p.PieceId))
             {
-                var garment = doc.GarmentOfPiece(pieceId);
-                var piece = garment?.FindPiece(pieceId);
-                if (piece == null || piece.Points.Count <= 3 || index < 0 || index >= piece.Points.Count)
-                    continue;
-                int n = piece.Points.Count;
-                piece.Points[(index - 1 + n) % n].Curve = null;
-                piece.Points.RemoveAt(index);
-                garment!.Seams.RemoveAll(s => s.A.Matches(pieceId, index) || s.B.Matches(pieceId, index));
-                foreach (var seam in garment.Seams)
-                {
-                    if (seam.A.PieceId == pieceId && seam.A.Edge > index)
-                        seam.A.Edge--;
-                    if (seam.B.PieceId == pieceId && seam.B.Edge > index)
-                        seam.B.Edge--;
-                }
+                var garment = doc.GarmentOfPiece(group.Key);
+                if (garment?.FindPiece(group.Key) is { } piece)
+                    RemovePoints(garment, piece, group.Select(p => p.Index).ToList());
             }
         });
         SelectedPoint = null;
         SelectionChanged?.Invoke();
+    }
+
+    /// <summary>Removes points of one piece and the seams on the edges that go with them, renumbering the rest.</summary>
+    private static void RemovePoints(Garment garment, PatternPiece piece, IReadOnlyCollection<int> indices)
+    {
+        var chosen = indices.Where(i => i >= 0 && i < piece.PointCount).ToHashSet();
+        // Each removal is a run of point numbers; going from the highest down keeps the numbers still to do valid.
+        var removals = new List<(int Start, int Count, int Hole)>();
+        int holeIndex = -1;
+        foreach (var (loop, start) in piece.Loops())
+        {
+            var mine = Enumerable.Range(start, loop.Count).Where(chosen.Contains).ToList();
+            if (holeIndex >= 0 && mine.Count > 0 && loop.Count - mine.Count < 3)
+                removals.Add((start, loop.Count, holeIndex));
+            else
+                removals.AddRange(mine.OrderByDescending(i => i).Take(Math.Max(0, loop.Count - 3)).Select(i => (i, 1, -1)));
+            holeIndex++;
+        }
+        foreach (var (start, count, hole) in removals.OrderByDescending(r => r.Start))
+        {
+            if (hole >= 0)
+            {
+                piece.Holes.RemoveAt(hole);
+            }
+            else
+            {
+                // The edges before and after the point merge into one straight edge.
+                piece.PointAt(piece.PreviousPoint(start)).Curve = null;
+                var (loop, first) = piece.LoopOf(start);
+                loop.RemoveAt(start - first);
+            }
+            bool Gone(EdgeRef e) => e.PieceId == piece.Id && e.Edge >= start && e.Edge < start + count;
+            garment.Seams.RemoveAll(s => Gone(s.A) || Gone(s.B));
+            foreach (var seam in garment.Seams)
+            {
+                if (seam.A.PieceId == piece.Id && seam.A.Edge >= start + count)
+                    seam.A.Edge -= count;
+                if (seam.B.PieceId == piece.Id && seam.B.Edge >= start + count)
+                    seam.B.Edge -= count;
+            }
+        }
     }
 
     public void StraightenEdge(string pieceId, int edge)
@@ -737,8 +1034,8 @@ public sealed class Workspace
         History.Execute(Lang.T("Straighten edge"), doc =>
         {
             var piece = doc.FindPiece(pieceId);
-            if (piece != null && edge >= 0 && edge < piece.Points.Count)
-                piece.Points[edge].Curve = null;
+            if (piece != null && edge >= 0 && edge < piece.EdgeCount)
+                piece.PointAt(edge).Curve = null;
         });
     }
 
@@ -995,7 +1292,7 @@ public sealed class Workspace
         {
             var (min, max) = Outline.Bounds(p);
             return new PlacementStart(p.Placement.Position, p.Placement.Rotation, p.Drape, (min + max) / 2,
-                p.Points.Select(point => (point.Position, point.Curve)).ToArray());
+                p.AllPoints().Select(point => (point.Position, point.Curve)).ToArray());
         });
         return true;
     }
@@ -1059,15 +1356,17 @@ public sealed class Workspace
         float Along(float share) => uniform ? factor : 1 + (factor - 1) * MathF.Abs(share);
         foreach (var piece in Document.AllPieces())
         {
-            if (!_placementStart.TryGetValue(piece.Id, out var start) || start.Points.Length != piece.Points.Count)
+            if (!_placementStart.TryGetValue(piece.Id, out var start) || start.Points.Length != piece.PointCount)
                 continue;
             var rotation = EulerMatrix(start.Rotation);
             var scale = new Vector2(Along(Vector3.Dot(axis, Vector3.TransformNormal(Vector3.UnitX, rotation))),
                 Along(Vector3.Dot(axis, Vector3.TransformNormal(Vector3.UnitY, rotation))));
-            for (int i = 0; i < start.Points.Length; i++)
+            int i = 0;
+            foreach (var point in piece.AllPoints())
             {
-                piece.Points[i].Position = start.Centre + (start.Points[i].Position - start.Centre) * scale;
-                piece.Points[i].Curve = start.Points[i].Curve is { } curve ? start.Centre + (curve - start.Centre) * scale : null;
+                point.Position = start.Centre + (start.Points[i].Position - start.Centre) * scale;
+                point.Curve = start.Points[i].Curve is { } curve ? start.Centre + (curve - start.Centre) * scale : null;
+                i++;
             }
             var spread = new Vector3(Along(axis.X), Along(axis.Y), Along(axis.Z));
             piece.Placement.Position = _placementPivot + (start.Position - _placementPivot) * spread;

@@ -97,6 +97,19 @@ Item {
             if (close) ctx.closePath()
         }
 
+        // A piece's outline and its holes as one path; filling it with the even-odd rule leaves the holes open.
+        function traceShape(ctx, outline, holes) {
+            trace(ctx, outline, true)
+            for (const hole of holes || []) {
+                for (let i = 0; i < hole.length; i += 2) {
+                    if (i === 0) ctx.moveTo(root.sx(hole[i]), root.sy(hole[i + 1]))
+                    else ctx.lineTo(root.sx(hole[i]), root.sy(hole[i + 1]))
+                }
+                ctx.closePath()
+            }
+            ctx.fillRule = Qt.OddEvenFill
+        }
+
         // Point halfway along a polyline, measured by length.
         function middle(pts) {
             let total = 0
@@ -172,7 +185,7 @@ Item {
 
             const showPoints = (s.tool === "EditPoints" || s.tool === "TransformPoints") && !root.uv
             for (const p of s.pieces) {
-                trace(ctx, p.outline, true)
+                traceShape(ctx, p.outline, p.holes)
                 ctx.fillStyle = withAlpha(p.color, p.active ? (root.uv ? 0.5 : 0.62) : 0.28)
                 ctx.fill()
                 ctx.lineWidth = p.selected ? 2.5 : 1.3

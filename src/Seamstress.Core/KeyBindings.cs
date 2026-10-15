@@ -28,6 +28,7 @@ public static class KeyBindings
         new("edit.rotateRight", "Edit", "Rotate 90° Right", Array.Empty<string>()),
         new("edit.straighten", "Edit", "Straighten Curved Edges", Array.Empty<string>()),
         new("edit.invertNormals", "Edit", "Invert Normals", Array.Empty<string>()),
+        new("edit.cutHole", "Edit", "Cut Hole", Array.Empty<string>()),
         new("edit.group", "Edit", "Group Selected Pieces", new[] { "Ctrl+G" }),
         new("edit.reverseSeam", "Edit", "Reverse Seam Direction", Array.Empty<string>()),
 

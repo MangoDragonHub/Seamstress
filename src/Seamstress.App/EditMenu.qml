@@ -17,6 +17,7 @@ Menu {
     KeyMenuItem { text: tr("Rotate 90° Right"); command: "edit.rotateRight"; onTriggered: App.rotate(-90) }
     KeyMenuItem { text: tr("Straighten Curved Edges"); command: "edit.straighten"; onTriggered: App.straightenEdges() }
     KeyMenuItem { text: tr("Invert Normals"); command: "edit.invertNormals"; onTriggered: App.invertNormals() }
+    KeyMenuItem { text: tr("Cut Hole"); command: "edit.cutHole"; onTriggered: App.cutHole() }
     MenuSeparator {}
     KeyMenuItem { text: tr("Group Selected Pieces"); command: "edit.group"; onTriggered: App.groupSelection() }
     KeyMenuItem { text: tr("Reverse Seam Direction"); command: "edit.reverseSeam"; onTriggered: App.reverseSeam() }

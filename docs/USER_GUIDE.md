@@ -133,6 +133,7 @@ maps what you already know to where it lives here.
 | Selecting several points and moving or rotating them | **Transform Points** tool (**T**) |
 | Edit Curvature | **Edit Points** tool: drag an edge to bend it |
 | Add Point / Split Line | **Edit Points** tool: double-click an edge |
+| Internal shape ▸ Cut / Convert to Hole | Draw the shape as a piece on top, select both, **Edit ▸ Cut Hole** |
 | Segment Sewing | **Sew** tool (**S**): click one edge, then the other |
 | Edit Sewing ▸ reverse a twisted seam | Select the seam, then **Reverse Direction** in Properties |
 | Simulate (Space) | **Simulate** (Space) |
@@ -273,13 +274,38 @@ the UVs), not the 3D placement. The **Edit** menu also has **Duplicate** (Ctrl+D
   selected point. Hold **Shift** on a free drag to keep to one axis.
 - **Rotate:** with two or more points selected, drag the blue ring to turn them about their middle. Hold
   **Shift** for 15° steps.
-- **Delete** removes the selected points (a piece always keeps at least three).
+- **Delete** removes the selected points (a piece always keeps at least three). Selecting every point of a
+  hole and pressing **Delete** removes the hole.
 
 A curved edge keeps its shape when both of its ends are selected: the curve moves and turns with them. If
 only one end is selected, the curve handle stays where it is.
 
 This tool never bends an edge. To curve the edge between two points, switch back to **Edit Points** (**A**)
 and drag the edge.
+
+### Cutting holes
+
+A hole is cut in the shape of another piece: draw the shape on top of the piece to cut (with Polygon,
+Rectangle or Ellipse, or move an existing piece there), select both (click one, **Ctrl+click** the other), then
+right-click and choose **Cut Hole** (also in the **Edit** menu).
+
+![A pocket opening: the cut-out sewn into its hole on three sides, in 3D and in the pattern](images/cut-hole.png)
+
+- The piece the other one lies inside gets the hole. The shape must lie entirely inside it, without touching
+  its edges or a hole it already has. With several shapes selected inside one piece, each cuts its own hole.
+- What was cut out becomes a new piece, **"… cut-out"**, of the same fabric. It is laid out beside the cut
+  piece in the pattern and placed in 3D just behind the hole. The piece you drew the shape with is left as it
+  is, so either one can become the pocket bag, facing or patch; delete the other if you don't need it.
+- A draped piece stays draped when it is cut, and the cut-out starts draped the same way.
+- A hole's edges can be sewn like any other edge. For a pocket, sew the cut-out (or the shape you cut with) to
+  three sides of the hole and leave the fourth open. The hole runs the opposite way round the shape, so a seam
+  between matching edges starts out untwisted.
+- **Edit Points** and **Transform Points** work on a hole's points as on the outline's: drag them, add points by
+  double-clicking a hole edge, and **Delete** them. A hole needs at least three points, so deleting one of the
+  last three removes the hole, and so does selecting all of its points and pressing **Delete**. **Ctrl+Z**
+  brings it back.
+- In the 2D view you see through a hole to the grid and to any piece beneath it, and a click there selects
+  what is underneath.
 
 ---
 
@@ -662,6 +688,8 @@ The file is plain JSON meant to be readable and editable by hand:
 - Pattern lengths are centimetres; 3D positions are metres; angles are degrees.
 - `curve` is the control point that bends the edge leaving that point.
 - A seam's `edge` number *n* means the edge that starts at point *n* of the piece, counting from 0.
+- `holes` lists a piece's holes, each written like `points` and running clockwise. Their points are numbered on
+  from the outline's: with four outline points, the first hole's first point (and the edge leaving it) is 4.
 - Anything left out takes its default, so a minimal file like the one above loads.
 - The `drape` block holds the simulated shape. Deleting it returns the piece to its flat arrangement.
 - Texture paths are stored relative to the project file when the image is in the same folder or below it.

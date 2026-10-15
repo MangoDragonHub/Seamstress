@@ -176,7 +176,7 @@ public static class Mesher
         return new GarmentMesh { Garment = garment, Pieces = meshes, Stitches = stitches };
     }
 
-    /// <summary>Triangulates one piece with the given number of segments on each outline edge.</summary>
+    /// <summary>Triangulates one piece with the given number of segments on each outline and hole edge.</summary>
     public static PieceMesh BuildPiece(PatternPiece piece, int[] edgeSegments, float particleDistance,
         MeshTopology topology = MeshTopology.Triangles)
     {
@@ -199,18 +199,37 @@ public static class Mesher
             var chain = new int[edgeSegments[e] + 1];
             for (int k = 0; k < edgeSegments[e]; k++)
                 chain[k] = starts[e] + k;
-            chain[^1] = starts[(e + 1) % edgeCount];
+            chain[^1] = starts[piece.NextPoint(e)];
             chains[e] = chain;
         }
 
+        // The boundary vertices of the outline and of each hole, as closed polygons.
+        var loops = piece.Loops().Select(l => (First: starts[l.Start], End: l.Start + l.Loop.Count < edgeCount ? starts[l.Start + l.Loop.Count] : boundaryCount)).ToList();
+        List<Vector2> LoopPolygon(IReadOnlyList<Vector2> all, int loop)
+            => Enumerable.Range(loops[loop].First, loops[loop].End - loops[loop].First).Select(i => all[i]).ToList();
+        var outer = LoopPolygon(boundary, 0);
+        var holes = Enumerable.Range(1, loops.Count - 1).Select(l => LoopPolygon(boundary, l)).ToList();
+        bool OnCloth(List<Vector2> outline, List<List<Vector2>> cutouts, Vector2 p)
+            => Outline.Contains(outline, p) && !cutouts.Any(h => Outline.Contains(h, p));
+
         float h = particleDistance;
-        float orientation = Outline.SignedArea(boundary) >= 0 ? 1f : -1f;
+        // The side of each edge the cloth is on: the inside of the outline, the outside of a hole.
+        var inwardSign = new float[edgeCount];
+        int loopIndex = 0;
+        foreach (var (loop, start) in piece.Loops())
+        {
+            float area = Outline.SignedArea(loopIndex == 0 ? outer : holes[loopIndex - 1]);
+            float sign = (area >= 0 ? 1f : -1f) * (loopIndex == 0 ? 1f : -1f);
+            for (int e = start; e < start + loop.Count; e++)
+                inwardSign[e] = sign;
+            loopIndex++;
+        }
 
         // Lattice of interior points, kept clear of the outline so boundary edges survive triangulation: staggered
         // rows give near-equilateral triangles, a square grid gives cells that pair up into quads.
         var min = new Vector2(float.MaxValue);
         var max = new Vector2(float.MinValue);
-        foreach (var p in boundary)
+        foreach (var p in outer)
         {
             min = Vector2.Min(min, p);
             max = Vector2.Max(max, p);
@@ -232,9 +251,9 @@ public static class Mesher
                     var p = new Vector2(centre.X + c * h + shift, y);
                     if (p.X < min.X || p.X > max.X || p.Y < min.Y || p.Y > max.Y)
                         continue;
-                    if (!Outline.Contains(boundary, p))
+                    if (!OnCloth(outer, holes, p))
                         continue;
-                    if (Outline.DistanceToPolyline(p, boundary, true) < clearance)
+                    if (Outline.DistanceToPolyline(p, outer, true) < clearance || holes.Any(hole => Outline.DistanceToPolyline(p, hole, true) < clearance))
                         continue;
                     points.Add(p);
                 }
@@ -253,7 +272,7 @@ public static class Mesher
             var b = samples[e][n];
             var dir = b - a;
             float len = dir.Length();
-            var inward = len > 1e-9f ? new Vector2(-dir.Y, dir.X) / len * orientation : Vector2.Zero;
+            var inward = len > 1e-9f ? new Vector2(-dir.Y, dir.X) / len * inwardSign[e] : Vector2.Zero;
             for (int k = 0; k < n; k++)
             {
                 double t = k / (double)n;
@@ -277,6 +296,8 @@ public static class Mesher
         var displaced = new Vector2[boundaryCount];
         for (int i = 0; i < boundaryCount; i++)
             displaced[i] = new Vector2((float)xs[i], (float)ys[i]);
+        var displacedOuter = LoopPolygon(displaced, 0);
+        var displacedHoles = Enumerable.Range(1, loops.Count - 1).Select(l => LoopPolygon(displaced, l)).ToList();
 
         var triangles = new List<int>(raw.Length);
         double minArea = (double)h * h * 1e-3;
@@ -287,7 +308,7 @@ public static class Mesher
             if (area < minArea)
                 continue;
             var centroid = new Vector2((float)((xs[a] + xs[b] + xs[c]) / 3), (float)((ys[a] + ys[b] + ys[c]) / 3));
-            if (!Outline.Contains(displaced, centroid))
+            if (!OnCloth(displacedOuter, displacedHoles, centroid))
                 continue;
             triangles.Add(a);
             triangles.Add(b);
@@ -413,6 +434,28 @@ public static class Mesher
             result[i] = Vector3.Transform(local, rotation) + placement.Position;
         }
         return result;
+    }
+
+    /// <summary>
+    /// Where a local pattern point of a piece is when the piece is arranged (as <see cref="Arrange"/> does), and the
+    /// rotation of the piece's surface there: on a wrapped piece each point faces a little further round the wrap.
+    /// </summary>
+    public static (Vector3 Position, Matrix4x4 Rotation) ArrangedFrame(PatternPiece piece, Vector2 local)
+    {
+        var (min, max) = Outline.Bounds(piece);
+        var centre = (min + max) / 2;
+        float width = MathF.Max((max.X - min.X) * 0.01f, 1e-4f);
+        var placement = piece.Placement;
+        float arc = placement.Curvature * MathF.PI / 180f;
+        var rotation = Editing.Workspace.EulerMatrix(placement.Rotation);
+        float x = (local.X - centre.X) * 0.01f;
+        float y = (local.Y - centre.Y) * 0.01f;
+        if (MathF.Abs(arc) <= 1e-3f)
+            return (Vector3.Transform(new Vector3(x, y, 0), rotation) + placement.Position, rotation);
+        float radius = width / arc;
+        float angle = x / radius;
+        var position = new Vector3(radius * MathF.Sin(angle), y, -radius * (1 - MathF.Cos(angle)));
+        return (Vector3.Transform(position, rotation) + placement.Position, Matrix4x4.CreateRotationY(angle) * rotation);
     }
 
     /// <summary>Current 3D positions of a piece: its stored drape if still valid, otherwise the flat arrangement.</summary>

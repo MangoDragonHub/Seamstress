@@ -191,6 +191,13 @@ public sealed class PatternPiece
     /// <summary>Closed outline in local centimetres, counter-clockwise.</summary>
     public List<PatternPoint> Points { get; set; } = new();
 
+    /// <summary>
+    /// Holes cut into the piece, each a closed outline in local centimetres, clockwise, so the cloth is on the left
+    /// of every edge just as it is along the outline. Their points (and the edges that start at them) are numbered
+    /// on from the outline's: with five outline points, the first hole's points are 5, 6, 7 and so on.
+    /// </summary>
+    public List<List<PatternPoint>> Holes { get; set; } = new();
+
     public Placement Placement { get; set; } = new();
     public FabricPhysics Physics { get; set; } = new();
     public string? MaterialId { get; set; }
@@ -220,6 +227,7 @@ public sealed class PatternPiece
         Visible = Visible,
         Origin = Origin,
         Points = Points.Select(p => p.Clone()).ToList(),
+        Holes = Holes.Select(h => h.Select(p => p.Clone()).ToList()).ToList(),
         Placement = Placement.Clone(),
         Physics = Physics.Clone(),
         MaterialId = MaterialId,
@@ -230,7 +238,67 @@ public sealed class PatternPiece
         DrapeKey = DrapeKey,
     };
 
-    public int EdgeCount => Points.Count;
+    /// <summary>Points of the outline and of every hole.</summary>
+    public int PointCount
+    {
+        get
+        {
+            int count = Points.Count;
+            foreach (var hole in Holes)
+                count += hole.Count;
+            return count;
+        }
+    }
+
+    /// <summary>Edges of the outline and of every hole; edge n starts at point n.</summary>
+    public int EdgeCount => PointCount;
+
+    /// <summary>The outline and then each hole, with the number of its first point.</summary>
+    public IEnumerable<(List<PatternPoint> Loop, int Start)> Loops()
+    {
+        yield return (Points, 0);
+        int start = Points.Count;
+        foreach (var hole in Holes)
+        {
+            yield return (hole, start);
+            start += hole.Count;
+        }
+    }
+
+    /// <summary>The outline or hole that point <paramref name="index"/> belongs to, with the number of its first point.</summary>
+    public (List<PatternPoint> Loop, int Start) LoopOf(int index)
+    {
+        foreach (var (loop, start) in Loops())
+        {
+            if (index >= start && index < start + loop.Count)
+                return (loop, start);
+        }
+        throw new ArgumentOutOfRangeException(nameof(index), index, "No such point.");
+    }
+
+    public PatternPoint PointAt(int index)
+    {
+        var (loop, start) = LoopOf(index);
+        return loop[index - start];
+    }
+
+    /// <summary>The point after <paramref name="index"/> going round its outline or hole: where edge <paramref name="index"/> ends.</summary>
+    public int NextPoint(int index)
+    {
+        var (loop, start) = LoopOf(index);
+        return start + (index - start + 1) % loop.Count;
+    }
+
+    public int PreviousPoint(int index)
+    {
+        var (loop, start) = LoopOf(index);
+        return start + (index - start - 1 + loop.Count) % loop.Count;
+    }
+
+    /// <summary>True when point (or edge) <paramref name="index"/> is part of a hole rather than the outline.</summary>
+    public bool InHole(int index) => index >= Points.Count;
+
+    public IEnumerable<PatternPoint> AllPoints() => Holes.Aggregate((IEnumerable<PatternPoint>)Points, (all, hole) => all.Concat(hole));
 
     public void ClearDrape()
     {

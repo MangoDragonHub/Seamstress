@@ -110,7 +110,7 @@ public static class GarmentFile
                     WritePiece(w, p);
                 w.WriteEndArray();
 
-                // "edge" n is the outline edge that starts at point n of the piece (counting from 0).
+                // "edge" n is the edge that starts at point n of the piece (counting from 0, outline first, then holes).
                 w.WritePropertyName("seams");
                 w.WriteRawValue(Lines(g.Seams.Select(s =>
                     $"{{ \"id\": {Quote(s.Id)}, \"from\": {{ \"piece\": {Quote(s.A.PieceId)}, \"edge\": {s.A.Edge} }}, "
@@ -147,10 +147,17 @@ public static class GarmentFile
         w.WriteRawValue(V(p.Origin));
 
         // One outline point per line; "curve" is the control point bending the edge that leaves the point.
-        w.WritePropertyName("points");
-        w.WriteRawValue(Lines(p.Points.Select(point => point.Curve is { } c
+        static string Point(PatternPoint point) => point.Curve is { } c
             ? $"{{ \"at\": {V(point.Position)}, \"curve\": {V(c)} }}"
-            : $"{{ \"at\": {V(point.Position)} }}"), 6));
+            : $"{{ \"at\": {V(point.Position)} }}";
+        w.WritePropertyName("points");
+        w.WriteRawValue(Lines(p.Points.Select(Point), 6));
+        if (p.Holes.Count > 0)
+        {
+            // Holes go clockwise; their points are numbered on from the outline's, which is how seams name their edges.
+            w.WritePropertyName("holes");
+            w.WriteRawValue(Lines(p.Holes.Select(hole => Lines(hole.Select(Point), 7)), 6));
+        }
 
         w.WritePropertyName("placement");
         w.WriteRawValue($"{{ \"position\": {V(p.Placement.Position)}, \"rotation\": {V(p.Placement.Rotation)}, \"curvature\": {N(p.Placement.Curvature)} }}");
@@ -320,19 +327,15 @@ public static class GarmentFile
         piece.Visible = Bool(p, "visible", true);
         piece.Origin = Vec2(p, "origin", Vector2.Zero);
         foreach (var pt in Items(p, "points"))
+            piece.Points.Add(ReadPoint(pt));
+        foreach (var h in Items(p, "holes"))
         {
-            var point = new PatternPoint();
-            if (pt.ValueKind == JsonValueKind.Array)
-            {
-                point.Position = ToVec2(pt, Vector2.Zero);
-            }
-            else if (pt.ValueKind == JsonValueKind.Object)
-            {
-                point.Position = Vec2(pt, "at", Vector2.Zero);
-                if (pt.TryGetProperty("curve", out var curve) && curve.ValueKind == JsonValueKind.Array)
-                    point.Curve = ToVec2(curve, Vector2.Zero);
-            }
-            piece.Points.Add(point);
+            // A hole needs three points; one with fewer would leave no shape to cut.
+            var hole = h.ValueKind == JsonValueKind.Array
+                ? h.EnumerateArray().Where(pt => pt.ValueKind is JsonValueKind.Object or JsonValueKind.Array).Select(ReadPoint).ToList()
+                : new List<PatternPoint>();
+            if (hole.Count >= 3)
+                piece.Holes.Add(hole);
         }
         if (p.TryGetProperty("placement", out var placement) && placement.ValueKind == JsonValueKind.Object)
         {
@@ -382,6 +385,23 @@ public static class GarmentFile
             }
         }
         return piece;
+    }
+
+    /// <summary>A point written as { "at": [x, y], "curve": [x, y] }, or just as [x, y].</summary>
+    private static PatternPoint ReadPoint(JsonElement pt)
+    {
+        var point = new PatternPoint();
+        if (pt.ValueKind == JsonValueKind.Array)
+        {
+            point.Position = ToVec2(pt, Vector2.Zero);
+        }
+        else if (pt.ValueKind == JsonValueKind.Object)
+        {
+            point.Position = Vec2(pt, "at", Vector2.Zero);
+            if (pt.TryGetProperty("curve", out var curve) && curve.ValueKind == JsonValueKind.Array)
+                point.Curve = ToVec2(curve, Vector2.Zero);
+        }
+        return point;
     }
 
     private static string? Resolve(string? path, string? baseFolder)

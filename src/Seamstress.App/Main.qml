@@ -192,6 +192,7 @@ ApplicationWindow {
         "view.wireframe": () => viewport.wireframe = !viewport.wireframe,
         "view.normals": () => viewport.showNormals = !viewport.showNormals,
         "edit.invertNormals": () => App.invertNormals(),
+        "edit.cutHole": () => App.cutHole(),
         "view.pinch": () => viewport.pinchMode = !viewport.pinchMode,
         "view.handles": () => viewport.showGizmo = !viewport.showGizmo,
         "view.avatar": () => viewport.showAvatar = !viewport.showAvatar,

@@ -199,6 +199,25 @@ QtObject {
         App.undo()
         check("invert normals undone", selection().piece.flippedNormals === 0)
 
+        // Cut Hole: a small rectangle drawn on the second one, both selected, cut from the right-click menu.
+        App.tool = "Rectangle"
+        drag(70, 20, 90, 40)
+        App.tool = "Select"
+        App.pointerDown(80, 30, 1, false); App.pointerUp(80, 30)
+        App.pointerDown(65, 10, 1, true); App.pointerUp(65, 10)
+        check("pieces to cut selected", selection().kind === "pieces" && selection().count === 2)
+        let cutItem = null
+        for (let i = 0; i < contextMenu.count; i++) {
+            if (contextMenu.itemAt(i) && contextMenu.itemAt(i).text === "Cut Hole")
+                cutItem = contextMenu.itemAt(i)
+        }
+        check("context menu offers Cut Hole", cutItem !== null)
+        cutItem.triggered()
+        const holed = scene().pieces.filter(p => p.holes !== undefined)
+        check("hole cut", holed.length === 1 && holed[0].holes[0].length === 8 && scene().pieces.length === 5
+              && App.undoText === "Undo Cut hole" && selection().count === 1)
+        check("hole points shown for editing", holed[0].points.length === 16)
+
         // Send to MakeHuman suggests the garment's name and says where the asset would go (nothing is written here).
         check("send dialog suggests the garment name", App.activeGarmentName() !== "")
         const info = JSON.parse(App.makeHumanAssetInfo("Summer Skirt/v2"))
@@ -256,8 +275,9 @@ QtObject {
         check("export glb", App.exportTo("gltf", base + ".glb", true, false))
         check("export fbx", App.exportTo("fbx", base + ".fbx", true, true))
         App.newDocument()
-        check("reopen", App.open(base + ".garment.json") && scene().pieces.length === 5)
-        check("viewport lists the pieces", JSON.parse(App.viewportModels()).models.length === 5)
+        check("reopen", App.open(base + ".garment.json") && scene().pieces.length === 7)
+        check("reopened with its hole", scene().pieces.filter(p => p.holes !== undefined).length === 1)
+        check("viewport lists the pieces", JSON.parse(App.viewportModels()).models.length === 7)
         App.setAvatarShape("gender", 0.9)
         check("avatar body setting stored", Math.abs(JSON.parse(App.avatarShape()).gender - 0.9) < 1e-6)
         App.resetAvatarShape()

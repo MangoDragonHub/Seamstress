@@ -8,19 +8,18 @@ public static class Outline
 {
     private const int CurveSteps = 24;
 
-    public static Vector2 EdgeStart(PatternPiece piece, int edge) => piece.Points[edge].Position;
+    public static Vector2 EdgeStart(PatternPiece piece, int edge) => piece.PointAt(edge).Position;
 
-    public static Vector2 EdgeEnd(PatternPiece piece, int edge)
-        => piece.Points[(edge + 1) % piece.Points.Count].Position;
+    public static Vector2 EdgeEnd(PatternPiece piece, int edge) => piece.PointAt(piece.NextPoint(edge)).Position;
 
-    public static bool IsCurved(PatternPiece piece, int edge) => piece.Points[edge].Curve.HasValue;
+    public static bool IsCurved(PatternPiece piece, int edge) => piece.PointAt(edge).Curve.HasValue;
 
     /// <summary>Point on an edge at Bezier parameter <paramref name="t"/> (not arc-length).</summary>
     public static Vector2 EdgePoint(PatternPiece piece, int edge, float t)
     {
         var a = EdgeStart(piece, edge);
         var b = EdgeEnd(piece, edge);
-        var c = piece.Points[edge].Curve;
+        var c = piece.PointAt(edge).Curve;
         if (c is null)
             return Vector2.Lerp(a, b, t);
         float u = 1 - t;
@@ -79,11 +78,17 @@ public static class Outline
         return result;
     }
 
-    /// <summary>Whole outline as a closed polygon (last point not repeated), in local coordinates.</summary>
-    public static List<Vector2> Flatten(PatternPiece piece)
+    /// <summary>The outer outline as a closed polygon (last point not repeated), in local coordinates.</summary>
+    public static List<Vector2> Flatten(PatternPiece piece) => FlattenLoop(piece, 0, piece.Points.Count);
+
+    /// <summary>Each hole as a closed polygon, like <see cref="Flatten"/>.</summary>
+    public static List<List<Vector2>> FlattenHoles(PatternPiece piece)
+        => piece.Loops().Skip(1).Select(l => FlattenLoop(piece, l.Start, l.Loop.Count)).ToList();
+
+    private static List<Vector2> FlattenLoop(PatternPiece piece, int start, int count)
     {
         var list = new List<Vector2>();
-        for (int e = 0; e < piece.Points.Count; e++)
+        for (int e = start; e < start + count; e++)
         {
             var pts = FlattenEdge(piece, e);
             for (int i = 0; i < pts.Count - 1; i++)
@@ -104,8 +109,13 @@ public static class Outline
         return (float)(sum * 0.5);
     }
 
-    /// <summary>Surface area of the piece in square centimetres.</summary>
-    public static float Area(PatternPiece piece) => MathF.Abs(SignedArea(Flatten(piece)));
+    /// <summary>Surface area of the piece in square centimetres, without its holes.</summary>
+    public static float Area(PatternPiece piece)
+        => MathF.Abs(SignedArea(Flatten(piece))) - FlattenHoles(piece).Sum(h => MathF.Abs(SignedArea(h)));
+
+    /// <summary>True when a local point is on the cloth: inside the outline and not in a hole.</summary>
+    public static bool Contains(PatternPiece piece, Vector2 local)
+        => Contains(Flatten(piece), local) && !FlattenHoles(piece).Any(h => Contains(h, local));
 
     public static bool Contains(IReadOnlyList<Vector2> polygon, Vector2 p)
     {
@@ -152,21 +162,71 @@ public static class Outline
         return (min, max);
     }
 
-    /// <summary>Makes the outline counter-clockwise. Only safe before any seam refers to the piece.</summary>
+    /// <summary>
+    /// Makes the outline counter-clockwise and every hole clockwise. Only safe before any seam refers to the piece.
+    /// </summary>
     public static void EnsureCounterClockwise(PatternPiece piece)
     {
-        if (piece.Points.Count < 3 || SignedArea(Flatten(piece)) >= 0)
-            return;
-        // Reversing the point order moves each curve control to the edge that now starts at the following point.
-        var old = piece.Points;
-        int n = old.Count;
+        if (piece.Points.Count >= 3 && SignedArea(Flatten(piece)) < 0)
+            piece.Points = Reversed(piece.Points);
+        var holes = FlattenHoles(piece);
+        for (int h = 0; h < piece.Holes.Count; h++)
+        {
+            if (piece.Holes[h].Count >= 3 && SignedArea(holes[h]) > 0)
+                piece.Holes[h] = Reversed(piece.Holes[h]);
+        }
+    }
+
+    /// <summary>
+    /// The same closed outline walked the other way, starting from the same point. Point k of the result is point
+    /// n-k of the original, and the edge leaving it is original edge n-1-k, so each curve control moves with its edge.
+    /// </summary>
+    public static List<PatternPoint> Reversed(IReadOnlyList<PatternPoint> loop)
+    {
+        int n = loop.Count;
         var reversed = new List<PatternPoint>(n);
         for (int i = 0; i < n; i++)
         {
-            var src = old[(n - i) % n];
-            var edgeOwner = old[(n - i - 1 + n) % n];
+            var src = loop[(n - i) % n];
+            var edgeOwner = loop[(n - i - 1 + n) % n];
             reversed.Add(new PatternPoint { Position = src.Position, Curve = edgeOwner.Curve });
         }
-        piece.Points = reversed;
+        return reversed;
+    }
+
+    /// <summary>True when two closed polygons cross or touch anywhere along their sides.</summary>
+    public static bool Crosses(IReadOnlyList<Vector2> a, IReadOnlyList<Vector2> b)
+    {
+        for (int i = 0; i < a.Count; i++)
+        {
+            var p = a[i];
+            var q = a[(i + 1) % a.Count];
+            var lo = Vector2.Min(p, q);
+            var hi = Vector2.Max(p, q);
+            for (int j = 0; j < b.Count; j++)
+            {
+                var r = b[j];
+                var s = b[(j + 1) % b.Count];
+                if (MathF.Max(r.X, s.X) < lo.X || MathF.Min(r.X, s.X) > hi.X || MathF.Max(r.Y, s.Y) < lo.Y || MathF.Min(r.Y, s.Y) > hi.Y)
+                    continue;
+                if (SegmentsIntersect(p, q, r, s))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool SegmentsIntersect(Vector2 p, Vector2 q, Vector2 r, Vector2 s)
+    {
+        static float Cross(Vector2 o, Vector2 a, Vector2 b) => (a.X - o.X) * (b.Y - o.Y) - (a.Y - o.Y) * (b.X - o.X);
+        float d1 = Cross(r, s, p), d2 = Cross(r, s, q), d3 = Cross(p, q, r), d4 = Cross(p, q, s);
+        if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0)))
+            return true;
+        // Touching: an end of one segment lies on the other.
+        static bool On(Vector2 a, Vector2 b, Vector2 c, float cross)
+            => MathF.Abs(cross) <= 1e-6f * MathF.Max(1, Vector2.DistanceSquared(a, b))
+               && c.X >= MathF.Min(a.X, b.X) - 1e-5f && c.X <= MathF.Max(a.X, b.X) + 1e-5f
+               && c.Y >= MathF.Min(a.Y, b.Y) - 1e-5f && c.Y <= MathF.Max(a.Y, b.Y) + 1e-5f;
+        return On(r, s, p, d1) || On(r, s, q, d2) || On(p, q, r, d3) || On(p, q, s, d4);
     }
 }

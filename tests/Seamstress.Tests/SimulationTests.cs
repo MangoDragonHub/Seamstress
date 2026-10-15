@@ -127,6 +127,46 @@ public class SimulationTests : IClassFixture<AvatarFixture>
     }
 
     [Fact]
+    public void ACutOutSewnIntoItsHoleDrapesWithTheGarment()
+    {
+        var (ws, sim) = Setup("Skirt");
+        sim.Start(false);
+        Run(sim, 240);
+        sim.Stop();
+        var garment = ws.Document.Garments[0];
+        var front = garment.Pieces[0];
+        var draped = Mesher.CurrentPositions(front, ws.MeshFor(garment).Find(front.Id)!);
+        var drapedCentre = draped.Aggregate(Vector3.Zero, (s, p) => s + p) / draped.Length;
+
+        // A pocket opening on the draped skirt front: cut, then throw away the rectangle it was cut with.
+        var corner = front.Origin + new Vector2(28, 22);
+        var cutter = ws.AddPiece(new[] { corner, corner + new Vector2(14, 0), corner + new Vector2(14, 12), corner + new Vector2(0, 12) }, "Rectangle")!;
+        ws.SelectPiece(front.Id);
+        ws.SelectPiece(cutter.Id, additive: true);
+        var pocket = Assert.Single(ws.CutHole());
+        ws.SelectPiece(cutter.Id);
+        ws.DeleteSelection();
+        garment = ws.Document.Garments[0];
+        front = garment.FindPiece(front.Id)!;
+        var mesh = ws.MeshFor(garment).Find(front.Id)!;
+        Assert.Equal(mesh.Key, front.DrapeKey);
+        var cut = Mesher.CurrentPositions(front, mesh);
+        var cutCentre = cut.Aggregate(Vector3.Zero, (s, p) => s + p) / cut.Length;
+        Assert.True(Vector3.Distance(drapedCentre, cutCentre) < 0.03f, "the skirt keeps its drape when cut");
+
+        // Sew the cut-out back in along the sides and bottom of the hole, leaving the top open.
+        int hole = front.Points.Count;
+        ws.AddSeam(new EdgeRef(front.Id, hole), new EdgeRef(pocket.Id, 3));
+        ws.AddSeam(new EdgeRef(front.Id, hole + 2), new EdgeRef(pocket.Id, 1));
+        ws.AddSeam(new EdgeRef(front.Id, hole + 3), new EdgeRef(pocket.Id, 0));
+        Assert.Null(sim.Start(false));
+        Run(sim, 240);
+        sim.Stop();
+        Dump(ws, "SkirtPocket");
+        Check(ws, ws.Document.Garments[0], 0);
+    }
+
+    [Fact]
     public void OnlyTheActiveGarmentIsSimulated()
     {
         var (ws, sim) = Setup("Tank Top", "Skirt");
