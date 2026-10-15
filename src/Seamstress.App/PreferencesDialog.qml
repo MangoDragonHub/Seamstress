@@ -3,10 +3,10 @@ import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
 
-// Preferences, one page per topic: units and author, the 3D viewport, MakeHuman, textures, and keyboard shortcuts.
-Dialog {
+// Preferences, one page per topic: language and units, the 3D viewport, MakeHuman, textures, and keyboard shortcuts.
+AppDialog {
     id: root
-    title: "Preferences"
+    title: tr("Preferences")
     modal: true
     anchors.centerIn: parent
     width: 820
@@ -18,6 +18,9 @@ Dialog {
     // Set while the Keyboard page waits for a key, so the key does not also run its command.
     readonly property bool recording: keyboard.recordingRow >= 0
     readonly property var pages: ["General", "Viewport", "MakeHuman", "Textures", "Keyboard"]
+    readonly property var pageTitles: [tr("General"), tr("Viewport"), tr("MakeHuman"), tr("Textures"), tr("Keyboard")]
+    // [{code, name}], each language named in itself.
+    readonly property var languages: JSON.parse(App.languagesJson())
     property int page: 0
     function openPage(name) { page = Math.max(0, pages.indexOf(name)); open() }
 
@@ -30,6 +33,7 @@ Dialog {
         license.currentIndex = license.find(App.settingMakeHumanLicense)
         renderer.currentIndex = Math.max(0, ["auto", "gpu", "cpu"].indexOf(App.settingRenderer))
         resolution.currentIndex = Math.max(0, resolution.model.indexOf(App.settingTextureResolution))
+        language.currentIndex = Math.max(0, languages.findIndex(l => l.code === App.settingLanguage))
         units.currentIndex = App.settingUnits === "imperial" ? 1 : 0
         shownImperial = units.currentIndex === 1
         gridSize.text = shownLength(App.gridSizeCm)
@@ -59,7 +63,8 @@ Dialog {
     onAccepted: {
         App.savePreferences(userFolder.text, baseMesh.text, command.text,
                             ["auto", "gpu", "cpu"][renderer.currentIndex], resolution.model[resolution.currentIndex], author.text,
-                            license.editText, units.currentIndex === 1 ? "imperial" : "metric", typedCm(gridSize), typedCm(snapStep))
+                            license.editText, units.currentIndex === 1 ? "imperial" : "metric", typedCm(gridSize), typedCm(snapStep),
+                            languages[language.currentIndex].code)
         App.saveKeyBindings(JSON.stringify(keyboard.chosen()))
     }
 
@@ -86,7 +91,7 @@ Dialog {
                 required property string modelData
                 required property int index
                 width: ListView.view.width
-                text: modelData
+                text: root.pageTitles[index]
                 highlighted: ListView.isCurrentItem
                 onClicked: root.page = index
             }
@@ -102,23 +107,43 @@ Dialog {
             ColumnLayout {
                 spacing: 14
                 GroupBox {
-                    title: "Units"
+                    title: tr("Language")
                     Layout.fillWidth: true
                     GridLayout {
                         anchors.fill: parent
                         columns: 2
                         columnSpacing: 8
                         rowSpacing: 8
-                        Label { text: "Measurements" }
+                        Label { text: tr("Interface language") }
+                        ComboBox {
+                            id: language
+                            Layout.fillWidth: true
+                            model: root.languages.map(l => l.name)
+                        }
+                        Note {
+                            Layout.columnSpan: 2
+                            text: tr("Menus, panels and messages change when you press Save. Garments and pieces you add afterwards get names in this language; names that already exist stay as they are.")
+                        }
+                    }
+                }
+                GroupBox {
+                    title: tr("Units")
+                    Layout.fillWidth: true
+                    GridLayout {
+                        anchors.fill: parent
+                        columns: 2
+                        columnSpacing: 8
+                        rowSpacing: 8
+                        Label { text: tr("Measurements") }
                         ComboBox {
                             id: units
                             Layout.fillWidth: true
-                            model: ["Metric (cm, m, g/m²)", "Imperial (in, oz/yd²)"]
+                            model: [tr("Metric (cm, m, g/m²)"), tr("Imperial (in, oz/yd²)")]
                             onActivated: root.unitsChosen(currentIndex === 1)
                         }
                         Note {
                             Layout.columnSpan: 2
-                            text: "Changes the units shown and typed in the interface. Garment files and exports are not affected."
+                            text: tr("Changes the units shown and typed in the interface. Garment files and exports are not affected.")
                         }
                     }
                 }
@@ -129,36 +154,36 @@ Dialog {
             ColumnLayout {
                 spacing: 14
                 GroupBox {
-                    title: "3D Viewport"
+                    title: tr("3D Viewport")
                     Layout.fillWidth: true
                     GridLayout {
                         anchors.fill: parent
                         columns: 2
                         columnSpacing: 8
                         rowSpacing: 8
-                        Label { text: "Renderer" }
+                        Label { text: tr("Renderer") }
                         ComboBox {
                             id: renderer
                             Layout.fillWidth: true
-                            model: ["Automatic (GPU, falls back to CPU)", "GPU", "CPU (software rendering)"]
+                            model: [tr("Automatic (GPU, falls back to CPU)"), tr("GPU"), tr("CPU (software rendering)")]
                         }
-                        Label { text: "Currently using" }
+                        Label { text: tr("Currently using") }
                         Label { text: App.renderer; opacity: 0.75 }
                         Note {
                             Layout.columnSpan: 2
-                            text: "A renderer change takes effect the next time Seamstress starts."
+                            text: tr("A renderer change takes effect the next time Seamstress starts.")
                         }
                     }
                 }
                 GroupBox {
-                    title: "Grid and Snapping"
+                    title: tr("Grid and Snapping")
                     Layout.fillWidth: true
                     GridLayout {
                         anchors.fill: parent
                         columns: 2
                         columnSpacing: 8
                         rowSpacing: 8
-                        Label { text: "Grid size" }
+                        Label { text: tr("Grid size") }
                         RowLayout {
                             TextField {
                                 id: gridSize
@@ -168,9 +193,9 @@ Dialog {
                                 validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation; locale: "C" }
                             }
                             Label { text: root.shownImperial ? "in" : "cm"; opacity: 0.7 }
-                            Label { text: "One square of the 3D ground grid."; opacity: 0.6; font.pixelSize: 11; Layout.leftMargin: 8 }
+                            Label { text: tr("One square of the 3D ground grid."); opacity: 0.6; font.pixelSize: 11; Layout.leftMargin: 8 }
                         }
-                        Label { text: "Snap step" }
+                        Label { text: tr("Snap step") }
                         RowLayout {
                             TextField {
                                 id: snapStep
@@ -180,11 +205,11 @@ Dialog {
                                 validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation; locale: "C" }
                             }
                             Label { text: root.shownImperial ? "in" : "cm"; opacity: 0.7 }
-                            Label { text: "Hold Shift while dragging a 3D move arrow to snap to this."; opacity: 0.6; font.pixelSize: 11; Layout.leftMargin: 8 }
+                            Label { text: tr("Hold Shift while dragging a 3D move arrow to snap to this."); opacity: 0.6; font.pixelSize: 11; Layout.leftMargin: 8 }
                         }
                         Note {
                             Layout.columnSpan: 2
-                            text: "The 2D grid sizes itself to the zoom; Shift in Edit Points snaps to its smallest squares."
+                            text: tr("The 2D grid sizes itself to the zoom; Shift in Edit Points snaps to its smallest squares.")
                         }
                     }
                 }
@@ -195,7 +220,7 @@ Dialog {
             ColumnLayout {
                 spacing: 14
                 GroupBox {
-                    title: "MakeHuman"
+                    title: tr("MakeHuman")
                     Layout.fillWidth: true
                     GridLayout {
                         anchors.fill: parent
@@ -203,23 +228,23 @@ Dialog {
                         columnSpacing: 8
                         rowSpacing: 8
 
-                        Label { text: "User data folder" }
-                        TextField { id: userFolder; Layout.fillWidth: true; selectByMouse: true; placeholderText: "e.g. ~/makehuman/v1py3" }
-                        Button { text: "Browse…"; onClicked: folderDialog.open() }
+                        Label { text: tr("User data folder") }
+                        TextField { id: userFolder; Layout.fillWidth: true; selectByMouse: true; placeholderText: tr("e.g. ~/makehuman/v1py3") }
+                        Button { text: tr("Browse…"); onClicked: folderDialog.open() }
 
-                        Label { text: "Base mesh" }
+                        Label { text: tr("Base mesh") }
                         TextField { id: baseMesh; Layout.fillWidth: true; selectByMouse: true; placeholderText: "…/data/3dobjs/base.obj" }
-                        Button { text: "Browse…"; onClicked: meshDialog.open() }
+                        Button { text: tr("Browse…"); onClicked: meshDialog.open() }
 
-                        Label { text: "Launch command" }
-                        TextField { id: command; Layout.fillWidth: true; selectByMouse: true; placeholderText: "optional, e.g. python3 /opt/makehuman/makehuman.py" }
+                        Label { text: tr("Launch command") }
+                        TextField { id: command; Layout.fillWidth: true; selectByMouse: true; placeholderText: tr("optional, e.g. python3 /opt/makehuman/makehuman.py") }
                         Item {}
 
-                        Label { text: "Author name" }
-                        TextField { id: author; Layout.fillWidth: true; selectByMouse: true; placeholderText: App.defaultAuthor + " (your login name) when empty" }
+                        Label { text: tr("Author name") }
+                        TextField { id: author; Layout.fillWidth: true; selectByMouse: true; placeholderText: tr("%1 (your login name) when empty").arg(App.defaultAuthor) }
                         Item {}
 
-                        Label { text: "License" }
+                        Label { text: tr("License") }
                         // Pick a common licence or type any other.
                         ComboBox {
                             id: license
@@ -233,9 +258,9 @@ Dialog {
                         RowLayout {
                             Layout.columnSpan: 2
                             Button {
-                                text: "Detect Automatically"
+                                text: tr("Detect Automatically")
                                 onClicked: {
-                                    status.text = App.detectMakeHuman() ? "Found a MakeHuman installation." : "No MakeHuman installation found in the usual places."
+                                    status.text = App.detectMakeHuman() ? tr("Found a MakeHuman installation.") : tr("No MakeHuman installation found in the usual places.")
                                     userFolder.text = App.settingMakeHumanUserFolder
                                     baseMesh.text = App.settingMakeHumanBaseMesh
                                 }
@@ -245,10 +270,7 @@ Dialog {
 
                         Note {
                             Layout.columnSpan: 3
-                            text: "“Send to MakeHuman” writes garments into <user data folder>/data/clothes and fits them to the base mesh. "
-                                + "If a launch command is set, MakeHuman is started after sending when it is not already running. "
-                                + "The author and license are written into every asset sent, and MakeHuman shows them in its clothes library. "
-                                + "CC0 lets anyone use the asset freely; the CC-BY licenses ask for credit, and SA, NC and ND add share-alike, non-commercial and no-derivatives conditions."
+                            text: tr("“Send to MakeHuman” writes garments into <user data folder>/data/clothes and fits them to the base mesh. If a launch command is set, MakeHuman is started after sending when it is not already running. The author and license are written into every asset sent, and MakeHuman shows them in its clothes library. CC0 lets anyone use the asset freely; the CC-BY licenses ask for credit, and SA, NC and ND add share-alike, non-commercial and no-derivatives conditions.")
                         }
                     }
                 }
@@ -259,19 +281,19 @@ Dialog {
             ColumnLayout {
                 spacing: 14
                 GroupBox {
-                    title: "Textures"
+                    title: tr("Textures")
                     Layout.fillWidth: true
                     GridLayout {
                         anchors.fill: parent
                         columns: 3
                         columnSpacing: 8
                         rowSpacing: 8
-                        Label { text: "Texture size for texel density" }
+                        Label { text: tr("Texture size for texel density") }
                         ComboBox { id: resolution; model: [512, 1024, 2048, 4096, 8192]; implicitWidth: 120 }
                         Label { text: "px"; opacity: 0.7; Layout.fillWidth: true }
                         Note {
                             Layout.columnSpan: 3
-                            text: "The UV layout and the Properties panel report texel density (pixels per cm or inch) for a texture this size."
+                            text: tr("The UV layout and the Properties panel report texel density (pixels per cm or inch) for a texture this size.")
                         }
                     }
                 }
@@ -350,10 +372,10 @@ Dialog {
                         id: search
                         Layout.fillWidth: true
                         selectByMouse: true
-                        placeholderText: "Search commands or keys"
+                        placeholderText: tr("Search commands or keys")
                     }
                     Button {
-                        text: "Reset All"
+                        text: tr("Reset All")
                         onClicked: {
                             for (let i = 0; i < keyModel.count; i++)
                                 keyModel.setProperty(i, "keys", keyModel.get(i).defaults)
@@ -411,7 +433,7 @@ Dialog {
                             Button {
                                 id: keyButton
                                 Layout.preferredWidth: 210
-                                text: keyRow.listening ? "Press a key…" : keyRow.keys === "" ? "—" : keyRow.keys.split("\n").join(",  ")
+                                text: keyRow.listening ? root.tr("Press a key…") : keyRow.keys === "" ? "—" : keyRow.keys.split("\n").join(",  ")
                                 highlighted: keyRow.listening
                                 palette.buttonText: !keyRow.listening && keyboard.clashes(keyRow.keys) ? "#ff7b72" : root.palette.buttonText
                                 onClicked: {
@@ -436,7 +458,7 @@ Dialog {
                                 onActiveFocusChanged: if (!activeFocus && keyRow.listening) keyboard.recordingRow = -1
                                 ToolTip.visible: hovered && !keyRow.listening
                                 ToolTip.delay: 500
-                                ToolTip.text: "Click, then press the new key (Escape cancels)"
+                                ToolTip.text: tr("Click, then press the new key (Escape cancels)")
                             }
                             ToolButton {
                                 text: "✕"
@@ -444,7 +466,7 @@ Dialog {
                                 onClicked: { keyboard.recordingRow = -1; keyboard.setKeys(keyRow.index, "") }
                                 ToolTip.visible: hovered
                                 ToolTip.delay: 500
-                                ToolTip.text: "No key"
+                                ToolTip.text: tr("No key")
                             }
                             ToolButton {
                                 text: "↺"
@@ -452,7 +474,7 @@ Dialog {
                                 onClicked: { keyboard.recordingRow = -1; keyboard.setKeys(keyRow.index, keyRow.defaults) }
                                 ToolTip.visible: hovered
                                 ToolTip.delay: 500
-                                ToolTip.text: keyRow.defaults === "" ? "Default: no key" : "Default: " + keyRow.defaults.split("\n").join(", ")
+                                ToolTip.text: keyRow.defaults === "" ? root.tr("Default: no key") : root.tr("Default: %1").arg(keyRow.defaults.split("\n").join(", "))
                             }
                         }
                     }
@@ -464,22 +486,22 @@ Dialog {
                     wrapMode: Text.WordWrap
                     color: "#ff7b72"
                     font.pixelSize: 11
-                    text: keyboard.conflicts.map(c => c.key + " is used by " + c.names.join(" and ")).join(".  ")
-                          + ". A key given to two commands does nothing until one of them is changed."
+                    text: keyboard.conflicts.map(c => tr("%1 is used by %2.").arg(c.key).arg(c.names.join(tr(" and ")))).join("  ")
+                          + "  " + tr("A key given to two commands does nothing until one of them is changed.")
                 }
-                Note { text: "Changes take effect when you press Save." }
+                Note { text: tr("Changes take effect when you press Save.") }
             }
         }
     }
 
     FolderDialog {
         id: folderDialog
-        title: "MakeHuman User Data Folder"
+        title: tr("MakeHuman User Data Folder")
         onAccepted: userFolder.text = App.pathFromUrl(selectedFolder.toString())
     }
     FileDialog {
         id: meshDialog
-        title: "MakeHuman Base Mesh (base.obj)"
+        title: tr("MakeHuman Base Mesh (base.obj)")
         nameFilters: ["Wavefront OBJ (*.obj)"]
         onAccepted: baseMesh.text = App.pathFromUrl(selectedFile.toString())
     }

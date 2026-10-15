@@ -8,6 +8,7 @@ Pane {
     padding: 0
 
     property var rows: []
+    function tr(text) { App.languageRevision; return App.tr(text) }
     property string editingId: ""
     property string menuId: ""
     property string menuKind: ""
@@ -35,7 +36,7 @@ Pane {
         spacing: 0
 
         Label {
-            text: "Layers"
+            text: tr("Layers")
             font.bold: true
             padding: 8
             Layout.fillWidth: true
@@ -143,7 +144,7 @@ Pane {
 
                     Label {
                         visible: row.modelData.kind === "garment" && root.editingId !== row.modelData.id
-                        text: row.modelData.kind === "garment" ? row.modelData.faces.toLocaleString(Qt.locale(), "f", 0) + " faces" : ""
+                        text: row.modelData.kind === "garment" ? tr("%1 faces").arg(row.modelData.faces.toLocaleString(Qt.locale(), "f", 0)) : ""
                         font.pixelSize: 10
                         opacity: 0.55
                     }
@@ -161,7 +162,7 @@ Pane {
                         onClicked: App.setSimulateWithOthers(row.modelData.id, checked)
                         ToolTip.visible: hovered
                         ToolTip.delay: 400
-                        ToolTip.text: checked ? "Simulated together with the active garment" : "Only simulated when it is the active garment"
+                        ToolTip.text: checked ? tr("Simulated together with the active garment") : tr("Only simulated when it is the active garment")
                     }
 
                     ToolButton {
@@ -173,7 +174,7 @@ Pane {
                         onClicked: App.setVisible(row.modelData.id, !row.modelData.visible)
                         ToolTip.visible: hovered
                         ToolTip.delay: 400
-                        ToolTip.text: row.modelData.visible ? "Hide" : "Show"
+                        ToolTip.text: row.modelData.visible ? tr("Hide") : tr("Show")
                     }
                 }
             }
@@ -183,7 +184,7 @@ Pane {
                 visible: root.rows.length === 0
                 opacity: 0.5
                 horizontalAlignment: Text.AlignHCenter
-                text: "No garments yet"
+                text: tr("No garments yet")
             }
         }
 
@@ -191,24 +192,24 @@ Pane {
             Layout.fillWidth: true
             Layout.margins: 4
             spacing: 4
-            Button { text: "+ Garment"; Layout.fillWidth: true; onClicked: App.addGarment() }
-            Button { text: "+ Group"; Layout.fillWidth: true; onClicked: App.addGroup(); enabled: root.rows.length > 0 }
-            Button { text: "Delete"; Layout.fillWidth: true; onClicked: App.deleteSelection(); enabled: root.rows.some(r => r.selected) }
+            Button { text: tr("+ Garment"); Layout.fillWidth: true; onClicked: App.addGarment() }
+            Button { text: tr("+ Group"); Layout.fillWidth: true; onClicked: App.addGroup(); enabled: root.rows.length > 0 }
+            Button { text: tr("Delete"); Layout.fillWidth: true; onClicked: App.deleteSelection(); enabled: root.rows.some(r => r.selected) }
         }
     }
 
     Menu {
         id: contextMenu
-        MenuItem { text: "Rename"; onTriggered: root.editingId = root.menuId }
-        MenuItem { text: "Duplicate"; enabled: root.menuKind === "piece"; onTriggered: App.duplicate() }
+        MenuItem { text: tr("Rename"); onTriggered: root.editingId = root.menuId }
+        MenuItem { text: tr("Duplicate"); enabled: root.menuKind === "piece"; onTriggered: App.duplicate() }
         MenuSeparator {}
-        MenuItem { text: "Group Selected Pieces"; enabled: root.menuKind === "piece"; onTriggered: App.groupSelection() }
-        MenuItem { text: "Ungroup"; enabled: root.menuKind === "group"; onTriggered: App.ungroup(root.menuId) }
+        MenuItem { text: tr("Group Selected Pieces"); enabled: root.menuKind === "piece"; onTriggered: App.groupSelection() }
+        MenuItem { text: tr("Ungroup"); enabled: root.menuKind === "group"; onTriggered: App.ungroup(root.menuId) }
         Menu {
             id: moveMenu
-            title: "Move to Group"
+            title: tr("Move to Group")
             enabled: root.menuKind !== "garment"
-            MenuItem { text: "(Top level)"; onTriggered: App.moveToGroup(root.menuId, "") }
+            MenuItem { text: tr("(Top level)"); onTriggered: App.moveToGroup(root.menuId, "") }
             Instantiator {
                 model: root.groupChoices
                 delegate: MenuItem {
@@ -222,6 +223,6 @@ Pane {
             }
         }
         MenuSeparator {}
-        MenuItem { text: "Delete"; onTriggered: App.deleteLayer(root.menuId) }
+        MenuItem { text: tr("Delete"); onTriggered: App.deleteLayer(root.menuId) }
     }
 }

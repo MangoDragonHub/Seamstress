@@ -210,11 +210,11 @@ public static class GarmentFile
         using var parsed = JsonDocument.Parse(json, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
         var root = parsed.RootElement;
         if (root.ValueKind != JsonValueKind.Object)
-            throw new InvalidDataException("Not a Seamstress garment file: the top level must be a JSON object.");
+            throw new InvalidDataException(Lang.T("Not a Seamstress garment file: the top level must be a JSON object."));
         if (root.TryGetProperty("format", out var format) && format.GetString() != FormatName)
-            throw new InvalidDataException($"Not a Seamstress garment file (format is '{format.GetString()}').");
+            throw new InvalidDataException(Lang.F("Not a Seamstress garment file (format is '{0}').", format.GetString()));
         if (root.TryGetProperty("version", out var version) && version.TryGetInt32(out int v) && v > FormatVersion)
-            throw new InvalidDataException($"This file was written by a newer version of Seamstress (format version {v}).");
+            throw new InvalidDataException(Lang.F("This file was written by a newer version of Seamstress (format version {0}).", v));
 
         var doc = new Document { Name = Str(root, "name") ?? "Untitled" };
         if (root.TryGetProperty("simulation", out var sim) && sim.ValueKind == JsonValueKind.Object)

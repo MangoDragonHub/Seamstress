@@ -20,6 +20,9 @@ public sealed class AppSettings
     /// <summary>Texture size in pixels assumed when reporting texel density.</summary>
     public int TextureResolution { get; set; } = 2048;
 
+    /// <summary>Language of the interface, as a code from <see cref="Lang.Languages"/> ("en", "es", "pt", "fr", "zh", "ja").</summary>
+    public string Language { get; set; } = Lang.English;
+
     /// <summary>"metric" or "imperial". Only changes what the interface shows; files and exports stay metric.</summary>
     public string Units { get; set; } = "metric";
 

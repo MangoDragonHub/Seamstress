@@ -256,9 +256,9 @@ public sealed class Workspace
     public Garment AddGarment(string? name = null)
     {
         Garment? added = null;
-        History.Execute("Add garment", doc =>
+        History.Execute(Lang.T("Add garment"), doc =>
         {
-            added = new Garment { Name = doc.UniqueName(name ?? "Garment") };
+            added = new Garment { Name = doc.UniqueName(name ?? Lang.T("Garment")) };
             doc.Garments.Add(added);
         });
         SelectLayer(added!.Id);
@@ -269,7 +269,7 @@ public sealed class Workspace
     public Garment AddTemplate(string template, float bodyHeight = Templates.ReferenceBodyHeight)
     {
         Garment? added = null;
-        History.Execute($"Add {template}", doc =>
+        History.Execute(Lang.F("Add {0}", Lang.T(template)), doc =>
         {
             added = Templates.Create(template, doc, bodyHeight);
             doc.Garments.Add(added);
@@ -284,17 +284,17 @@ public sealed class Workspace
         if (outline.Count < 3 || MathF.Abs(Outline.SignedArea(outline)) < 1f)
             return null;
         PatternPiece? piece = null;
-        History.Execute($"Add {baseName.ToLowerInvariant()}", doc =>
+        History.Execute(baseName switch { "Rectangle" => Lang.T("Add rectangle"), "Ellipse" => Lang.T("Add ellipse"), _ => Lang.T("Add piece") }, doc =>
         {
             var garment = doc.FindGarment(ActiveGarmentId);
             if (garment == null)
             {
-                garment = new Garment { Name = doc.UniqueName("Garment") };
+                garment = new Garment { Name = doc.UniqueName(Lang.T("Garment")) };
                 doc.Garments.Add(garment);
                 ActiveGarmentId = garment.Id;
             }
             var min = outline.Aggregate(new Vector2(float.MaxValue), Vector2.Min);
-            piece = new PatternPiece { Name = doc.UniqueName(baseName), Origin = min };
+            piece = new PatternPiece { Name = doc.UniqueName(Lang.T(baseName)), Origin = min };
             foreach (var p in outline)
                 piece.Points.Add(new PatternPoint { Position = p - min });
             Outline.EnsureCounterClockwise(piece);
@@ -304,7 +304,7 @@ public sealed class Workspace
                 piece.Physics = existing.Physics.Clone();
             if (piece.MaterialId == null)
             {
-                var material = new FabricMaterial { Name = doc.UniqueName("Fabric") };
+                var material = new FabricMaterial { Name = doc.UniqueName(Lang.T("Fabric")) };
                 doc.Materials.Add(material);
                 piece.MaterialId = material.Id;
             }
@@ -322,7 +322,7 @@ public sealed class Workspace
         if (SelectedSeamId != null)
         {
             string id = SelectedSeamId;
-            History.Execute("Delete seam", doc =>
+            History.Execute(Lang.T("Delete seam"), doc =>
             {
                 foreach (var g in doc.Garments)
                     g.Seams.RemoveAll(s => s.Id == id);
@@ -342,7 +342,7 @@ public sealed class Workspace
         if (SelectedPieces.Count == 0)
             return;
         var ids = SelectedPieces.ToHashSet();
-        History.Execute(ids.Count == 1 ? "Delete piece" : "Delete pieces", doc =>
+        History.Execute(ids.Count == 1 ? Lang.T("Delete piece") : Lang.T("Delete pieces"), doc =>
         {
             foreach (var g in doc.Garments)
                 RemovePieces(g, ids);
@@ -360,12 +360,12 @@ public sealed class Workspace
     {
         if (Document.FindGarment(id) != null)
         {
-            History.Execute("Delete garment", doc => doc.Garments.RemoveAll(g => g.Id == id));
+            History.Execute(Lang.T("Delete garment"), doc => doc.Garments.RemoveAll(g => g.Id == id));
             return;
         }
         if (Document.FindPiece(id) != null)
         {
-            History.Execute("Delete piece", doc =>
+            History.Execute(Lang.T("Delete piece"), doc =>
             {
                 foreach (var g in doc.Garments)
                     RemovePieces(g, new HashSet<string> { id });
@@ -380,7 +380,7 @@ public sealed class Workspace
         name = name.Trim();
         if (name.Length == 0)
             return;
-        History.Execute("Rename", doc =>
+        History.Execute(Lang.T("Rename"), doc =>
         {
             if (doc.FindGarment(id) is { } garment)
                 garment.Name = name;
@@ -399,7 +399,7 @@ public sealed class Workspace
 
     public void SetVisible(string id, bool visible)
     {
-        History.Execute(visible ? "Show" : "Hide", doc =>
+        History.Execute(visible ? Lang.T("Show") : Lang.T("Hide"), doc =>
         {
             if (doc.FindGarment(id) is { } garment)
                 garment.Visible = visible;
@@ -455,12 +455,12 @@ public sealed class Workspace
         string? target = garmentId ?? ActiveGarment?.Id;
         if (target == null)
             return null;
-        History.Execute("Add group", doc =>
+        History.Execute(Lang.T("Add group"), doc =>
         {
             var garment = doc.FindGarment(target);
             if (garment == null)
                 return;
-            group = new LayerGroup { Name = doc.UniqueName("Group") };
+            group = new LayerGroup { Name = doc.UniqueName(Lang.T("Group")) };
             garment.Groups.Add(group);
         });
         return group;
@@ -477,13 +477,13 @@ public sealed class Workspace
             return null;
         LayerGroup? group = null;
         string ownerId = owner.Id;
-        History.Execute("Group pieces", doc =>
+        History.Execute(Lang.T("Group pieces"), doc =>
         {
             var garment = doc.FindGarment(ownerId)!;
             var members = garment.Pieces.Where(p => ids.Contains(p.Id)).ToList();
             // If everything selected already shares a parent group, nest the new group inside it.
             var parents = members.Select(p => p.GroupId).Distinct().ToList();
-            group = new LayerGroup { Name = doc.UniqueName("Group"), ParentId = parents.Count == 1 ? parents[0] : null };
+            group = new LayerGroup { Name = doc.UniqueName(Lang.T("Group")), ParentId = parents.Count == 1 ? parents[0] : null };
             garment.Groups.Add(group);
             foreach (var piece in members)
                 piece.GroupId = group.Id;
@@ -496,7 +496,7 @@ public sealed class Workspace
     {
         if (!Document.Garments.Any(g => g.FindGroup(groupId) != null))
             return;
-        History.Execute("Ungroup", doc =>
+        History.Execute(Lang.T("Ungroup"), doc =>
         {
             foreach (var garment in doc.Garments)
             {
@@ -515,7 +515,7 @@ public sealed class Workspace
     /// <summary>Moves a piece or group into a group of the same garment, or to the garment's top level when null.</summary>
     public void MoveToGroup(string id, string? groupId)
     {
-        History.Execute("Move layer", doc =>
+        History.Execute(Lang.T("Move layer"), doc =>
         {
             foreach (var garment in doc.Garments)
             {
@@ -537,7 +537,7 @@ public sealed class Workspace
         if (ids.Count == 0)
             return;
         var created = new List<string>();
-        History.Execute("Duplicate", doc =>
+        History.Execute(Lang.T("Duplicate"), doc =>
         {
             foreach (var garment in doc.Garments)
             {
@@ -571,7 +571,7 @@ public sealed class Workspace
         var ids = SelectedPieces.ToHashSet();
         if (ids.Count == 0)
             return;
-        History.Execute(ids.Count == 1 ? "Invert normals" : "Invert normals of " + ids.Count + " pieces", doc =>
+        History.Execute(ids.Count == 1 ? Lang.T("Invert normals") : Lang.F("Invert normals of {0} pieces", ids.Count), doc =>
         {
             foreach (var piece in doc.AllPieces().Where(p => ids.Contains(p.Id)))
                 piece.FlipNormals = !piece.FlipNormals;
@@ -583,7 +583,7 @@ public sealed class Workspace
         var ids = SelectedPieces.ToHashSet();
         if (ids.Count == 0)
             return;
-        History.Execute("Mirror", doc =>
+        History.Execute(Lang.T("Mirror"), doc =>
         {
             foreach (var garment in doc.Garments)
             {
@@ -630,7 +630,7 @@ public sealed class Workspace
             return;
         float r = degrees * MathF.PI / 180f;
         float cos = MathF.Cos(r), sin = MathF.Sin(r);
-        History.Execute("Rotate", doc =>
+        History.Execute(Lang.T("Rotate"), doc =>
         {
             foreach (var piece in doc.AllPieces().Where(p => ids.Contains(p.Id)))
             {
@@ -655,7 +655,7 @@ public sealed class Workspace
     /// <summary>Splits an edge by inserting a new outline point at the given local position.</summary>
     public void InsertPoint(string pieceId, int edge, Vector2 localPosition)
     {
-        History.Execute("Add point", doc =>
+        History.Execute(Lang.T("Add point"), doc =>
         {
             var garment = doc.GarmentOfPiece(pieceId);
             var piece = garment?.FindPiece(pieceId);
@@ -679,7 +679,7 @@ public sealed class Workspace
         var target = Document.FindPiece(pieceId);
         if (target == null || target.Points.Count <= 3 || index < 0 || index >= target.Points.Count)
             return;
-        History.Execute("Delete point", doc =>
+        History.Execute(Lang.T("Delete point"), doc =>
         {
             var garment = doc.GarmentOfPiece(pieceId)!;
             var piece = garment.FindPiece(pieceId)!;
@@ -706,7 +706,7 @@ public sealed class Workspace
     {
         if (points.Count == 0)
             return;
-        History.Execute(points.Count == 1 ? "Delete point" : "Delete points", doc =>
+        History.Execute(points.Count == 1 ? Lang.T("Delete point") : Lang.T("Delete points"), doc =>
         {
             // Highest index first, so the indices still to be removed stay valid.
             foreach (var (pieceId, index) in points.Distinct().OrderByDescending(p => p.Index))
@@ -734,7 +734,7 @@ public sealed class Workspace
 
     public void StraightenEdge(string pieceId, int edge)
     {
-        History.Execute("Straighten edge", doc =>
+        History.Execute(Lang.T("Straighten edge"), doc =>
         {
             var piece = doc.FindPiece(pieceId);
             if (piece != null && edge >= 0 && edge < piece.Points.Count)
@@ -757,7 +757,7 @@ public sealed class Workspace
             return null;
         Seam? seam = null;
         string garmentId = garment.Id;
-        History.Execute("Sew edges", doc =>
+        History.Execute(Lang.T("Sew edges"), doc =>
         {
             seam = new Seam { A = a.Clone(), B = b.Clone() };
             doc.FindGarment(garmentId)!.Seams.Add(seam);
@@ -769,7 +769,7 @@ public sealed class Workspace
 
     public void ReverseSeam(string seamId)
     {
-        History.Execute("Reverse seam", doc =>
+        History.Execute(Lang.T("Reverse seam"), doc =>
         {
             foreach (var seam in doc.Garments.SelectMany(g => g.Seams).Where(s => s.Id == seamId))
                 seam.Reversed = !seam.Reversed;
@@ -784,20 +784,29 @@ public sealed class Workspace
         var ids = SelectedPieces.ToHashSet();
         if (ids.Count == 0 || float.IsNaN(value) || float.IsInfinity(value))
             return;
-        History.Execute("Change " + Describe(key), doc =>
+        History.Execute(Describe(key), doc =>
         {
             foreach (var piece in doc.AllPieces().Where(p => ids.Contains(p.Id)))
                 ApplyPieceValue(piece, key, value);
         }, "piece:" + key + ":" + string.Join(",", ids.OrderBy(i => i)));
     }
 
+    /// <summary>The undo name for changing a piece value.</summary>
     private static string Describe(string key) => key switch
     {
-        "posX" or "posY" or "posZ" => "position",
-        "rotX" or "rotY" or "rotZ" => "rotation",
-        "particleDistance" => "particle distance",
-        "uvScale" or "uvRotation" or "uvOffsetX" or "uvOffsetY" => "UV",
-        _ => key,
+        "posX" or "posY" or "posZ" => Lang.T("Change position"),
+        "rotX" or "rotY" or "rotZ" => Lang.T("Change rotation"),
+        "curvature" => Lang.T("Change wrap"),
+        "particleDistance" => Lang.T("Change particle distance"),
+        "uvScale" or "uvRotation" or "uvOffsetX" or "uvOffsetY" => Lang.T("Change UV"),
+        "density" => Lang.T("Change weight"),
+        "stretch" => Lang.T("Change stretch"),
+        "shear" => Lang.T("Change shear"),
+        "bend" => Lang.T("Change bend"),
+        "damping" => Lang.T("Change damping"),
+        "friction" => Lang.T("Change friction"),
+        "thickness" => Lang.T("Change thickness"),
+        _ => Lang.T("Change piece"),
     };
 
     private static void ApplyPieceValue(PatternPiece piece, string key, float value)
@@ -839,7 +848,7 @@ public sealed class Workspace
         var ids = SelectedPieces.ToHashSet();
         if (ids.Count == 0)
             return;
-        History.Execute("Apply fabric preset", doc =>
+        History.Execute(Lang.T("Apply fabric preset"), doc =>
         {
             foreach (var piece in doc.AllPieces().Where(p => ids.Contains(p.Id)))
                 piece.Physics = FabricPhysics.FromPreset(preset);
@@ -850,7 +859,7 @@ public sealed class Workspace
     {
         if (float.IsNaN(value))
             return;
-        History.Execute("Change particle distance", doc =>
+        History.Execute(Lang.T("Change particle distance"), doc =>
         {
             if (doc.FindGarment(garmentId) is { } garment)
                 garment.ParticleDistance = Math.Clamp(value, 0.3f, 20f);
@@ -861,12 +870,12 @@ public sealed class Workspace
     {
         if (Document.FindGarment(garmentId) is not { } current || current.Topology == topology)
             return;
-        History.Execute("Change topology", doc => doc.FindGarment(garmentId)!.Topology = topology);
+        History.Execute(Lang.T("Change topology"), doc => doc.FindGarment(garmentId)!.Topology = topology);
     }
 
     public void SetSimulateWithOthers(string garmentId, bool value)
     {
-        History.Execute("Change simulation scope", doc =>
+        History.Execute(Lang.T("Change simulation scope"), doc =>
         {
             if (doc.FindGarment(garmentId) is { } garment)
                 garment.SimulateWithOthers = value;
@@ -875,7 +884,7 @@ public sealed class Workspace
 
     public void SetSimulationValue(string key, float value)
     {
-        History.Execute("Change simulation settings", doc =>
+        History.Execute(Lang.T("Change simulation settings"), doc =>
         {
             var s = doc.Simulation;
             switch (key)
@@ -891,7 +900,7 @@ public sealed class Workspace
 
     public void SetAvatar(AvatarKind kind, string? path = null, float scale = 1f)
     {
-        History.Execute("Change avatar", doc =>
+        History.Execute(Lang.T("Change avatar"), doc =>
         {
             doc.Avatar.Kind = kind;
             doc.Avatar.Path = path;
@@ -905,7 +914,7 @@ public sealed class Workspace
         if (float.IsNaN(value))
             return;
         value = Math.Clamp(value, 0, 1);
-        History.Execute("Change avatar body", doc =>
+        History.Execute(Lang.T("Change avatar body"), doc =>
         {
             var a = doc.Avatar;
             switch (key)
@@ -922,7 +931,7 @@ public sealed class Workspace
 
     public void ResetAvatarShape()
     {
-        History.Execute("Reset avatar body", doc =>
+        History.Execute(Lang.T("Reset avatar body"), doc =>
         {
             var a = doc.Avatar;
             a.Gender = a.Age = a.Muscle = a.Weight = a.Height = a.Proportions = 0.5f;
@@ -937,7 +946,7 @@ public sealed class Workspace
             : SelectedPieces.ToHashSet();
         if (!Document.AllPieces().Any(p => ids.Contains(p.Id) && p.Drape != null))
             return;
-        History.Execute("Reset arrangement", doc =>
+        History.Execute(Lang.T("Reset arrangement"), doc =>
         {
             foreach (var piece in doc.AllPieces().Where(p => ids.Contains(p.Id)))
                 piece.ClearDrape();
@@ -977,7 +986,7 @@ public sealed class Workspace
     {
         if (SelectionCentre() is not { } pivot)
             return false;
-        History.Begin(name ?? (SelectedPieces.Count == 1 ? "Move piece in 3D" : "Move pieces in 3D"));
+        History.Begin(name ?? (SelectedPieces.Count == 1 ? Lang.T("Move piece in 3D") : Lang.T("Move pieces in 3D")));
         _placementPivot = pivot;
         // With snapping, a single piece lands with its own position on the grid; several pieces with their centre.
         _placementSnapOrigin = SelectedPieces.Count == 1 ? SelectedPieceObjects().First().Placement.Position : pivot;
@@ -1118,7 +1127,7 @@ public sealed class Workspace
         var current = EditableMaterial(Document, ids);
         if (current == null || float.IsNaN(value))
             return;
-        History.Execute("Change material", doc =>
+        History.Execute(Lang.T("Change material"), doc =>
         {
             var m = EditableMaterial(doc, ids)!;
             switch (key)
@@ -1137,7 +1146,7 @@ public sealed class Workspace
         var current = EditableMaterial(Document, ids);
         if (current == null)
             return;
-        History.Execute("Change colour", doc => EditableMaterial(doc, ids)!.Color = color, "material:color:" + current.Id);
+        History.Execute(Lang.T("Change colour"), doc => EditableMaterial(doc, ids)!.Color = color, "material:color:" + current.Id);
     }
 
     public void SetMaterialTexture(string? path)
@@ -1145,7 +1154,7 @@ public sealed class Workspace
         var ids = SelectedPieces.ToHashSet();
         if (EditableMaterial(Document, ids) == null)
             return;
-        History.Execute(path == null ? "Remove texture" : "Set texture", doc => EditableMaterial(doc, ids)!.Texture = path);
+        History.Execute(path == null ? Lang.T("Remove texture") : Lang.T("Set texture"), doc => EditableMaterial(doc, ids)!.Texture = path);
     }
 
     public void RenameMaterial(string name)
@@ -1153,7 +1162,7 @@ public sealed class Workspace
         var ids = SelectedPieces.ToHashSet();
         if (EditableMaterial(Document, ids) == null || string.IsNullOrWhiteSpace(name))
             return;
-        History.Execute("Rename material", doc => EditableMaterial(doc, ids)!.Name = name.Trim());
+        History.Execute(Lang.T("Rename material"), doc => EditableMaterial(doc, ids)!.Name = name.Trim());
     }
 
     /// <summary>Gives the selected pieces their own new material (a copy of the first piece's current one).</summary>
@@ -1162,12 +1171,12 @@ public sealed class Workspace
         var ids = SelectedPieces.ToHashSet();
         if (ids.Count == 0)
             return;
-        History.Execute("New material", doc =>
+        History.Execute(Lang.T("New material"), doc =>
         {
             var source = EditableMaterial(doc, ids);
             var material = source?.Clone() ?? new FabricMaterial();
             material.Id = Document.NewId();
-            material.Name = doc.UniqueName(source?.Name ?? "Fabric");
+            material.Name = doc.UniqueName(source?.Name ?? Lang.T("Fabric"));
             doc.Materials.Add(material);
             foreach (var piece in doc.AllPieces().Where(p => ids.Contains(p.Id)))
                 piece.MaterialId = material.Id;
@@ -1179,7 +1188,7 @@ public sealed class Workspace
         var ids = SelectedPieces.ToHashSet();
         if (ids.Count == 0 || Document.FindMaterial(materialId) == null)
             return;
-        History.Execute("Assign material", doc =>
+        History.Execute(Lang.T("Assign material"), doc =>
         {
             foreach (var piece in doc.AllPieces().Where(p => ids.Contains(p.Id)))
                 piece.MaterialId = materialId;

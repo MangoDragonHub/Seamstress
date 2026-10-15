@@ -32,7 +32,7 @@ public partial class AppController : INotifyPropertyChanged
     private string _avatarTaskKey = "";
 
     private int _sceneRevision, _layersRevision, _selectionRevision, _viewportRevision, _errorRevision;
-    private string _status = "Ready";
+    private string _status = "";
     private string _simInfo = "";
     private string _lastError = "";
     private bool _simulateAll;
@@ -43,6 +43,8 @@ public partial class AppController : INotifyPropertyChanged
 
     public AppController()
     {
+        Lang.Current = Startup.Language ?? _settings.Language;
+        _status = Lang.T("Ready");
         _editor = new PatternEditor(_workspace);
         _simulation = new SimulationController(_workspace, () => _avatar);
         _workspace.History.Changed += OnDocumentChanged;
@@ -98,7 +100,7 @@ public partial class AppController : INotifyPropertyChanged
     {
         get
         {
-            string name = _workspace.FilePath != null ? Path.GetFileName(_workspace.FilePath) : "Untitled";
+            string name = _workspace.FilePath != null ? Path.GetFileName(_workspace.FilePath) : Lang.T("Untitled");
             return (_workspace.History.IsDirty ? "● " : "") + name + " — Seamstress";
         }
     }
@@ -107,8 +109,8 @@ public partial class AppController : INotifyPropertyChanged
     public bool HasFile => _workspace.FilePath != null;
     public bool CanUndo => _workspace.History.CanUndo || _simulation.IsRunning;
     public bool CanRedo => _workspace.History.CanRedo;
-    public string UndoText => _workspace.History.CanUndo ? "Undo " + _workspace.History.UndoName : "Undo";
-    public string RedoText => _workspace.History.CanRedo ? "Redo " + _workspace.History.RedoName : "Redo";
+    public string UndoText => _workspace.History.CanUndo ? Lang.F("Undo {0}", _workspace.History.UndoName) : Lang.T("Undo");
+    public string RedoText => _workspace.History.CanRedo ? Lang.F("Redo {0}", _workspace.History.RedoName) : Lang.T("Redo");
     public bool Simulating => _simulation.IsRunning;
 
     public string StatusText { get => _status; private set { _status = value; Notify(); } }
@@ -166,7 +168,7 @@ public partial class AppController : INotifyPropertyChanged
             ViewportRevision++;
         }
     }
-    public string Renderer => Startup.RendererDescription;
+    public string Renderer => Lang.T(Startup.RendererDescription);
 
     /// <summary>The application version from Directory.Build.props, without the source revision the SDK appends.</summary>
     public string Version { get; } = (System.Reflection.CustomAttributeExtensions
@@ -201,7 +203,7 @@ public partial class AppController : INotifyPropertyChanged
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            StatusText = "Could not save preferences: " + e.Message;
+            StatusText = Lang.F("Could not save preferences: {0}", e.Message);
         }
     }
 
@@ -216,8 +218,8 @@ public partial class AppController : INotifyPropertyChanged
         => JsonSerializer.Serialize(KeyBindings.Commands.Select(c => new
         {
             id = c.Id,
-            group = c.Group,
-            name = c.Name,
+            group = Lang.T(c.Group),
+            name = Lang.T(c.Name),
             keys = KeyBindings.For(_settings, c.Id),
             defaults = c.Defaults,
         }));
@@ -239,7 +241,7 @@ public partial class AppController : INotifyPropertyChanged
 
     /// <summary>Keys given to more than one command in a set of choices ({id: [keys]}), as [{key, names}].</summary>
     public string KeyConflicts(string json)
-        => JsonSerializer.Serialize(KeyBindings.Conflicts(ParseKeys(json)).Select(c => new { key = c.Key, names = c.Commands }));
+        => JsonSerializer.Serialize(KeyBindings.Conflicts(ParseKeys(json)).Select(c => new { key = c.Key, names = c.Commands.Select(Lang.T) }));
 
     /// <summary>Stores the shortcuts chosen in Preferences ({id: [keys]}).</summary>
     public void SaveKeyBindings(string json)
@@ -356,7 +358,7 @@ public partial class AppController : INotifyPropertyChanged
     {
         if (_simulation.IsRunning)
             StopSimulation();
-        return _workspace.BeginPlacementEdit(_workspace.SelectedPieces.Count == 1 ? "Scale piece" : "Scale pieces");
+        return _workspace.BeginPlacementEdit(_workspace.SelectedPieces.Count == 1 ? Lang.T("Scale piece") : Lang.T("Scale pieces"));
     }
 
     /// <summary>Scale handles: <paramref name="axis"/> is "x", "y" or "z", or anything else to scale evenly.</summary>
@@ -382,10 +384,10 @@ public partial class AppController : INotifyPropertyChanged
             Notify();
             StatusText = mode switch
             {
-                Seamstress.Core.Editing.GizmoMode.Move => "Handles: move",
-                Seamstress.Core.Editing.GizmoMode.Rotate => "Handles: rotate",
-                Seamstress.Core.Editing.GizmoMode.Scale => "Handles: scale",
-                _ => "Handles: move, rotate and scale",
+                Seamstress.Core.Editing.GizmoMode.Move => Lang.T("Handles: move"),
+                Seamstress.Core.Editing.GizmoMode.Rotate => Lang.T("Handles: rotate"),
+                Seamstress.Core.Editing.GizmoMode.Scale => Lang.T("Handles: scale"),
+                _ => Lang.T("Handles: move, rotate and scale"),
             };
         }
     }
@@ -406,12 +408,12 @@ public partial class AppController : INotifyPropertyChanged
         {
             if (_avatarTask != null)
             {
-                StatusText = "The avatar is still being prepared — try again in a moment.";
+                StatusText = Lang.T("The avatar is still being prepared — try again in a moment.");
                 return false;
             }
             if (_workspace.ActiveGarmentId != garment.Id)
                 _workspace.SelectPiece(pieceId);
-            string? problem = _simulation.Start(_simulateAll, "Pinch cloth");
+            string? problem = _simulation.Start(_simulateAll, Lang.T("Pinch cloth"));
             if (problem != null)
             {
                 StatusText = problem;
@@ -423,13 +425,13 @@ public partial class AppController : INotifyPropertyChanged
         }
         else if (!_simulation.SimulatedGarments.Contains(garment.Id))
         {
-            StatusText = $"“{garment.Name}” is not part of the running simulation, so it cannot be pinched right now.";
+            StatusText = Lang.F("“{0}” is not part of the running simulation, so it cannot be pinched right now.", garment.Name);
             return false;
         }
         _pinching = true;
         _pinchStopFrame = -1;
         _simulation.BeginPinch(new Vector3((float)x, (float)y, (float)z));
-        StatusText = "Pinching — drag to pull the cloth, release to let it settle.";
+        StatusText = Lang.T("Pinching — drag to pull the cloth, release to let it settle.");
         return true;
     }
 
@@ -448,7 +450,7 @@ public partial class AppController : INotifyPropertyChanged
         if (_pinchStartedSimulation)
             _pinchStopFrame = _simulation.Frame + PinchSettleFrames;
         else
-            StatusText = "Simulating — press Space to stop.";
+            StatusText = Lang.T("Simulating — press Space to stop.");
     }
 
     /// <summary>Called by a UI timer: applies the newest simulation frame and finishes background avatar loading.</summary>
@@ -461,16 +463,16 @@ public partial class AppController : INotifyPropertyChanged
             {
                 _avatar = task.Result;
                 _avatarKey = _avatarTaskKey;
-                StatusText = _avatar == null ? "No avatar"
+                StatusText = _avatar == null ? Lang.T("No avatar")
                     : _avatar.MakeHuman is { Shaped: false }
-                        ? "Avatar ready: MakeHuman base mesh as it is on disk (MakeHuman's targets folder was not found next to it, so body shape cannot be changed)"
-                        : $"Avatar ready: {_avatar.Name}";
+                        ? Lang.T("Avatar ready: MakeHuman base mesh as it is on disk (MakeHuman's targets folder was not found next to it, so body shape cannot be changed)")
+                        : Lang.F("Avatar ready: {0}", Lang.T(_avatar.Name));
             }
             else
             {
                 _avatar = null;
                 _avatarKey = _avatarTaskKey;
-                Fail("Could not load the avatar.", task.Exception?.GetBaseException() ?? new Exception("Unknown error"));
+                Fail(Lang.T("Could not load the avatar."), task.Exception?.GetBaseException() ?? new Exception(Lang.T("Unknown error")));
             }
             ViewportRevision++;
             EnsureAvatar();
@@ -492,13 +494,13 @@ public partial class AppController : INotifyPropertyChanged
             // The cloth has had a moment to settle after the pinch that started this run.
             _simulation.Pump();
             StopSimulation();
-            StatusText = "Pinch applied. Ctrl+Z undoes it.";
+            StatusText = Lang.T("Pinch applied. Ctrl+Z undoes it.");
             return;
         }
         if (_simulation.Pump())
         {
             ViewportRevision++;
-            SimInfo = $"Simulating · {_simulation.ParticleCount:N0} particles · {_simulation.StepMilliseconds:0.0} ms/step";
+            SimInfo = Lang.F("Simulating · {0:N0} particles · {1:0.0} ms/step", _simulation.ParticleCount, _simulation.StepMilliseconds);
         }
     }
 
@@ -522,15 +524,15 @@ public partial class AppController : INotifyPropertyChanged
         _avatarTaskKey = key;
         string baseMesh = _settings.MakeHumanBaseMesh;
         if (wanted.Kind != AvatarKind.None)
-            StatusText = "Preparing avatar…";
+            StatusText = Lang.T("Preparing avatar…");
         _avatarTask = Task.Run(() => wanted.Kind switch
         {
             AvatarKind.None => null,
             AvatarKind.Mannequin => Avatar.CreateMannequin(),
             AvatarKind.MakeHuman => File.Exists(baseMesh)
                 ? Avatar.FromMakeHumanBase(baseMesh, wanted)
-                : throw new FileNotFoundException("The MakeHuman base mesh was not found. Set its location in Preferences."),
-            _ => Avatar.FromObj(wanted.Path ?? throw new FileNotFoundException("No avatar file is set."), wanted.Scale),
+                : throw new FileNotFoundException(Lang.T("The MakeHuman base mesh was not found. Set its location in Preferences.")),
+            _ => Avatar.FromObj(wanted.Path ?? throw new FileNotFoundException(Lang.T("No avatar file is set.")), wanted.Scale),
         });
     }
 
@@ -559,7 +561,7 @@ public partial class AppController : INotifyPropertyChanged
             return;
         if (parsed == AvatarKind.MakeHuman && !File.Exists(_settings.MakeHumanBaseMesh))
         {
-            Fail("The MakeHuman base mesh is not linked yet.\n\nOpen File ▸ Preferences and point Seamstress at MakeHuman's base.obj (inside its data/3dobjs folder).");
+            Fail(Lang.T("The MakeHuman base mesh is not linked yet.\n\nOpen File ▸ Preferences and point Seamstress at MakeHuman's base.obj (inside its data/3dobjs folder)."));
             return;
         }
         _workspace.SetAvatar(parsed, string.IsNullOrEmpty(fileUrl) ? null : LocalPath(fileUrl), scale <= 0 ? 1f : (float)scale);
@@ -576,13 +578,13 @@ public partial class AppController : INotifyPropertyChanged
             return;
         }
         if (_workspace.History.Undo())
-            StatusText = "Undone";
+            StatusText = Lang.T("Undone");
     }
 
     public void Redo()
     {
         if (_workspace.History.Redo())
-            StatusText = "Redone";
+            StatusText = Lang.T("Redone");
     }
 
     public void DeleteSelection()
@@ -608,7 +610,7 @@ public partial class AppController : INotifyPropertyChanged
     public void AddTemplate(string name)
     {
         _workspace.AddTemplate(name, _avatar?.Mesh.Bounds().Max.Y ?? Templates.ReferenceBodyHeight);
-        StatusText = $"Added {name}. Press Simulate to sew and drape it.";
+        StatusText = Lang.F("Added {0}. Press Simulate to sew and drape it.", Lang.T(name));
     }
 
     public string TemplateNames() => string.Join("|", Templates.Names);
@@ -617,7 +619,7 @@ public partial class AppController : INotifyPropertyChanged
     public void GroupSelection()
     {
         if (_workspace.GroupSelection() == null)
-            StatusText = "Select one or more pieces of the same garment to group them.";
+            StatusText = Lang.T("Select one or more pieces of the same garment to group them.");
     }
 
     public void Ungroup(string groupId) => _workspace.Ungroup(groupId);
@@ -679,7 +681,7 @@ public partial class AppController : INotifyPropertyChanged
         if (_startWhenAvatarReady)
         {
             _startWhenAvatarReady = false;
-            StatusText = "Simulation cancelled.";
+            StatusText = Lang.T("Simulation cancelled.");
             return;
         }
         if (_simulation.IsRunning)
@@ -694,7 +696,7 @@ public partial class AppController : INotifyPropertyChanged
         {
             // The avatar's collision field is still being built; start as soon as it is ready.
             _startWhenAvatarReady = true;
-            StatusText = "Preparing the avatar — the simulation starts as soon as it is ready.";
+            StatusText = Lang.T("Preparing the avatar — the simulation starts as soon as it is ready.");
             return;
         }
         string? problem = _simulation.Start(_simulateAll);
@@ -704,7 +706,7 @@ public partial class AppController : INotifyPropertyChanged
             return;
         }
         var names = _workspace.Document.Garments.Where(g => _simulation.SimulatedGarments.Contains(g.Id)).Select(g => g.Name);
-        StatusText = "Simulating " + string.Join(", ", names) + " — press Space to stop.";
+        StatusText = Lang.F("Simulating {0} — press Space to stop.", string.Join(", ", names));
         Notify(nameof(Simulating));
         Notify(nameof(CanUndo));
     }
@@ -718,9 +720,9 @@ public partial class AppController : INotifyPropertyChanged
         SimInfo = "";
         Notify(nameof(Simulating));
         if (error != null)
-            Fail("The simulation stopped because of an error.", new Exception(error));
+            Fail(Lang.T("The simulation stopped because of an error."), new Exception(error));
         else
-            StatusText = "Simulation stopped.";
+            StatusText = Lang.T("Simulation stopped.");
     }
 
     public void ResetArrangement()
@@ -728,7 +730,7 @@ public partial class AppController : INotifyPropertyChanged
         if (_simulation.IsRunning)
             StopSimulation();
         _workspace.ResetDrape(wholeGarment: _workspace.SelectedPieces.Count == 0 || _workspace.SelectedLayerId != null);
-        StatusText = "Pieces returned to their flat arrangement.";
+        StatusText = Lang.T("Pieces returned to their flat arrangement.");
     }
 
     // ---------------------------------------------------------------- files
@@ -739,7 +741,7 @@ public partial class AppController : INotifyPropertyChanged
     public void NewDocument()
     {
         _workspace.New();
-        StatusText = "New project";
+        StatusText = Lang.T("New project");
     }
 
     public bool Open(string fileUrl)
@@ -750,12 +752,12 @@ public partial class AppController : INotifyPropertyChanged
             _workspace.Open(path);
             _settings.AddRecent(path);
             TrySaveSettings();
-            StatusText = "Opened " + Path.GetFileName(path);
+            StatusText = Lang.F("Opened {0}", Path.GetFileName(path));
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
         {
-            Fail($"Could not open {Path.GetFileName(path)}.", e);
+            Fail(Lang.F("Could not open {0}.", Path.GetFileName(path)), e);
             return false;
         }
     }
@@ -774,12 +776,12 @@ public partial class AppController : INotifyPropertyChanged
             _workspace.Save(path);
             _settings.AddRecent(path);
             TrySaveSettings();
-            StatusText = "Saved " + Path.GetFileName(path);
+            StatusText = Lang.F("Saved {0}", Path.GetFileName(path));
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            Fail($"Could not save {Path.GetFileName(path)}.", e);
+            Fail(Lang.F("Could not save {0}.", Path.GetFileName(path)), e);
             return false;
         }
     }
@@ -801,7 +803,7 @@ public partial class AppController : INotifyPropertyChanged
             options.GarmentIds = new[] { active.Id };
         var scene = ExportScene.Build(_workspace.Document, _workspace.MeshFor, options);
         if (scene.Meshes.Count == 0)
-            throw new InvalidOperationException("There is nothing to export: no visible garment has any pieces.");
+            throw new InvalidOperationException(Lang.T("There is nothing to export: no visible garment has any pieces."));
         return scene;
     }
 
@@ -830,12 +832,12 @@ public partial class AppController : INotifyPropertyChanged
                     throw new InvalidOperationException($"Unknown export format '{format}'.");
             }
             int faces = scene.Meshes.Sum(m => format == "gltf" ? m.TriangleCount : m.FaceCount);
-            StatusText = $"Exported {scene.Meshes.Count} garment(s), {faces:N0} faces to {path}";
+            StatusText = Lang.F("Exported {0} garment(s), {1:N0} faces to {2}", scene.Meshes.Count, faces, path);
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            Fail("Export failed.", e);
+            Fail(Lang.T("Export failed."), e);
             return false;
         }
     }
@@ -866,24 +868,24 @@ public partial class AppController : INotifyPropertyChanged
         try
         {
             if (_settings.MakeHumanClothesFolder is not { } clothes || !Directory.Exists(_settings.MakeHumanUserFolder))
-                throw new InvalidOperationException("MakeHuman is not linked yet. Open File ▸ Preferences and choose MakeHuman's user data folder.");
+                throw new InvalidOperationException(Lang.T("MakeHuman is not linked yet. Open File ▸ Preferences and choose MakeHuman's user data folder."));
             if (_workspace.ActiveGarment is not { } garment)
-                throw new InvalidOperationException("Select the garment to send first.");
+                throw new InvalidOperationException(Lang.T("Select the garment to send first."));
             if (_avatar?.MakeHuman is not { } baseMesh)
-                throw new InvalidOperationException("Garments are fitted to MakeHuman's base mesh.\n\nChoose Avatar ▸ MakeHuman Base Mesh, simulate the garment on it, then send it again.");
+                throw new InvalidOperationException(Lang.T("Garments are fitted to MakeHuman's base mesh.\n\nChoose Avatar ▸ MakeHuman Base Mesh, simulate the garment on it, then send it again."));
             var scene = BuildExport(weld: true, activeOnly: true);
             string name = string.IsNullOrWhiteSpace(assetName) ? garment.Name : assetName.Trim();
             var result = MakeHumanExporter.Export(scene.Meshes[0], baseMesh, clothes, _settings.Author, _settings.MakeHumanLicense, name);
             string launched = "";
             if (!string.IsNullOrWhiteSpace(_settings.MakeHumanCommand) && Startup.AllowLaunch)
-                launched = LaunchMakeHuman() ? " MakeHuman is starting." : "";
-            StatusText = $"Sent “{name}” to MakeHuman ({result.VertexCount:N0} vertices): {result.Folder}.{launched}";
+                launched = LaunchMakeHuman() ? " " + Lang.T("MakeHuman is starting.") : "";
+            StatusText = Lang.F("Sent “{0}” to MakeHuman ({1:N0} vertices): {2}.", name, result.VertexCount, result.Folder) + launched;
             LastMakeHumanFolder = result.Folder;
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            Fail("Could not send the garment to MakeHuman.", e);
+            Fail(Lang.T("Could not send the garment to MakeHuman."), e);
             return false;
         }
     }
@@ -906,7 +908,7 @@ public partial class AppController : INotifyPropertyChanged
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            StatusText = "Could not start MakeHuman: " + e.Message;
+            StatusText = Lang.F("Could not start MakeHuman: {0}", e.Message);
             return false;
         }
     }
@@ -928,6 +930,40 @@ public partial class AppController : INotifyPropertyChanged
     public string SettingMakeHumanLicense => _settings.MakeHumanLicense;
     public string SettingUnits => _settings.Units;
 
+    // ---------------------------------------------------------------- language
+
+    private int _languageRevision;
+    /// <summary>Goes up whenever the language changes, so every translated text in the interface is read again.</summary>
+    public int LanguageRevision { get => _languageRevision; private set { _languageRevision = value; Notify(); } }
+
+    /// <summary>Code of the interface language, e.g. "en" or "ja".</summary>
+    public string SettingLanguage => Lang.Current;
+
+    /// <summary>The languages offered in Preferences, as [{code, name}] with each name in its own language.</summary>
+    public string LanguagesJson() => JsonSerializer.Serialize(Lang.Languages.Select(l => new { code = l.Code, name = l.NativeName }));
+
+    /// <summary>An English interface text in the current language. QML reads <see cref="LanguageRevision"/> alongside it.</summary>
+    public string Tr(string text) => Lang.T(text);
+
+    /// <summary>Shows the interface in a language for this session; Preferences stores the choice before calling it.</summary>
+    public void ShowLanguage(string code)
+    {
+        if (code == Lang.Current)
+            return;
+        Lang.Current = code;
+        // Texts the C# side builds are read again too: titles, undo names, hints, the key list and the panels' JSON.
+        Notify(nameof(SettingLanguage));
+        Notify(nameof(WindowTitle));
+        Notify(nameof(UndoText));
+        Notify(nameof(RedoText));
+        Notify(nameof(Renderer));
+        LanguageRevision++;
+        KeysRevision++;
+        SceneRevision++;
+        LayersRevision++;
+        SelectionRevision++;
+    }
+
     /// <summary>The author written into MakeHuman assets when none is set: the login name.</summary>
     public string DefaultAuthor => Environment.UserName;
 
@@ -944,7 +980,7 @@ public partial class AppController : INotifyPropertyChanged
     public double SnapStepCm => _settings.SnapStep > 0 ? _settings.SnapStep : AppSettings.DefaultGridStep(Imperial);
 
     public void SavePreferences(string userFolder, string baseMesh, string command, string renderer, int textureResolution, string author, string license,
-        string units, double gridSizeCm, double snapStepCm)
+        string units, double gridSizeCm, double snapStepCm, string language)
     {
         bool baseChanged = _settings.MakeHumanBaseMesh != LocalPath(baseMesh.Trim());
         _settings.MakeHumanUserFolder = LocalPath(userFolder.Trim());
@@ -961,13 +997,15 @@ public partial class AppController : INotifyPropertyChanged
         _settings.GridSize = Chosen(gridSizeCm);
         _settings.SnapStep = Chosen(snapStepCm);
         Startup.Units = null;
+        _settings.Language = Lang.Languages.Any(l => l.Code == language) ? language : Lang.English;
+        ShowLanguage(_settings.Language);
         TrySaveSettings();
         NotifySettings();
         if (baseChanged)
             EnsureAvatar();
         SelectionRevision++;
         SceneRevision++;
-        StatusText = "Preferences saved.";
+        StatusText = Lang.T("Preferences saved.");
     }
 
     /// <summary>Searches the usual locations for MakeHuman and fills in the preferences that are still empty.</summary>

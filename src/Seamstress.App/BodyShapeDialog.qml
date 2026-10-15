@@ -4,9 +4,9 @@ import QtQuick.Layouts
 
 // Body shape of the MakeHuman avatar: the same sliders as MakeHuman's Main modelling tab. The avatar is rebuilt
 // when a slider is released, which takes a second or two.
-Dialog {
+AppDialog {
     id: root
-    title: "MakeHuman Body Shape"
+    title: tr("MakeHuman Body Shape")
     modal: false
     x: 300
     y: 90
@@ -58,35 +58,35 @@ Dialog {
     ColumnLayout {
         anchors.fill: parent
         spacing: 8
-        ShapeRow { key: "gender"; label: "Gender"; low: "female"; high: "male" }
-        ShapeRow { key: "age"; label: "Age"; low: "baby"; high: "old" }
-        ShapeRow { key: "muscle"; label: "Muscle"; low: "less"; high: "more" }
-        ShapeRow { key: "weight"; label: "Weight"; low: "light"; high: "heavy" }
-        ShapeRow { key: "height"; label: "Height"; low: "short"; high: "tall" }
-        ShapeRow { key: "proportions"; label: "Proportions"; low: "uncommon"; high: "ideal" }
+        ShapeRow { key: "gender"; label: tr("Gender"); low: tr("female"); high: tr("male") }
+        ShapeRow { key: "age"; label: tr("Age"); low: tr("baby"); high: tr("old") }
+        ShapeRow { key: "muscle"; label: tr("Muscle"); low: tr("less"); high: tr("more") }
+        ShapeRow { key: "weight"; label: tr("Weight"); low: tr("light"); high: tr("heavy") }
+        ShapeRow { key: "height"; label: tr("Height"); low: tr("short"); high: tr("tall") }
+        ShapeRow { key: "proportions"; label: tr("Proportions"); low: tr("uncommon"); high: tr("ideal") }
         RowLayout {
             Layout.fillWidth: true
             Label {
                 Layout.fillWidth: true
                 opacity: 0.75
-                text: root.shape.loading ? "Rebuilding the avatar…"
-                    : root.shape.heightCm > 0 ? "Height: " + root.heightText(root.shape.heightCm) : ""
+                text: root.shape.loading ? tr("Rebuilding the avatar…")
+                    : root.shape.heightCm > 0 ? tr("Height: %1").arg(root.heightText(root.shape.heightCm)) : ""
             }
-            Button { text: "Reset to Neutral"; onClicked: App.resetAvatarShape() }
+            Button { text: tr("Reset to Neutral"); onClicked: App.resetAvatarShape() }
         }
         Label {
             visible: !root.shape.shaped
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
             color: "#ffb469"
-            text: "MakeHuman's targets folder was not found next to the base mesh, so the body cannot be reshaped. It should be at data/targets beside data/3dobjs."
+            text: tr("MakeHuman's targets folder was not found next to the base mesh, so the body cannot be reshaped. It should be at data/targets beside data/3dobjs.")
         }
         Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
             opacity: 0.6
             font.pixelSize: 11
-            text: "These match the sliders on MakeHuman's Main modelling tab; 50% everywhere is MakeHuman's default character. Garments already draped keep their shape — simulate again to fit them to the new body."
+            text: tr("These match the sliders on MakeHuman's Main modelling tab; 50% everywhere is MakeHuman's default character. Garments already draped keep their shape — simulate again to fit them to the new body.")
         }
     }
 }

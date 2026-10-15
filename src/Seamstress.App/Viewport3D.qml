@@ -10,6 +10,7 @@ Item {
     id: root
     clip: true
 
+    function tr(text) { App.languageRevision; return App.tr(text) }
     property string displayMode: "shaded"   // "shaded" or "checker"
     property bool wireframe: false
     onWireframeChanged: App.showWire = wireframe
@@ -503,8 +504,9 @@ Item {
 
     Label {
         id: viewTitle
-        anchors { left: parent.left; top: parent.top; margins: 8 }
-        text: "3D Garment"
+        anchors { left: parent.left; top: parent.top; margins: 8; right: viewButtons.left; rightMargin: 12 }
+        elide: Text.ElideRight
+        text: tr("3D Garment")
         font.bold: true
         opacity: 0.75
     }
@@ -514,12 +516,13 @@ Item {
         anchors { left: parent.left; top: viewTitle.bottom; leftMargin: 8; topMargin: 6 }
         spacing: 6
         Rectangle { implicitWidth: 12; implicitHeight: 12; radius: 2; color: "#3f78e0" }
-        Label { text: "Front (normal side)"; font.pixelSize: 11; opacity: 0.85 }
+        Label { text: tr("Front (normal side)"); font.pixelSize: 11; opacity: 0.85 }
         Rectangle { implicitWidth: 12; implicitHeight: 12; radius: 2; color: "#e04848"; Layout.leftMargin: 8 }
-        Label { text: "Back"; font.pixelSize: 11; opacity: 0.85 }
+        Label { text: tr("Back"); font.pixelSize: 11; opacity: 0.85 }
     }
 
     RowLayout {
+        id: viewButtons
         anchors { right: parent.right; top: parent.top; margins: 6 }
         spacing: 4
         component ViewButton: ToolButton {
@@ -527,53 +530,53 @@ Item {
             implicitHeight: 24
             padding: 5
         }
-        ViewButton { text: "Front"; onClicked: root.setView(0, -5) }
-        ViewButton { text: "Side"; onClicked: root.setView(90, -5) }
-        ViewButton { text: "Back"; onClicked: root.setView(180, -5) }
+        ViewButton { text: tr("view|Front"); onClicked: root.setView(0, -5) }
+        ViewButton { text: tr("view|Side"); onClicked: root.setView(90, -5) }
+        ViewButton { text: tr("view|Back"); onClicked: root.setView(180, -5) }
         ViewButton {
-            text: "Ortho"
+            text: tr("Ortho")
             checkable: true
             checked: root.orthographic
             onToggled: root.orthographic = checked
             ToolTip.visible: hovered
             readonly property string key: { App.keysRevision; return App.keyText("view.ortho") }
-            ToolTip.text: "Orthographic view: no perspective, so parts of the garment can be compared in size" + (key !== "" ? " (" + key + ")" : "")
+            ToolTip.text: tr("Orthographic view: no perspective, so parts of the garment can be compared in size") + (key !== "" ? " (" + key + ")" : "")
         }
         ToolSeparator { implicitHeight: 22 }
         ViewButton {
-            text: "Checker"
+            text: tr("Checker")
             checkable: true
             checked: root.displayMode === "checker"
             onToggled: root.displayMode = checked ? "checker" : "shaded"
             ToolTip.visible: hovered
-            ToolTip.text: "Show a checker texture to judge UVs and texel density"
+            ToolTip.text: tr("Show a checker texture to judge UVs and texel density")
         }
         ViewButton {
-            text: "Wire"
+            text: tr("Wire")
             checkable: true
             checked: root.wireframe
             onToggled: root.wireframe = checked
             ToolTip.visible: hovered
-            ToolTip.text: "Show the mesh topology"
+            ToolTip.text: tr("Show the mesh topology")
         }
         ViewButton {
-            text: "Pinch"
+            text: tr("Pinch")
             checkable: true
             checked: root.pinchMode
             onToggled: root.pinchMode = checked
             ToolTip.visible: hovered
-            ToolTip.text: "Drag the cloth itself to tug it into place, during or after simulation"
+            ToolTip.text: tr("Drag the cloth itself to tug it into place, during or after simulation")
         }
         ViewButton {
-            text: "Gizmo"
+            text: tr("Gizmo")
             checkable: true
             checked: root.showGizmo
             onToggled: root.showGizmo = checked
             ToolTip.visible: hovered
-            ToolTip.text: "Show handles to move (arrows) and rotate (rings) the selected pieces"
+            ToolTip.text: tr("Show handles to move (arrows) and rotate (rings) the selected pieces")
         }
         ViewButton {
-            text: "Avatar"
+            text: tr("Avatar")
             checkable: true
             checked: root.showAvatar
             onToggled: root.showAvatar = checked
@@ -585,9 +588,9 @@ Item {
         elide: Text.ElideRight
         opacity: 0.55
         font.pixelSize: 11
-        text: root.measuring ? "Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Drag elsewhere: orbit"
-            : root.pinchMode ? "Pinch: drag the cloth to pull it  ·  Drag elsewhere: orbit  ·  Shift-drag: pan  ·  Wheel: zoom"
-                            : "Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap"
+        text: root.measuring ? tr("Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Drag elsewhere: orbit")
+            : root.pinchMode ? tr("Pinch: drag the cloth to pull it  ·  Drag elsewhere: orbit  ·  Shift-drag: pan  ·  Wheel: zoom")
+                            : tr("Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap")
     }
     Label {
         id: rendererLabel

@@ -24,12 +24,26 @@ ApplicationWindow {
         brightText: "#ffffff"; link: "#6aa7ee"
     }
 
+    // Chinese and Japanese draw some of the same characters (and punctuation) differently, so use the first regional
+    // CJK font that is installed; with none of them, or in other languages, the usual font and its fallbacks apply.
+    readonly property var cjkFonts: ({
+        zh: ["Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei UI", "PingFang SC"],
+        ja: ["Noto Sans CJK JP", "Source Han Sans JP", "Yu Gothic UI", "Meiryo UI", "Hiragino Sans"],
+    })
+    readonly property string cjkFont: {
+        const installed = Qt.fontFamilies()
+        return (cjkFonts[App.settingLanguage] || []).find(f => installed.indexOf(f) >= 0) || ""
+    }
+    font.family: cjkFont !== "" ? cjkFont : Qt.application.font.family
+
     property bool viewportConfirmed: false
     property var afterDiscard: null      // what to do once unsaved changes were dealt with
     property bool closing: false
     property string pendingExport: ""
     // A text box has the keyboard: Enter and Escape belong to it rather than to the tool shortcuts.
     readonly property bool typing: activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined
+    // Interface texts in the language chosen in Preferences; reading the revision redoes the binding when it changes.
+    function tr(text) { App.languageRevision; return App.tr(text) }
 
     onFrameSwapped: {
         if (!viewportConfirmed) {
@@ -207,12 +221,12 @@ ApplicationWindow {
         }
     }
 
-    Action { id: newAction; text: "&New"; onTriggered: window.guard(() => App.newDocument()) }
-    Action { id: openAction; text: "&Open…"; onTriggered: window.guard(() => openDialog.open()) }
-    Action { id: saveAction; text: "&Save"; onTriggered: window.save(null) }
+    Action { id: newAction; text: tr("&New"); onTriggered: window.guard(() => App.newDocument()) }
+    Action { id: openAction; text: tr("&Open…"); onTriggered: window.guard(() => openDialog.open()) }
+    Action { id: saveAction; text: tr("&Save"); onTriggered: window.save(null) }
     Action {
         id: saveAsAction
-        text: "Save &As…"
+        text: tr("Save &As…")
         onTriggered: {
             saveDialog.then = null
             saveDialog.currentFile = saveDialog.currentFolder + "/" + App.suggestedFileName(".garment.json")
@@ -229,12 +243,12 @@ ApplicationWindow {
         MenuBar {
             Layout.fillWidth: true
             Menu {
-                title: "&File"
+                title: tr("&File")
                 KeyMenuItem { action: newAction; command: "file.new" }
                 KeyMenuItem { action: openAction; command: "file.open" }
                 Menu {
                     id: recentMenu
-                    title: "Open &Recent"
+                    title: tr("Open &Recent")
                     property var files: []
                     enabled: files.length > 0
                     onAboutToShow: files = App.recentFiles().split("|").filter(f => f !== "")
@@ -255,30 +269,30 @@ ApplicationWindow {
                 KeyMenuItem { action: saveAsAction; command: "file.saveAs" }
                 MenuSeparator {}
                 Menu {
-                    title: "&Export"
-                    MenuItem { text: "Wavefront &OBJ…"; onTriggered: window.startExport("obj") }
-                    MenuItem { text: "&glTF 2.0 (.glb / .gltf)…"; onTriggered: window.startExport("gltf") }
-                    MenuItem { text: "&FBX…"; onTriggered: window.startExport("fbx") }
+                    title: tr("&Export")
+                    MenuItem { text: tr("Wavefront &OBJ…"); onTriggered: window.startExport("obj") }
+                    MenuItem { text: tr("&glTF 2.0 (.glb / .gltf)…"); onTriggered: window.startExport("gltf") }
+                    MenuItem { text: tr("&FBX…"); onTriggered: window.startExport("fbx") }
                     MenuSeparator {}
-                    MenuItem { text: "Send to &MakeHuman"; onTriggered: makeHumanDialog.open() }
+                    MenuItem { text: tr("Send to &MakeHuman"); onTriggered: makeHumanDialog.open() }
                 }
                 MenuSeparator {}
-                KeyMenuItem { text: "&Preferences…"; command: "file.preferences"; onTriggered: preferences.open() }
+                KeyMenuItem { text: tr("&Preferences…"); command: "file.preferences"; onTriggered: preferences.open() }
                 MenuSeparator {}
-                KeyMenuItem { text: "&Quit"; command: "file.quit"; onTriggered: window.close() }
+                KeyMenuItem { text: tr("&Quit"); command: "file.quit"; onTriggered: window.close() }
             }
             EditMenu {}
             Menu {
                 id: garmentMenu
-                title: "&Garment"
-                MenuItem { text: "New Empty Garment"; onTriggered: App.addGarment() }
-                MenuItem { text: "New Group"; onTriggered: App.addGroup() }
+                title: tr("&Garment")
+                MenuItem { text: tr("New Empty Garment"); onTriggered: App.addGarment() }
+                MenuItem { text: tr("New Group"); onTriggered: App.addGroup() }
                 MenuSeparator {}
                 Instantiator {
                     model: App.templateNames().split("|")
                     delegate: MenuItem {
                         required property string modelData
-                        text: "Add " + modelData
+                        text: tr("Add %1").arg(tr(modelData))
                         onTriggered: App.addTemplate(modelData)
                     }
                     onObjectAdded: (index, object) => garmentMenu.insertItem(index + 3, object)
@@ -286,54 +300,54 @@ ApplicationWindow {
                 }
             }
             Menu {
-                title: "&Simulation"
-                KeyMenuItem { text: App.simulating ? "Stop Simulation" : "Simulate"; command: "sim.toggle"; onTriggered: App.toggleSimulation() }
+                title: tr("&Simulation")
+                KeyMenuItem { text: App.simulating ? tr("Stop Simulation") : tr("Simulate"); command: "sim.toggle"; onTriggered: App.toggleSimulation() }
                 MenuItem {
-                    text: "Simulate All Garments"
+                    text: tr("Simulate All Garments")
                     checkable: true
                     checked: App.simulateAll
                     onTriggered: App.simulateAll = checked
                 }
                 MenuSeparator {}
-                KeyMenuItem { text: "Reset Arrangement"; command: "sim.reset"; onTriggered: App.resetArrangement() }
+                KeyMenuItem { text: tr("Reset Arrangement"); command: "sim.reset"; onTriggered: App.resetArrangement() }
             }
             Menu {
-                title: "&Avatar"
-                MenuItem { text: "Mannequin"; checkable: true; checked: App.avatarType === "Mannequin"; onTriggered: App.setAvatar("Mannequin", "", 1) }
-                MenuItem { text: "MakeHuman Base Mesh"; checkable: true; checked: App.avatarType === "MakeHuman"; onTriggered: App.setAvatar("MakeHuman", "", 1) }
-                MenuItem { text: "MakeHuman Body Shape…"; enabled: App.avatarType === "MakeHuman"; onTriggered: bodyShape.open() }
-                MenuItem { text: "Load OBJ…"; checkable: true; checked: App.avatarType === "CustomObj"; onTriggered: avatarDialog.open() }
-                MenuItem { text: "None"; checkable: true; checked: App.avatarType === "None"; onTriggered: App.setAvatar("None", "", 1) }
+                title: tr("&Avatar")
+                MenuItem { text: tr("Mannequin"); checkable: true; checked: App.avatarType === "Mannequin"; onTriggered: App.setAvatar("Mannequin", "", 1) }
+                MenuItem { text: tr("MakeHuman Base Mesh"); checkable: true; checked: App.avatarType === "MakeHuman"; onTriggered: App.setAvatar("MakeHuman", "", 1) }
+                MenuItem { text: tr("MakeHuman Body Shape…"); enabled: App.avatarType === "MakeHuman"; onTriggered: bodyShape.open() }
+                MenuItem { text: tr("Load OBJ…"); checkable: true; checked: App.avatarType === "CustomObj"; onTriggered: avatarDialog.open() }
+                MenuItem { text: tr("None"); checkable: true; checked: App.avatarType === "None"; onTriggered: App.setAvatar("None", "", 1) }
             }
             Menu {
-                title: "&View"
-                MenuItem { text: "2D: Pattern"; checkable: true; checked: !App.uvMode; onTriggered: App.uvMode = false }
-                KeyMenuItem { text: "2D: UV Layout"; command: "view.uv"; checkable: true; checked: App.uvMode; onTriggered: App.uvMode = true }
-                KeyMenuItem { text: "Frame All in 2D"; command: "view.frame"; onTriggered: patternView.frameAll() }
+                title: tr("&View")
+                MenuItem { text: tr("2D: Pattern"); checkable: true; checked: !App.uvMode; onTriggered: App.uvMode = false }
+                KeyMenuItem { text: tr("2D: UV Layout"); command: "view.uv"; checkable: true; checked: App.uvMode; onTriggered: App.uvMode = true }
+                KeyMenuItem { text: tr("Frame All in 2D"); command: "view.frame"; onTriggered: patternView.frameAll() }
                 MenuSeparator {}
-                KeyMenuItem { text: "3D: Orthographic"; command: "view.ortho"; checkable: true; checked: viewport.orthographic; onTriggered: viewport.orthographic = checked }
-                KeyMenuItem { text: "3D: Front"; command: "view.front"; onTriggered: viewport.setView(0, -5) }
-                KeyMenuItem { text: "3D: Side"; command: "view.side"; onTriggered: viewport.setView(90, -5) }
-                KeyMenuItem { text: "3D: Back"; command: "view.back"; onTriggered: viewport.setView(180, -5) }
+                KeyMenuItem { text: tr("3D: Orthographic"); command: "view.ortho"; checkable: true; checked: viewport.orthographic; onTriggered: viewport.orthographic = checked }
+                KeyMenuItem { text: tr("3D: Front"); command: "view.front"; onTriggered: viewport.setView(0, -5) }
+                KeyMenuItem { text: tr("3D: Side"); command: "view.side"; onTriggered: viewport.setView(90, -5) }
+                KeyMenuItem { text: tr("3D: Back"); command: "view.back"; onTriggered: viewport.setView(180, -5) }
                 MenuSeparator {}
-                KeyMenuItem { text: "3D: Checker (Texel Density)"; command: "view.checker"; checkable: true; checked: viewport.displayMode === "checker"; onTriggered: viewport.displayMode = checked ? "checker" : "shaded" }
-                KeyMenuItem { text: "3D: Wireframe (Topology)"; command: "view.wireframe"; checkable: true; checked: viewport.wireframe; onTriggered: viewport.wireframe = checked }
-                KeyMenuItem { text: "3D: Normal Direction"; command: "view.normals"; checkable: true; checked: viewport.showNormals; onTriggered: viewport.showNormals = checked }
-                KeyMenuItem { text: "3D: Pinch Cloth"; command: "view.pinch"; checkable: true; checked: viewport.pinchMode; onTriggered: viewport.pinchMode = checked }
-                KeyMenuItem { text: "3D: Show Handles"; command: "view.handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
+                KeyMenuItem { text: tr("3D: Checker (Texel Density)"); command: "view.checker"; checkable: true; checked: viewport.displayMode === "checker"; onTriggered: viewport.displayMode = checked ? "checker" : "shaded" }
+                KeyMenuItem { text: tr("3D: Wireframe (Topology)"); command: "view.wireframe"; checkable: true; checked: viewport.wireframe; onTriggered: viewport.wireframe = checked }
+                KeyMenuItem { text: tr("3D: Normal Direction"); command: "view.normals"; checkable: true; checked: viewport.showNormals; onTriggered: viewport.showNormals = checked }
+                KeyMenuItem { text: tr("3D: Pinch Cloth"); command: "view.pinch"; checkable: true; checked: viewport.pinchMode; onTriggered: viewport.pinchMode = checked }
+                KeyMenuItem { text: tr("3D: Show Handles"); command: "view.handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
                 Menu {
-                    title: "Handles"
-                    KeyMenuItem { text: "Move, Rotate and Scale"; command: "handles.full"; checkable: true; checked: App.gizmoMode === "Full"; onTriggered: App.gizmoMode = "Full" }
-                    KeyMenuItem { text: "Move"; command: "handles.move"; checkable: true; checked: App.gizmoMode === "Move"; onTriggered: App.gizmoMode = "Move" }
-                    KeyMenuItem { text: "Rotate"; command: "handles.rotate"; checkable: true; checked: App.gizmoMode === "Rotate"; onTriggered: App.gizmoMode = "Rotate" }
-                    KeyMenuItem { text: "Scale"; command: "handles.scale"; checkable: true; checked: App.gizmoMode === "Scale"; onTriggered: App.gizmoMode = "Scale" }
+                    title: tr("Handles")
+                    KeyMenuItem { text: tr("Move, Rotate and Scale"); command: "handles.full"; checkable: true; checked: App.gizmoMode === "Full"; onTriggered: App.gizmoMode = "Full" }
+                    KeyMenuItem { text: tr("Move"); command: "handles.move"; checkable: true; checked: App.gizmoMode === "Move"; onTriggered: App.gizmoMode = "Move" }
+                    KeyMenuItem { text: tr("Rotate"); command: "handles.rotate"; checkable: true; checked: App.gizmoMode === "Rotate"; onTriggered: App.gizmoMode = "Rotate" }
+                    KeyMenuItem { text: tr("Scale"); command: "handles.scale"; checkable: true; checked: App.gizmoMode === "Scale"; onTriggered: App.gizmoMode = "Scale" }
                 }
-                KeyMenuItem { text: "3D: Show Avatar"; command: "view.avatar"; checkable: true; checked: viewport.showAvatar; onTriggered: viewport.showAvatar = checked }
-                MenuItem { text: "3D: Show Sewing Threads"; checkable: true; checked: viewport.showThreads; onTriggered: viewport.showThreads = checked }
+                KeyMenuItem { text: tr("3D: Show Avatar"); command: "view.avatar"; checkable: true; checked: viewport.showAvatar; onTriggered: viewport.showAvatar = checked }
+                MenuItem { text: tr("3D: Show Sewing Threads"); checkable: true; checked: viewport.showThreads; onTriggered: viewport.showThreads = checked }
             }
             Menu {
-                title: "&Help"
-                MenuItem { text: "About Seamstress"; onTriggered: aboutDialog.open() }
+                title: tr("&Help")
+                MenuItem { text: tr("About Seamstress"); onTriggered: aboutDialog.open() }
             }
         }
 
@@ -375,47 +389,47 @@ ApplicationWindow {
                     color: palette.light
                 }
 
-                ToolChoice { text: "Select"; tool: "Select"; command: "tool.select"; tip: "Select and move pieces" }
+                ToolChoice { text: tr("Select"); tool: "Select"; command: "tool.select"; tip: tr("Select and move pieces") }
                 ButtonDivider {}
-                ToolChoice { text: "Edit Points"; tool: "EditPoints"; command: "tool.editPoints"; tip: "Move points, curve edges, add points" }
+                ToolChoice { text: tr("Edit Points"); tool: "EditPoints"; command: "tool.editPoints"; tip: tr("Move points, curve edges, add points") }
                 ButtonDivider {}
-                ToolChoice { text: "Transform Points"; tool: "TransformPoints"; command: "tool.transformPoints"; tip: "Select points and move, rotate or scale them with handles" }
+                ToolChoice { text: tr("Transform Points"); tool: "TransformPoints"; command: "tool.transformPoints"; tip: tr("Select points and move, rotate or scale them with handles") }
                 ButtonDivider {}
-                ToolChoice { text: "Sew"; tool: "Sew"; command: "tool.sew"; tip: "Click two edges to sew them together" }
+                ToolChoice { text: tr("Sew"); tool: "Sew"; command: "tool.sew"; tip: tr("Click two edges to sew them together") }
                 GroupDivider {}
-                ToolChoice { text: "Polygon"; tool: "Polygon"; command: "tool.polygon"; tip: "Draw a piece corner by corner" }
+                ToolChoice { text: tr("Polygon"); tool: "Polygon"; command: "tool.polygon"; tip: tr("Draw a piece corner by corner") }
                 ButtonDivider {}
-                ToolChoice { text: "Rectangle"; tool: "Rectangle"; command: "tool.rectangle"; tip: "Drag out a rectangular piece" }
+                ToolChoice { text: tr("Rectangle"); tool: "Rectangle"; command: "tool.rectangle"; tip: tr("Drag out a rectangular piece") }
                 ButtonDivider {}
-                ToolChoice { text: "Ellipse"; tool: "Ellipse"; command: "tool.ellipse"; tip: "Drag out an elliptical piece" }
+                ToolChoice { text: tr("Ellipse"); tool: "Ellipse"; command: "tool.ellipse"; tip: tr("Drag out an elliptical piece") }
                 GroupDivider {}
-                ToolChoice { text: "Ruler"; tool: "Ruler"; command: "tool.ruler"; tip: "Measure distances in the 2D view, or between two points on the cloth or avatar in the 3D view" }
+                ToolChoice { text: tr("Ruler"); tool: "Ruler"; command: "tool.ruler"; tip: tr("Measure distances in the 2D view, or between two points on the cloth or avatar in the 3D view") }
                 GroupDivider {}
                 ToolButton { text: "↶"; font.pixelSize: 18; enabled: App.canUndo; onClicked: App.undo(); ToolTip.visible: hovered; ToolTip.text: App.undoText }
                 ToolButton { text: "↷"; font.pixelSize: 18; enabled: App.canRedo; onClicked: App.redo(); ToolTip.visible: hovered; ToolTip.text: App.redoText }
                 GroupDivider {}
                 ToolButton {
-                    text: App.uvMode ? "UV Layout" : "Pattern"
+                    text: App.uvMode ? tr("UV Layout") : tr("Pattern")
                     checkable: true
                     checked: App.uvMode
                     onClicked: App.uvMode = checked
                     ToolTip.visible: hovered
-                    ToolTip.text: "Switch the 2D view between the pattern and its UV layout" + window.keyHint("view.uv")
+                    ToolTip.text: tr("Switch the 2D view between the pattern and its UV layout") + window.keyHint("view.uv")
                 }
 
                 Item { Layout.fillWidth: true }
 
                 CheckBox {
-                    text: "All garments"
+                    text: tr("All garments")
                     checked: App.simulateAll
                     onToggled: App.simulateAll = checked
                     ToolTip.visible: hovered
                     ToolTip.delay: 500
-                    ToolTip.text: "Off: only the active garment (and garments linked with ⇄) is simulated.\nOn: every visible garment is simulated."
+                    ToolTip.text: tr("Off: only the active garment (and garments linked with ⇄) is simulated.\nOn: every visible garment is simulated.")
                 }
                 Button {
                     id: simulateButton
-                    text: App.simulating ? "■  Stop" : "▶  Simulate"
+                    text: App.simulating ? "■  " + tr("Stop") : "▶  " + tr("Simulate")
                     implicitWidth: 120
                     highlighted: true
                     palette.highlight: App.simulating ? "#d9534f" : "#3fa35a"
@@ -423,14 +437,14 @@ ApplicationWindow {
                     onClicked: App.toggleSimulation()
                     ToolTip.visible: hovered
                     ToolTip.delay: 500
-                    ToolTip.text: "Sew and drape the active garment" + window.keyHint("sim.toggle")
+                    ToolTip.text: tr("Sew and drape the active garment") + window.keyHint("sim.toggle")
                 }
                 Button {
-                    text: "Reset"
+                    text: tr("Reset")
                     onClicked: App.resetArrangement()
                     ToolTip.visible: hovered
                     ToolTip.delay: 500
-                    ToolTip.text: "Return the pieces to their flat arrangement"
+                    ToolTip.text: tr("Return the pieces to their flat arrangement")
                 }
             }
         }
@@ -487,7 +501,7 @@ ApplicationWindow {
                 Label {
                     font.pixelSize: 12
                     opacity: 0.7
-                    text: propertiesPanel.sel.totalFaces !== undefined ? propertiesPanel.sel.totalFaces.toLocaleString(Qt.locale(), "f", 0) + " faces total" : ""
+                    text: propertiesPanel.sel.totalFaces !== undefined ? tr("%1 faces total").arg(propertiesPanel.sel.totalFaces.toLocaleString(Qt.locale(), "f", 0)) : ""
                 }
             }
         }
@@ -496,86 +510,86 @@ ApplicationWindow {
     // ------------------------------------------------------------------ dialogs
     FileDialog {
         id: openDialog
-        title: "Open Garment"
-        nameFilters: ["Seamstress garments (*.garment.json *.json)", "All files (*)"]
+        title: tr("Open Garment")
+        nameFilters: [tr("Seamstress garments") + " (*.garment.json *.json)", tr("All files") + " (*)"]
         currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
         onAccepted: App.open(selectedFile)
     }
     FileDialog {
         id: saveDialog
-        title: "Save Garment"
+        title: tr("Save Garment")
         fileMode: FileDialog.SaveFile
-        nameFilters: ["Seamstress garments (*.garment.json)"]
+        nameFilters: [tr("Seamstress garments") + " (*.garment.json)"]
         currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
         property var then: null
         onAccepted: { if (App.saveAs(selectedFile) && then) then() }
     }
     FileDialog {
         id: exportDialog
-        title: "Export"
+        title: tr("Export")
         fileMode: FileDialog.SaveFile
         currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
         onAccepted: App.exportTo(window.pendingExport, selectedFile, weldBox.checked, scopeBox.currentIndex === 1)
     }
     FileDialog {
         id: textureDialog
-        title: "Choose Texture"
-        nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.bmp)", "All files (*)"]
+        title: tr("Choose Texture")
+        nameFilters: [tr("Images") + " (*.png *.jpg *.jpeg *.webp *.bmp)", tr("All files") + " (*)"]
         currentFolder: StandardPaths.writableLocation(StandardPaths.PicturesLocation)
         onAccepted: App.setMaterialTexture(selectedFile)
     }
     FileDialog {
         id: avatarDialog
-        title: "Load Avatar (OBJ, in metres)"
+        title: tr("Load Avatar (OBJ, in metres)")
         nameFilters: ["Wavefront OBJ (*.obj)"]
         currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
         onAccepted: App.setAvatar("CustomObj", selectedFile, 1)
     }
     ColorDialog {
         id: colorDialog
-        title: "Fabric Colour"
+        title: tr("Fabric Colour")
         onSelectedColorChanged: if (visible) App.setMaterialColor(selectedColor.toString())
         onAccepted: App.setMaterialColor(selectedColor.toString())
     }
 
-    Dialog {
+    AppDialog {
         id: exportOptions
-        title: window.pendingExport === "obj" ? "Export OBJ" : window.pendingExport === "fbx" ? "Export FBX" : "Export glTF"
+        title: tr("Export %1").arg(window.pendingExport === "obj" ? "OBJ" : window.pendingExport === "fbx" ? "FBX" : "glTF")
         modal: true
         anchors.centerIn: parent
         standardButtons: Dialog.Ok | Dialog.Cancel
         ColumnLayout {
             spacing: 10
             RowLayout {
-                Label { text: "Export" }
-                ComboBox { id: scopeBox; implicitWidth: 240; model: ["All visible garments", "Active garment only"] }
+                Label { text: tr("Export") }
+                ComboBox { id: scopeBox; implicitWidth: 240; model: [tr("All visible garments"), tr("Active garment only")] }
             }
             CheckBox {
                 id: weldBox
                 checked: true
-                text: "Weld sewn seams into one connected mesh"
+                text: tr("Weld sewn seams into one connected mesh")
             }
             Label {
                 Layout.preferredWidth: 380
                 wrapMode: Text.WordWrap
                 opacity: 0.65
                 font.pixelSize: 11
-                text: "Exports the garment as it currently looks in the 3D view, in metres with Y up. Set the face count with Particle distance in the Topology panel."
+                text: tr("Exports the garment as it currently looks in the 3D view, in metres with Y up. Set the face count with Particle distance in the Topology panel.")
             }
         }
         onAccepted: {
             const ext = window.pendingExport === "obj" ? ".obj" : window.pendingExport === "fbx" ? ".fbx" : ".glb"
             exportDialog.nameFilters = window.pendingExport === "obj" ? ["Wavefront OBJ (*.obj)"]
                                      : window.pendingExport === "fbx" ? ["Autodesk FBX (*.fbx)"]
-                                     : ["glTF binary (*.glb)", "glTF separate (*.gltf)"]
+                                     : [tr("glTF binary") + " (*.glb)", tr("glTF separate") + " (*.gltf)"]
             exportDialog.currentFile = exportDialog.currentFolder + "/" + App.suggestedFileName(ext)
             exportDialog.open()
         }
     }
 
-    Dialog {
+    AppDialog {
         id: makeHumanDialog
-        title: "Send to MakeHuman"
+        title: tr("Send to MakeHuman")
         modal: true
         anchors.centerIn: parent
         standardButtons: Dialog.Ok | Dialog.Cancel
@@ -588,30 +602,30 @@ ApplicationWindow {
             if (App.makeHumanLinked)
                 assetName.forceActiveFocus()
         }
-        Component.onCompleted: standardButton(Dialog.Ok).text = "Send"
+        okText: tr("Send")
         ColumnLayout {
             spacing: 10
             Label {
                 visible: !App.makeHumanLinked
                 Layout.preferredWidth: 460
                 wrapMode: Text.WordWrap
-                text: "MakeHuman is not linked yet. Choose its user data folder and base mesh in Preferences first."
+                text: tr("MakeHuman is not linked yet. Choose its user data folder and base mesh in Preferences first.")
             }
             GridLayout {
                 visible: App.makeHumanLinked
                 columns: 2
                 columnSpacing: 10
                 rowSpacing: 8
-                Label { text: "Asset name" }
+                Label { text: tr("Asset name") }
                 TextField {
                     id: assetName
                     Layout.preferredWidth: 340
                     selectByMouse: true
-                    placeholderText: "the name MakeHuman lists it under"
+                    placeholderText: tr("the name MakeHuman lists it under")
                     onTextChanged: makeHumanDialog.check()
                     onAccepted: makeHumanDialog.accept()
                 }
-                Label { text: "Saved in"; opacity: 0.75 }
+                Label { text: tr("Saved in"); opacity: 0.75 }
                 Label {
                     Layout.preferredWidth: 340
                     text: makeHumanDialog.target.folder
@@ -621,9 +635,9 @@ ApplicationWindow {
                     ToolTip.text: text
                     HoverHandler { id: savedIn }
                 }
-                Label { text: "Author"; opacity: 0.75 }
+                Label { text: tr("Author"); opacity: 0.75 }
                 Label { text: App.settingAuthor !== "" ? App.settingAuthor : App.defaultAuthor; opacity: 0.75 }
-                Label { text: "License"; opacity: 0.75 }
+                Label { text: tr("License"); opacity: 0.75 }
                 Label { text: App.settingMakeHumanLicense; opacity: 0.75 }
             }
             Label {
@@ -631,7 +645,7 @@ ApplicationWindow {
                 Layout.preferredWidth: 460
                 wrapMode: Text.WordWrap
                 color: "#ffb469"
-                text: "An asset with this name is already there. Sending replaces it; choose another name to keep both."
+                text: tr("An asset with this name is already there. Sending replaces it; choose another name to keep both.")
             }
             Label {
                 visible: App.makeHumanLinked
@@ -639,49 +653,73 @@ ApplicationWindow {
                 wrapMode: Text.WordWrap
                 opacity: 0.65
                 font.pixelSize: 11
-                text: "The garment is fitted to the MakeHuman base mesh, so it follows the character when you change body shape. In MakeHuman it appears under Geometries ▸ Clothes. Author and license are set in Preferences ▸ MakeHuman."
+                text: tr("The garment is fitted to the MakeHuman base mesh, so it follows the character when you change body shape. In MakeHuman it appears under Geometries ▸ Clothes. Author and license are set in Preferences ▸ MakeHuman.")
             }
             Label {
                 visible: App.makeHumanLinked && App.avatarType !== "MakeHuman"
                 Layout.preferredWidth: 460
                 wrapMode: Text.WordWrap
                 color: "#ffb469"
-                text: "The avatar is not the MakeHuman base mesh. Switch to Avatar ▸ MakeHuman Base Mesh and simulate the garment on it before sending."
+                text: tr("The avatar is not the MakeHuman base mesh. Switch to Avatar ▸ MakeHuman Base Mesh and simulate the garment on it before sending.")
             }
             RowLayout {
-                Button { visible: !App.makeHumanLinked; text: "Open Preferences…"; onClicked: { makeHumanDialog.close(); preferences.openPage("MakeHuman") } }
-                Button { visible: App.makeHumanLinked; text: "Change Author or License…"; flat: true; onClicked: { makeHumanDialog.close(); preferences.openPage("MakeHuman") } }
+                Button { visible: !App.makeHumanLinked; text: tr("Open Preferences…"); onClicked: { makeHumanDialog.close(); preferences.openPage("MakeHuman") } }
+                Button { visible: App.makeHumanLinked; text: tr("Change Author or License…"); flat: true; onClicked: { makeHumanDialog.close(); preferences.openPage("MakeHuman") } }
             }
         }
         onAccepted: if (App.makeHumanLinked) App.sendToMakeHuman(assetName.text)
     }
 
-    MessageDialog {
+    AppDialog {
         id: errorDialog
+        property alias text: errorText.text
         title: "Seamstress"
-        buttons: MessageDialog.Ok
-    }
-    MessageDialog {
-        id: unsavedDialog
-        title: "Unsaved Changes"
-        text: "This garment has unsaved changes."
-        informativeText: "Do you want to save them first?"
-        buttons: MessageDialog.Save | MessageDialog.Discard | MessageDialog.Cancel
-        onButtonClicked: (button, role) => {
-            const action = window.afterDiscard
-            window.afterDiscard = null
-            if (button === MessageDialog.Save)
-                window.save(action)
-            else if (button === MessageDialog.Discard && action)
-                action()
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.Ok
+        ColumnLayout {
+            Label { id: errorText; wrapMode: Text.WordWrap; Layout.maximumWidth: 520 }
         }
     }
-    MessageDialog {
+    AppDialog {
+        id: unsavedDialog
+        title: tr("Unsaved Changes")
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.Save | Dialog.Discard | Dialog.Cancel
+        ColumnLayout {
+            spacing: 6
+            Label { text: tr("This garment has unsaved changes."); font.bold: true }
+            Label { text: tr("Do you want to save them first?") }
+        }
+        function finish(saving) {
+            const action = window.afterDiscard
+            window.afterDiscard = null
+            if (saving)
+                window.save(action)
+            else if (action)
+                action()
+        }
+        onAccepted: finish(true)
+        onDiscarded: { close(); finish(false) }
+        onRejected: window.afterDiscard = null
+    }
+    AppDialog {
         id: aboutDialog
-        title: "About Seamstress"
-        text: "Seamstress " + App.version
-        informativeText: "A 3D garment creation tool: draw pattern pieces, sew them, and drape them on an avatar.\n\nBuilt with C# and Qt Quick (Qt Bridge for C#).\n3D viewport: " + App.renderer
-        buttons: MessageDialog.Ok
+        title: tr("About Seamstress")
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.Ok
+        ColumnLayout {
+            spacing: 8
+            Label { text: "Seamstress " + App.version; font.bold: true; font.pixelSize: 15 }
+            Label {
+                Layout.maximumWidth: 460
+                wrapMode: Text.WordWrap
+                text: tr("A 3D garment creation tool: draw pattern pieces, sew them, and drape them on an avatar.") + "\n\n"
+                      + tr("Built with C# and Qt Quick (Qt Bridge for C#).") + "\n" + tr("3D viewport: %1").arg(App.renderer)
+            }
+        }
     }
 
     PreferencesDialog { id: preferences }

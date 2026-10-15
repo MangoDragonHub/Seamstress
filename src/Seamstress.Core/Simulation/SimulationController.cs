@@ -51,10 +51,10 @@ public sealed class SimulationController : IDisposable
         var doc = _workspace.Document;
         var simulated = GarmentsToSimulate(allGarments);
         if (simulated.Count == 0)
-            return "There is no visible garment to simulate. Add a garment or select one in the layers panel.";
+            return Lang.T("There is no visible garment to simulate. Add a garment or select one in the layers panel.");
 
         _stopping = true; // Begin raises BeforeChange; this run has not started yet
-        _workspace.History.Begin(undoName ?? (simulated.Count == 1 ? $"Simulate {simulated[0].Name}" : "Simulate garments"));
+        _workspace.History.Begin(undoName ?? (simulated.Count == 1 ? Lang.F("Simulate {0}", simulated[0].Name) : Lang.T("Simulate garments")));
         _stopping = false;
 
         var active = simulated.Select(g => _workspace.MeshFor(g)).ToList();

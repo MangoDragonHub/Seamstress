@@ -8,6 +8,7 @@ Pane {
     id: root
     padding: 0
 
+    function tr(text) { App.languageRevision; return App.tr(text) }
     property var sel: ({ kind: "none", count: 0, presets: [], materials: [], simulation: {} })
     signal pickColor(string current)
     signal pickTexture()
@@ -151,10 +152,10 @@ Pane {
                 padding: 8
                 font.bold: true
                 elide: Text.ElideRight
-                text: root.sel.kind === "seam" ? "Seam"
+                text: root.sel.kind === "seam" ? tr("Seam")
                     : root.sel.kind === "pieces" ? root.sel.piece.name
                     : root.sel.kind === "garment" ? root.sel.garment.name
-                    : "Properties"
+                    : tr("Properties")
             }
 
             Label {
@@ -163,15 +164,15 @@ Pane {
                 padding: 8
                 wrapMode: Text.WordWrap
                 opacity: 0.6
-                text: "Nothing selected. Add a garment from the Garment menu or draw a piece in the 2D view."
+                text: tr("Nothing selected. Add a garment from the Garment menu or draw a piece in the 2D view.")
             }
 
             // ---- Topology ------------------------------------------------------------
             Section {
-                title: "Topology"
+                title: tr("Topology")
                 visible: !!root.sel.garment
                 SliderRow {
-                    label: "Particle distance"
+                    label: tr("Particle distance")
                     from: root.imperial ? 0.2 : 0.5; to: root.imperial ? 2.4 : 6
                     stepSize: root.imperial ? 0.05 : 0.1; decimals: root.imperial ? 2 : 1; suffix: " " + root.lengthName
                     value: (root.sel.garment ? root.sel.garment.particleDistance : 2) / root.cmUnit
@@ -179,44 +180,44 @@ Pane {
                 }
                 RowLayout {
                     Layout.fillWidth: true
-                    Label { text: "Faces"; Layout.preferredWidth: 118; opacity: 0.85 }
+                    Label { text: tr("Faces"); Layout.preferredWidth: 118; opacity: 0.85 }
                     ComboBox {
                         Layout.fillWidth: true
                         implicitHeight: 26
-                        model: ["Triangles", "Quads"]
+                        model: [tr("Triangles"), tr("Quads")]
                         currentIndex: root.sel.garment && root.sel.garment.topology === "Quads" ? 1 : 0
-                        onActivated: App.setTopology(currentText)
+                        onActivated: App.setTopology(currentIndex === 1 ? "Quads" : "Triangles")
                     }
                 }
                 InfoRow {
-                    label: "Garment mesh"
-                    value: root.sel.garment ? root.sel.garment.faces.toLocaleString(Qt.locale(), "f", 0) + " faces  ·  "
-                         + root.sel.garment.vertices.toLocaleString(Qt.locale(), "f", 0) + " verts" : ""
+                    label: tr("Garment mesh")
+                    value: root.sel.garment ? tr("%1 faces  ·  %2 verts").arg(root.sel.garment.faces.toLocaleString(Qt.locale(), "f", 0))
+                                                .arg(root.sel.garment.vertices.toLocaleString(Qt.locale(), "f", 0)) : ""
                 }
                 InfoRow {
                     visible: root.sel.garment ? root.sel.garment.topology === "Quads" : false
-                    label: "Of which"
-                    value: root.sel.garment ? root.sel.garment.quads.toLocaleString(Qt.locale(), "f", 0) + " quads  ·  "
-                         + (root.sel.garment.faces - root.sel.garment.quads).toLocaleString(Qt.locale(), "f", 0) + " triangles" : ""
+                    label: tr("Of which")
+                    value: root.sel.garment ? tr("%1 quads  ·  %2 triangles").arg(root.sel.garment.quads.toLocaleString(Qt.locale(), "f", 0))
+                                                .arg((root.sel.garment.faces - root.sel.garment.quads).toLocaleString(Qt.locale(), "f", 0)) : ""
                 }
                 Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     opacity: 0.55
                     font.pixelSize: 11
-                    text: "Smaller distance = more faces: finer wrinkles, slower simulation. Quads export to OBJ and FBX; glTF and MakeHuman always receive triangles."
+                    text: tr("Smaller distance = more faces: finer wrinkles, slower simulation. Quads export to OBJ and FBX; glTF and MakeHuman always receive triangles.")
                 }
                 NumberRow {
                     visible: root.sel.kind === "pieces"
-                    label: "Piece override"
+                    label: tr("Piece override")
                     decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.05 : 0.1; suffix: root.lengthName
                     value: (root.sel.piece ? root.sel.piece.particleDistance : 0) / root.cmUnit
                     onEdited: (v) => App.setPieceValue("particleDistance", v * root.cmUnit)
                 }
                 InfoRow {
                     visible: root.sel.kind === "pieces"
-                    label: "Selected"
-                    value: root.sel.piece ? root.sel.piece.faces.toLocaleString(Qt.locale(), "f", 0) + " faces  ·  "
+                    label: tr("Selected")
+                    value: root.sel.piece ? tr("%1 faces").arg(root.sel.piece.faces.toLocaleString(Qt.locale(), "f", 0)) + "  ·  "
                          + (root.sel.piece.area / (root.cmUnit * root.cmUnit)).toFixed(0) + " " + root.lengthName + "²" : ""
                 }
                 Label {
@@ -224,18 +225,18 @@ Pane {
                     Layout.fillWidth: true
                     opacity: 0.55
                     font.pixelSize: 11
-                    text: "Override 0 uses the garment's particle distance."
+                    text: tr("Override 0 uses the garment's particle distance.")
                 }
             }
 
             // ---- Seam ----------------------------------------------------------------
             Section {
-                title: "Seam"
+                title: tr("Seam")
                 visible: root.sel.kind === "seam"
-                InfoRow { label: "From"; value: root.sel.seam ? root.sel.seam.a : "" }
-                InfoRow { label: "To"; value: root.sel.seam ? root.sel.seam.b : "" }
+                InfoRow { label: tr("From"); value: root.sel.seam ? root.sel.seam.a : "" }
+                InfoRow { label: tr("To"); value: root.sel.seam ? root.sel.seam.b : "" }
                 InfoRow {
-                    label: "Lengths"
+                    label: tr("Lengths")
                     value: root.sel.seam ? (root.sel.seam.lengthA / root.cmUnit).toFixed(root.imperial ? 2 : 1) + " " + root.lengthName + "  ↔  "
                          + (root.sel.seam.lengthB / root.cmUnit).toFixed(root.imperial ? 2 : 1) + " " + root.lengthName : ""
                 }
@@ -243,27 +244,27 @@ Pane {
                     Layout.fillWidth: true
                     Button {
                         Layout.fillWidth: true
-                        text: "Reverse Direction"
+                        text: tr("Reverse Direction")
                         onClicked: App.reverseSeam()
                         ToolTip.visible: hovered
-                        ToolTip.text: "Swap which ends of the two edges are sewn together (fixes a twisted seam)"
+                        ToolTip.text: tr("Swap which ends of the two edges are sewn together (fixes a twisted seam)")
                     }
-                    Button { Layout.fillWidth: true; text: "Delete Seam"; onClicked: App.deleteSelection() }
+                    Button { Layout.fillWidth: true; text: tr("Delete Seam"); onClicked: App.deleteSelection() }
                 }
             }
 
             // ---- Arrangement ---------------------------------------------------------
             Section {
-                title: "3D Arrangement"
+                title: tr("3D Arrangement")
                 visible: root.sel.kind === "pieces"
-                NumberRow { label: "Position X"; suffix: root.imperial ? "in" : "m"; decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01; value: (root.sel.piece ? root.sel.piece.posX : 0) / root.mUnit; onEdited: (v) => App.setPieceValue("posX", v * root.mUnit) }
-                NumberRow { label: "Position Y"; suffix: root.imperial ? "in" : "m"; decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01; value: (root.sel.piece ? root.sel.piece.posY : 0) / root.mUnit; onEdited: (v) => App.setPieceValue("posY", v * root.mUnit) }
-                NumberRow { label: "Position Z"; suffix: root.imperial ? "in" : "m"; decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01; value: (root.sel.piece ? root.sel.piece.posZ : 0) / root.mUnit; onEdited: (v) => App.setPieceValue("posZ", v * root.mUnit) }
-                NumberRow { label: "Rotation X"; suffix: "°"; decimals: 1; step: 5; value: root.sel.piece ? root.sel.piece.rotX : 0; onEdited: (v) => App.setPieceValue("rotX", v) }
-                NumberRow { label: "Rotation Y"; suffix: "°"; decimals: 1; step: 5; value: root.sel.piece ? root.sel.piece.rotY : 0; onEdited: (v) => App.setPieceValue("rotY", v) }
-                NumberRow { label: "Rotation Z"; suffix: "°"; decimals: 1; step: 5; value: root.sel.piece ? root.sel.piece.rotZ : 0; onEdited: (v) => App.setPieceValue("rotZ", v) }
+                NumberRow { label: tr("Position X"); suffix: root.imperial ? "in" : "m"; decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01; value: (root.sel.piece ? root.sel.piece.posX : 0) / root.mUnit; onEdited: (v) => App.setPieceValue("posX", v * root.mUnit) }
+                NumberRow { label: tr("Position Y"); suffix: root.imperial ? "in" : "m"; decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01; value: (root.sel.piece ? root.sel.piece.posY : 0) / root.mUnit; onEdited: (v) => App.setPieceValue("posY", v * root.mUnit) }
+                NumberRow { label: tr("Position Z"); suffix: root.imperial ? "in" : "m"; decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01; value: (root.sel.piece ? root.sel.piece.posZ : 0) / root.mUnit; onEdited: (v) => App.setPieceValue("posZ", v * root.mUnit) }
+                NumberRow { label: tr("Rotation X"); suffix: "°"; decimals: 1; step: 5; value: root.sel.piece ? root.sel.piece.rotX : 0; onEdited: (v) => App.setPieceValue("rotX", v) }
+                NumberRow { label: tr("Rotation Y"); suffix: "°"; decimals: 1; step: 5; value: root.sel.piece ? root.sel.piece.rotY : 0; onEdited: (v) => App.setPieceValue("rotY", v) }
+                NumberRow { label: tr("Rotation Z"); suffix: "°"; decimals: 1; step: 5; value: root.sel.piece ? root.sel.piece.rotZ : 0; onEdited: (v) => App.setPieceValue("rotZ", v) }
                 SliderRow {
-                    label: "Wrap"
+                    label: tr("Wrap")
                     from: -300; to: 300; stepSize: 5; suffix: "°"
                     value: root.sel.piece ? root.sel.piece.curvature : 0
                     onEdited: (v) => App.setPieceValue("curvature", v)
@@ -273,57 +274,59 @@ Pane {
                     wrapMode: Text.WordWrap
                     opacity: 0.55
                     font.pixelSize: 11
-                    text: "Where the piece sits in 3D; you can also drag the arrows and rings in the 3D view. Wrap curls the flat piece around an arm or leg."
+                    text: tr("Where the piece sits in 3D; you can also drag the arrows and rings in the 3D view. Wrap curls the flat piece around an arm or leg.")
                 }
                 InfoRow {
                     readonly property int flipped: root.sel.piece ? root.sel.piece.flippedNormals : 0
                     readonly property int count: root.sel.piece ? root.sel.piece.count : 0
-                    label: "Normals"
-                    value: flipped === 0 ? "As drawn" : flipped === count ? (count === 1 ? "Inverted" : "All inverted")
-                                                                         : flipped + " of " + count + " inverted"
+                    label: tr("Normals")
+                    value: flipped === 0 ? tr("As drawn") : flipped === count ? (count === 1 ? tr("Inverted") : tr("All inverted"))
+                                                                         : tr("%1 of %2 inverted").arg(flipped).arg(count)
                 }
                 Button {
                     Layout.fillWidth: true
-                    text: "Invert Normals"
+                    text: tr("Invert Normals")
                     onClicked: App.invertNormals()
                     ToolTip.visible: hovered
                     ToolTip.delay: 500
-                    ToolTip.text: "Turn the faces of the selected pieces to point the other way. Use View ▸ 3D: Normal Direction to see which way they face: blue is the front, red the back."
+                    ToolTip.text: tr("Turn the faces of the selected pieces to point the other way. Use View ▸ 3D: Normal Direction to see which way they face: blue is the front, red the back.")
                 }
             }
 
             // ---- Fabric --------------------------------------------------------------
             Section {
-                title: "Fabric Physics"
+                title: tr("Fabric Physics")
                 visible: root.sel.kind === "pieces"
                 RowLayout {
                     Layout.fillWidth: true
-                    Label { text: "Preset"; Layout.preferredWidth: 118; opacity: 0.85 }
+                    Label { text: tr("Preset"); Layout.preferredWidth: 118; opacity: 0.85 }
                     ComboBox {
                         id: presetBox
                         Layout.fillWidth: true
                         implicitHeight: 26
-                        model: root.sel.physics && root.sel.presets.indexOf(root.sel.physics.preset) < 0
+                        // Preset names are stored in English and shown translated.
+                        readonly property var names: root.sel.physics && root.sel.presets.indexOf(root.sel.physics.preset) < 0
                              ? root.sel.presets.concat([root.sel.physics.preset]) : root.sel.presets
-                        currentIndex: root.sel.physics ? model.indexOf(root.sel.physics.preset) : -1
-                        onActivated: if (root.sel.presets.indexOf(currentText) >= 0) App.setPreset(currentText)
+                        model: names.map(n => root.tr(n))
+                        currentIndex: root.sel.physics ? names.indexOf(root.sel.physics.preset) : -1
+                        onActivated: (index) => { if (root.sel.presets.indexOf(names[index]) >= 0) App.setPreset(names[index]) }
                     }
                 }
                 SliderRow {
-                    label: "Weight"
+                    label: tr("Weight")
                     from: root.imperial ? 0.6 : 20; to: root.imperial ? 29.5 : 1000
                     stepSize: root.imperial ? 0.1 : 5; decimals: root.imperial ? 1 : 0
                     suffix: root.imperial ? " oz/yd²" : " g/m²"; valueWidth: root.imperial ? 70 : 54
                     value: (root.sel.physics ? root.sel.physics.density : 150) / root.gsmUnit
                     onEdited: (v) => App.setPieceValue("density", v * root.gsmUnit)
                 }
-                SliderRow { label: "Stretch"; value: root.sel.physics ? root.sel.physics.stretch : 0; onEdited: (v) => App.setPieceValue("stretch", v) }
-                SliderRow { label: "Shear"; value: root.sel.physics ? root.sel.physics.shear : 0; onEdited: (v) => App.setPieceValue("shear", v) }
-                SliderRow { label: "Bend"; value: root.sel.physics ? root.sel.physics.bend : 0; onEdited: (v) => App.setPieceValue("bend", v) }
-                SliderRow { label: "Damping"; value: root.sel.physics ? root.sel.physics.damping : 0; onEdited: (v) => App.setPieceValue("damping", v) }
-                SliderRow { label: "Friction"; value: root.sel.physics ? root.sel.physics.friction : 0; onEdited: (v) => App.setPieceValue("friction", v) }
+                SliderRow { label: tr("Stretch"); value: root.sel.physics ? root.sel.physics.stretch : 0; onEdited: (v) => App.setPieceValue("stretch", v) }
+                SliderRow { label: tr("Shear"); value: root.sel.physics ? root.sel.physics.shear : 0; onEdited: (v) => App.setPieceValue("shear", v) }
+                SliderRow { label: tr("Bend"); value: root.sel.physics ? root.sel.physics.bend : 0; onEdited: (v) => App.setPieceValue("bend", v) }
+                SliderRow { label: tr("Damping"); value: root.sel.physics ? root.sel.physics.damping : 0; onEdited: (v) => App.setPieceValue("damping", v) }
+                SliderRow { label: tr("Friction"); value: root.sel.physics ? root.sel.physics.friction : 0; onEdited: (v) => App.setPieceValue("friction", v) }
                 SliderRow {
-                    label: "Thickness"
+                    label: tr("Thickness")
                     from: root.imperial ? 0.02 : 0.5; to: root.imperial ? 0.6 : 15
                     stepSize: root.imperial ? 0.02 : 0.5; decimals: root.imperial ? 2 : 1; suffix: root.imperial ? " in" : " mm"
                     value: (root.sel.physics ? root.sel.physics.thickness : 3) / root.mmUnit
@@ -333,7 +336,7 @@ Pane {
 
             // ---- Material ------------------------------------------------------------
             Section {
-                title: "Material"
+                title: tr("Material")
                 visible: root.sel.kind === "pieces" && !!root.sel.material
                 RowLayout {
                     Layout.fillWidth: true
@@ -347,16 +350,16 @@ Pane {
                         onActivated: App.assignMaterial(currentValue)
                     }
                     Button {
-                        text: "New"
+                        text: tr("New")
                         implicitHeight: 26
                         onClicked: App.newMaterial()
                         ToolTip.visible: hovered
-                        ToolTip.text: "Give the selected pieces their own copy of this material"
+                        ToolTip.text: tr("Give the selected pieces their own copy of this material")
                     }
                 }
                 RowLayout {
                     Layout.fillWidth: true
-                    Label { text: "Name"; Layout.preferredWidth: 118; opacity: 0.85 }
+                    Label { text: tr("Name"); Layout.preferredWidth: 118; opacity: 0.85 }
                     TextField {
                         Layout.fillWidth: true
                         implicitHeight: 24
@@ -368,7 +371,7 @@ Pane {
                 }
                 RowLayout {
                     Layout.fillWidth: true
-                    Label { text: "Colour"; Layout.preferredWidth: 118; opacity: 0.85 }
+                    Label { text: tr("Colour"); Layout.preferredWidth: 118; opacity: 0.85 }
                     Rectangle {
                         Layout.fillWidth: true
                         implicitHeight: 24
@@ -380,12 +383,12 @@ Pane {
                 }
                 RowLayout {
                     Layout.fillWidth: true
-                    Label { text: "Texture"; Layout.preferredWidth: 118; opacity: 0.85 }
+                    Label { text: tr("Texture"); Layout.preferredWidth: 118; opacity: 0.85 }
                     Label {
                         Layout.fillWidth: true
                         elide: Text.ElideMiddle
                         text: root.sel.material && root.sel.material.textureName !== ""
-                            ? (root.sel.material.textureMissing ? "⚠ missing: " : "") + root.sel.material.textureName : "None"
+                            ? (root.sel.material.textureMissing ? "⚠ " + tr("missing:") + " " : "") + root.sel.material.textureName : tr("None")
                         opacity: root.sel.material && root.sel.material.textureName !== "" ? 1 : 0.5
                         color: root.sel.material && root.sel.material.textureMissing ? "#ff8c69" : palette.windowText
                     }
@@ -396,64 +399,64 @@ Pane {
                         onClicked: App.setMaterialTexture("")
                     }
                 }
-                SliderRow { label: "Texture repeat"; from: 0.25; to: 20; stepSize: 0.25; decimals: 2; suffix: "×"; value: root.sel.material ? root.sel.material.repeat : 1; onEdited: (v) => App.setMaterialValue("repeat", v) }
-                SliderRow { label: "Roughness"; from: 0; to: 1; stepSize: 0.01; decimals: 2; value: root.sel.material ? root.sel.material.roughness : 0.8; onEdited: (v) => App.setMaterialValue("roughness", v) }
-                SliderRow { label: "Metallic"; from: 0; to: 1; stepSize: 0.01; decimals: 2; value: root.sel.material ? root.sel.material.metallic : 0; onEdited: (v) => App.setMaterialValue("metallic", v) }
-                SliderRow { label: "Opacity"; from: 0; to: 1; stepSize: 0.01; decimals: 2; value: root.sel.material ? root.sel.material.opacity : 1; onEdited: (v) => App.setMaterialValue("opacity", v) }
+                SliderRow { label: tr("Texture repeat"); from: 0.25; to: 20; stepSize: 0.25; decimals: 2; suffix: "×"; value: root.sel.material ? root.sel.material.repeat : 1; onEdited: (v) => App.setMaterialValue("repeat", v) }
+                SliderRow { label: tr("Roughness"); from: 0; to: 1; stepSize: 0.01; decimals: 2; value: root.sel.material ? root.sel.material.roughness : 0.8; onEdited: (v) => App.setMaterialValue("roughness", v) }
+                SliderRow { label: tr("Metallic"); from: 0; to: 1; stepSize: 0.01; decimals: 2; value: root.sel.material ? root.sel.material.metallic : 0; onEdited: (v) => App.setMaterialValue("metallic", v) }
+                SliderRow { label: tr("Opacity"); from: 0; to: 1; stepSize: 0.01; decimals: 2; value: root.sel.material ? root.sel.material.opacity : 1; onEdited: (v) => App.setMaterialValue("opacity", v) }
                 Label {
                     visible: root.sel.material ? root.sel.material.users > root.sel.count : false
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     opacity: 0.55
                     font.pixelSize: 11
-                    text: root.sel.material ? "Shared by " + root.sel.material.users + " pieces — changes affect all of them." : ""
+                    text: root.sel.material ? tr("Shared by %1 pieces — changes affect all of them.").arg(root.sel.material.users) : ""
                 }
             }
 
             // ---- UV ------------------------------------------------------------------
             Section {
-                title: "UV & Texel Density"
+                title: tr("UV & Texel Density")
                 visible: root.sel.kind === "pieces"
                 InfoRow {
-                    label: "Texel density"
+                    label: tr("Texel density")
                     value: root.sel.piece ? (root.sel.piece.texelDensity * root.cmUnit).toFixed(root.imperial ? 1 : 2) + " px/" + root.lengthName + "  @ " + root.sel.piece.textureResolution + " px" : ""
                 }
-                SliderRow { label: "UV scale"; from: 0.1; to: 4; stepSize: 0.05; decimals: 2; suffix: "×"; value: root.sel.piece ? root.sel.piece.uvScale : 1; onEdited: (v) => App.setPieceValue("uvScale", v) }
-                SliderRow { label: "UV rotation"; from: -180; to: 180; stepSize: 5; suffix: "°"; value: root.sel.piece ? root.sel.piece.uvRotation : 0; onEdited: (v) => App.setPieceValue("uvRotation", v) }
+                SliderRow { label: tr("UV scale"); from: 0.1; to: 4; stepSize: 0.05; decimals: 2; suffix: "×"; value: root.sel.piece ? root.sel.piece.uvScale : 1; onEdited: (v) => App.setPieceValue("uvScale", v) }
+                SliderRow { label: tr("UV rotation"); from: -180; to: 180; stepSize: 5; suffix: "°"; value: root.sel.piece ? root.sel.piece.uvRotation : 0; onEdited: (v) => App.setPieceValue("uvRotation", v) }
                 Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     opacity: 0.55
                     font.pixelSize: 11
-                    text: "UVs follow the 2D pattern layout. Switch the 2D view to UV to move pieces in texture space; turn on Checker in the 3D view to preview density."
+                    text: tr("UVs follow the 2D pattern layout. Switch the 2D view to UV to move pieces in texture space; turn on Checker in the 3D view to preview density.")
                 }
             }
 
             // ---- Simulation ----------------------------------------------------------
             Section {
-                title: "Simulation"
+                title: tr("Simulation")
                 open: root.sel.kind !== "pieces"
                 CheckBox {
                     visible: !!root.sel.garment
                     Layout.fillWidth: true
-                    text: "Also simulate with other garments"
+                    text: tr("Also simulate with other garments")
                     ToolTip.visible: hovered
                     ToolTip.delay: 500
-                    ToolTip.text: "When on, this garment is simulated too while another garment is the active one."
+                    ToolTip.text: tr("When on, this garment is simulated too while another garment is the active one.")
                     checked: root.sel.garment ? root.sel.garment.simulateWithOthers : false
                     onToggled: App.setSimulateWithOthers(root.sel.garment.id, checked)
                 }
-                SliderRow { label: "Gravity"; from: -20; to: 0; stepSize: 0.1; decimals: 1; suffix: " m/s²"; value: root.sel.simulation.gravity !== undefined ? root.sel.simulation.gravity : -9.8; onEdited: (v) => App.setSimulationValue("gravity", v) }
-                SliderRow { label: "Substeps"; from: 4; to: 40; stepSize: 1; value: root.sel.simulation.substeps !== undefined ? root.sel.simulation.substeps : 12; onEdited: (v) => App.setSimulationValue("substeps", v) }
-                SliderRow { label: "Speed"; from: 0.1; to: 2; stepSize: 0.1; decimals: 1; suffix: "×"; value: root.sel.simulation.timeScale !== undefined ? root.sel.simulation.timeScale : 1; onEdited: (v) => App.setSimulationValue("timeScale", v) }
+                SliderRow { label: tr("Gravity"); from: -20; to: 0; stepSize: 0.1; decimals: 1; suffix: " m/s²"; value: root.sel.simulation.gravity !== undefined ? root.sel.simulation.gravity : -9.8; onEdited: (v) => App.setSimulationValue("gravity", v) }
+                SliderRow { label: tr("Substeps"); from: 4; to: 40; stepSize: 1; value: root.sel.simulation.substeps !== undefined ? root.sel.simulation.substeps : 12; onEdited: (v) => App.setSimulationValue("substeps", v) }
+                SliderRow { label: tr("Speed"); from: 0.1; to: 2; stepSize: 0.1; decimals: 1; suffix: "×"; value: root.sel.simulation.timeScale !== undefined ? root.sel.simulation.timeScale : 1; onEdited: (v) => App.setSimulationValue("timeScale", v) }
                 CheckBox {
                     Layout.fillWidth: true
-                    text: "Cloth-to-cloth collision"
+                    text: tr("Cloth-to-cloth collision")
                     checked: !!root.sel.simulation.selfCollision
                     onToggled: App.setSimulationValue("selfCollision", checked ? 1 : 0)
                 }
                 CheckBox {
-                    text: "Ground plane"
+                    text: tr("Ground plane")
                     checked: !!root.sel.simulation.groundPlane
                     onToggled: App.setSimulationValue("groundPlane", checked ? 1 : 0)
                 }

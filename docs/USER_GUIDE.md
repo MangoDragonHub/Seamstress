@@ -729,6 +729,7 @@ MakeHuman's body.
 
 | Page | Setting | Meaning |
 | --- | --- | --- |
+| General | **Interface language** | English, Español, Português (Brasil), Français, 中文（简体） or 日本語. See [Language](#language) below. |
 | General | **Measurements** | *Metric* shows centimetres, metres, millimetres and g/m². *Imperial* shows inches, oz/yd² and feet and inches for the avatar height, and the grids change to 4 in squares with a stronger line every foot. Only the interface changes: garment files and exports are the same either way. |
 | Viewport | **Renderer** | *Automatic* uses the GPU and falls back to CPU rendering when no GPU driver is found or the GPU failed to start last time. *GPU* and *CPU* force one or the other. Takes effect on the next start. |
 | Viewport | **Grid size** | The size of one square of the ground grid in the 3D view. 10 cm by default, 4 in with imperial units. |
@@ -745,6 +746,29 @@ MakeHuman's body.
 Nothing changes until you press **Save**; **Cancel** leaves everything as it was. The renderer in use is shown
 in the bottom-right corner of the 3D view. You can also force it for one run by starting Seamstress with
 `--cpu` or `--gpu`.
+
+### Language
+
+**Preferences ▸ General ▸ Interface language** switches every menu, panel, dialog, tooltip and status message
+between English, Spanish, Brazilian Portuguese, French, Simplified Chinese and Japanese. The change happens as
+soon as you press **Save**; there is no need to restart.
+
+![Seamstress in Japanese](images/language-ja.png)
+
+- **Names you see in the layers panel are part of your project**, so they are not translated after the fact.
+  Garments, pieces, groups and materials you add *after* switching get names in the new language (a T-shirt
+  added in French has the pieces *Devant*, *Dos*, *Manche G* and *Manche D*); everything that already exists
+  keeps its name. Rename anything by double-clicking it.
+- Fabric presets (Cotton, Silk, …) are shown in your language but saved under their English names, so a
+  project opens the same way whatever language it is opened in.
+- Undo history entries keep the language they were made in.
+- Keys, units and file formats do not change with the language, and neither do MakeHuman's own panel names
+  (*Geometries ▸ Clothes*), which are quoted as MakeHuman shows them.
+- The file dialogs and colour picker come from Qt and your desktop, and follow your system language rather than
+  this setting.
+
+To try a language for one run without changing the saved choice, start Seamstress with `--lang es` (or `pt`,
+`fr`, `zh`, `ja`, `en`).
 
 ### Keyboard shortcuts
 

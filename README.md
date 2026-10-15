@@ -20,6 +20,8 @@ Marvelous Designer.
   in the pattern or on the cloth and avatar in 3D.
 - **Keyboard** – every shortcut can be changed in Preferences, and right-clicking either view opens the Edit
   menu.
+- **Languages** – English, Spanish, Brazilian Portuguese, French, Simplified Chinese and Japanese, chosen under
+  *Preferences ▸ General* and switched without restarting.
 - **Simulation** – the Simulate button sews and drapes the *active* garment only. Other garments stay as
   they are unless you link them (⇄ in the layers panel) or tick **All garments**. Cloth collides with the
   avatar, with itself and with the other garments, so a shirt settles over a skirt instead of through it.
@@ -183,7 +185,7 @@ and the optional `drape` block (the simulated shape) can be deleted to return a 
 
 | Path | Contents |
 | --- | --- |
-| `src/Seamstress.Core` | Everything that is not UI: document model, meshing, cloth solver, undo history, file formats, exporters. No Qt dependency. |
+| `src/Seamstress.Core` | Everything that is not UI: document model, meshing, cloth solver, undo history, file formats, exporters, translations. No Qt dependency. |
 | `src/Seamstress.App` | The Qt Quick application: QML views and the controller that connects them to the core. |
 | `tests/Seamstress.Tests` | Unit tests (`dotnet test`). |
 | `samples` | Example projects. |
@@ -192,6 +194,16 @@ and the optional `drape` block (the simulated shape) can be deleted to return a 
 
 `Seamstress --smoke --screenshot <folder>/shot.png` runs an automated pass over the interface (draw, sew,
 edit, change topology, move with the 3D handles, simulate, save, export, reopen) and prints the result.
+
+## Translations
+
+Interface texts are written in English in the source: `tr("…")` in QML and `Lang.T("…")` / `Lang.F("…", …)` in
+C#. Each language has a catalogue in `src/Seamstress.Core/Localization/<code>.json` that maps every English text
+to its translation; a text that has no entry is shown in English. `%1` (QML) and `{0}` (C#) placeholders must be
+kept, and a text can be prefixed with a context such as `view|Front` where one English word needs two
+translations. `LocalizationTests` collects every marked text from the source and fails if any catalogue is
+missing one, has one the source no longer uses, or changes a placeholder. To add a language, add it to
+`Lang.Languages` and add its catalogue.
 
 ## Known limits
 
@@ -205,3 +217,5 @@ edit, change topology, move with the 3D handles, simulate, save, export, reopen)
 - Windows: see the note under *Building*. macOS is untried; `build.sh` builds there but does not package.
 - The Flatpak cannot start MakeHuman for you after *Send to MakeHuman* (it is sandboxed); the files are still
   written to MakeHuman's folder.
+- The translations have not yet been checked by native speakers. The file dialogs and colour picker come from Qt
+  and the desktop, so they follow the system language rather than the one chosen in Preferences.

@@ -35,7 +35,7 @@ public static class MakeHumanExporter
         string? license = null, string? assetName = null)
     {
         if (mesh.Parts.Count == 0 || mesh.Positions.Length == 0)
-            throw new InvalidOperationException("The garment has no geometry to send.");
+            throw new InvalidOperationException(Lang.T("The garment has no geometry to send."));
         string displayName = DisplayName(assetName ?? mesh.Name);
         string name = ExportScene.SafeName(displayName);
         string folder = AssetFolder(clothesFolder, displayName);
@@ -94,7 +94,7 @@ public static class MakeHumanExporter
         {
             var (a, b) = ScaleVertices[axis];
             if (a >= baseMesh.Vertices.Length || b >= baseMesh.Vertices.Length)
-                throw new InvalidOperationException("The linked base mesh is not the MakeHuman hm08 base mesh.");
+                throw new InvalidOperationException(Lang.T("The linked base mesh is not the MakeHuman hm08 base mesh."));
             var d = baseMesh.Vertices[a] - baseMesh.Vertices[b];
             float distance = MathF.Abs(axis == 0 ? d.X : axis == 1 ? d.Y : d.Z);
             clo.Append(inv, $"{axes[axis]} {a} {b} {distance:0.0000}\n");

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using Seamstress.Core;
 using Seamstress.Core.Editing;
 using Seamstress.Core.Geometry;
 using Seamstress.Core.Model;
@@ -109,7 +110,7 @@ public partial class AppController
             var pieceMesh = _workspace.MeshFor(owner).Find(piece.Id);
             var material = doc.FindMaterial(piece.MaterialId);
             var layout = UvLayout.For(owner);
-            sb.Append(",\"piece\":{\"id\":").Append(Q(piece.Id)).Append(",\"name\":").Append(Q(pieces.Count == 1 ? piece.Name : $"{pieces.Count} pieces"));
+            sb.Append(",\"piece\":{\"id\":").Append(Q(piece.Id)).Append(",\"name\":").Append(Q(pieces.Count == 1 ? piece.Name : Lang.F("{0} pieces", pieces.Count)));
             sb.Append(",\"posX\":").Append(N(piece.Placement.Position.X)).Append(",\"posY\":").Append(N(piece.Placement.Position.Y)).Append(",\"posZ\":").Append(N(piece.Placement.Position.Z));
             sb.Append(",\"rotX\":").Append(N(piece.Placement.Rotation.X)).Append(",\"rotY\":").Append(N(piece.Placement.Rotation.Y)).Append(",\"rotZ\":").Append(N(piece.Placement.Rotation.Z));
             sb.Append(",\"curvature\":").Append(N(piece.Placement.Curvature));

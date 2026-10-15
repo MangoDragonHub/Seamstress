@@ -20,10 +20,13 @@ internal sealed class StartupOptions
     public bool Quads { get; set; }
     public float? Gender { get; set; }
     public string? Units { get; set; }
+    /// <summary>"--lang": the interface language for this run, without changing the saved one.</summary>
+    public string? Language { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
     public string? SelectPiece { get; set; }
     public bool AllowLaunch { get; set; } = true;
+    /// <summary>Which renderer is in use, in English; the interface shows it translated.</summary>
     public string RendererDescription { get; set; } = "GPU";
 
     private static string CrashMarker => Path.Combine(Path.GetDirectoryName(AppSettings.DefaultPath)!, "gpu-startup.marker");
@@ -112,6 +115,7 @@ public static class Program
                 case "--avatar": options.Avatar = Next(); break;
                 case "--quads": options.Quads = true; break;
                 case "--units": options.Units = Next(); break;
+                case "--lang": options.Language = Next(); break;
                 case "--gender":
                     if (float.TryParse(Next(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float g))
                         options.Gender = g;
@@ -133,7 +137,8 @@ public static class Program
                 case "-h":
                     Console.WriteLine("Usage: Seamstress [file.garment.json] [--cpu | --gpu]\n"
                         + "  --cpu   render the 3D viewport on the CPU (software rasterizer)\n"
-                        + "  --gpu   render on the GPU even if the last GPU start failed");
+                        + "  --gpu   render on the GPU even if the last GPU start failed\n"
+                        + "  --lang  interface language for this run: " + string.Join(", ", Lang.Languages.Select(l => l.Code)));
                     return;
                 default:
                     if (!args[i].StartsWith("--", StringComparison.Ordinal) && System.IO.File.Exists(args[i]))
@@ -142,34 +147,38 @@ public static class Program
             }
         }
 
+        // The automated check reads English texts unless asked for another language.
+        if (options.Smoke)
+            options.Language ??= Lang.English;
+
         // Decide between the GPU renderer and the CPU fallback before Qt creates its rendering context.
         string preference = forced ?? AppSettings.Load().Renderer;
         bool software;
         if (preference == "cpu")
         {
             software = true;
-            options.RendererDescription = "CPU (software rendering)";
+            options.RendererDescription = Lang.N("CPU (software rendering)");
         }
         else if (preference == "gpu")
         {
             software = false;
-            options.RendererDescription = "GPU";
+            options.RendererDescription = Lang.N("GPU");
         }
         else if (!GpuLooksUsable())
         {
             software = true;
-            options.RendererDescription = "CPU (no GPU driver found)";
+            options.RendererDescription = Lang.N("CPU (no GPU driver found)");
         }
         else if (StartupOptions.PreviousGpuStartFailed)
         {
             software = true;
-            options.RendererDescription = "CPU (the GPU renderer failed to start last time)";
+            options.RendererDescription = Lang.N("CPU (the GPU renderer failed to start last time)");
             options.ClearCrashMarker();
         }
         else
         {
             software = false;
-            options.RendererDescription = "GPU";
+            options.RendererDescription = Lang.N("GPU");
         }
 
         if (software)

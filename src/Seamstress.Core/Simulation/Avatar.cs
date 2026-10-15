@@ -180,11 +180,11 @@ public sealed class ObjFile
             foreach (int i in indices)
             {
                 if (i >= positions.Count)
-                    throw new InvalidDataException($"'{path}' refers to vertex {i + 1} but only has {positions.Count}.");
+                    throw new InvalidDataException(Lang.F("'{0}' refers to vertex {1} but only has {2}.", path, i + 1, positions.Count));
             }
         }
         if (faces.Count == 0)
-            throw new InvalidDataException($"'{path}' contains no faces.");
+            throw new InvalidDataException(Lang.F("'{0}' contains no faces.", path));
         return new ObjFile { Positions = positions.ToArray(), Faces = faces };
     }
 

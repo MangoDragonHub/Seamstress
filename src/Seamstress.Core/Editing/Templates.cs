@@ -26,7 +26,8 @@ public static class Templates
             "Skirt" => Skirt(document, scale),
             _ => throw new ArgumentException($"Unknown template '{template}'."),
         };
-        garment.Name = document.UniqueName(template);
+        // Names are given in the interface language; the template names themselves stay English.
+        garment.Name = document.UniqueName(Lang.T(template));
         return garment;
     }
 
@@ -51,7 +52,7 @@ public static class Templates
 
     private static Garment Top(Document document, bool sleeves, float length, float scale)
     {
-        string material = MaterialFor(document, sleeves ? "Shirt fabric" : "Top fabric", sleeves ? "#4F8FD9" : "#D9694F");
+        string material = MaterialFor(document, sleeves ? Lang.T("Shirt fabric") : Lang.T("Top fabric"), sleeves ? "#4F8FD9" : "#D9694F");
         float rowY = NextRowY(document);
         float armpit = length - 25;
         float flare = length > 80 ? 12 : (sleeves ? 0 : 2); // widen towards the hem to clear the hips
@@ -73,8 +74,8 @@ public static class Templates
         }
 
         var garment = new Garment();
-        var front = Body("Front", 9);
-        var back = Body("Back", 2.5f);
+        var front = Body(Lang.T("Front"), 9);
+        var back = Body(Lang.T("Back"), 2.5f);
         front.Origin = new Vector2(0, rowY);
         back.Origin = new Vector2(75 + 2 * flare, rowY);
         // The shoulder seam starts just above the avatar's shoulders, wherever those are on this body.
@@ -92,12 +93,12 @@ public static class Templates
 
         if (sleeves)
         {
-            var group = new LayerGroup { Name = "Sleeves" };
+            var group = new LayerGroup { Name = Lang.T("Sleeves") };
             garment.Groups.Add(group);
             for (int side = 0; side < 2; side++)
             {
                 float sign = side == 0 ? 1 : -1; // +X is the wearer's left arm
-                var sleeve = new PatternPiece { Name = side == 0 ? "Sleeve L" : "Sleeve R", MaterialId = material, GroupId = group.Id };
+                var sleeve = new PatternPiece { Name = side == 0 ? Lang.T("Sleeve L") : Lang.T("Sleeve R"), MaterialId = material, GroupId = group.Id };
                 // The cap (top edge) is split at its crown so each half sews to one armhole.
                 sleeve.Points.Add(new PatternPoint(3, 0));                    // 0 cuff
                 sleeve.Points.Add(new PatternPoint(37, 0));                   // 1 underarm seam
@@ -125,7 +126,7 @@ public static class Templates
 
     private static Garment Skirt(Document document, float scale)
     {
-        string material = MaterialFor(document, "Skirt fabric", "#7A5FC2");
+        string material = MaterialFor(document, Lang.T("Skirt fabric"), "#7A5FC2");
         float rowY = NextRowY(document);
         var garment = new Garment();
         PatternPiece Panel(string name)
@@ -137,8 +138,8 @@ public static class Templates
             piece.Points.Add(new PatternPoint(15, 50));   // 3 left side seam
             return piece;
         }
-        var front = Panel("Skirt Front");
-        var back = Panel("Skirt Back");
+        var front = Panel(Lang.T("Skirt Front"));
+        var back = Panel(Lang.T("Skirt Back"));
         front.Origin = new Vector2(0, rowY);
         back.Origin = new Vector2(85, rowY);
         // A little closer to the body than the tops start, so a top simulated at the same time ends up over the skirt.

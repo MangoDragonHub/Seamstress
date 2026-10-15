@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Interface translations, read by Lang. -->
+    <EmbeddedResource Include="Localization\*.json" />
+  </ItemGroup>
+
 </Project>

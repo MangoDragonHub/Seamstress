@@ -8,6 +8,7 @@ Item {
     id: root
     clip: true
 
+    function tr(text) { App.languageRevision; return App.tr(text) }
     property var scene: ({ mode: "pattern", tool: "Select", pieces: [], seams: [], bounds: [-20, -20, 120, 100] })
     property real zoom: 5
     property real panX: 40
@@ -79,6 +80,7 @@ Item {
         target: App
         function onSceneRevisionChanged() { Qt.callLater(root.refresh) }
         function onImperialChanged() { canvas.requestPaint() }
+        function onLanguageRevisionChanged() { canvas.requestPaint() }
     }
 
     Canvas {
@@ -339,7 +341,7 @@ Item {
                 ctx.fillStyle = "#c9ccd2"
                 ctx.font = "11px sans-serif"
                 ctx.textAlign = "left"
-                ctx.fillText("1 square = " + level[1], x + len + 8, y + 4)
+                ctx.fillText(root.tr("1 square = %1").arg(level[1]), x + len + 8, y + 4)
             }
         }
     }
@@ -413,7 +415,7 @@ Item {
 
     Label {
         anchors { left: parent.left; top: parent.top; margins: 8 }
-        text: root.uv ? "UV Layout" : "2D Pattern"
+        text: root.uv ? tr("UV Layout") : tr("2D Pattern")
         font.bold: true
         opacity: 0.75
     }
@@ -428,6 +430,6 @@ Item {
         visible: root.scene.pieces.length === 0 && !root.scene.draft
         horizontalAlignment: Text.AlignHCenter
         opacity: 0.55
-        text: "No pattern pieces yet.\nDraw one with the Polygon, Rectangle or Ellipse tool,\nor add a ready-made garment from the Garment menu."
+        text: tr("No pattern pieces yet.\nDraw one with the Polygon, Rectangle or Ellipse tool,\nor add a ready-made garment from the Garment menu.")
     }
 }

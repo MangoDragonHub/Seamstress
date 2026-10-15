@@ -205,6 +205,17 @@ QtObject {
         check("send dialog names the asset folder", info.folder === "" || /summer_skirt_v2$/.test(info.folder))
         check("licences offered", App.makeHumanLicenses().split("|").indexOf("CC-BY") >= 0 && App.settingMakeHumanLicense !== "")
 
+        // Languages offered in Preferences, and the texts of the one in use.
+        const languages = JSON.parse(App.languagesJson())
+        check("languages offered", languages.length === 6 && languages.some(l => l.code === "ja") && App.settingLanguage === languages[0].code)
+        check("interface texts", window.tr("Simulate") === "Simulate" && window.tr("view|Front") === "Front")
+        // Switching (for this run only) re-reads the texts on both sides; the menus and panels follow through tr().
+        App.showLanguage("fr")
+        check("language switch", window.tr("Simulate") === "Simuler" && App.undoText.indexOf("Annuler") === 0
+              && JSON.parse(App.keyBindingsJson())[0].group === "Fichier" && window.title.indexOf("Sans titre") >= 0 === !App.hasFile)
+        App.showLanguage("en")
+        check("language switched back", window.tr("Simulate") === "Simulate" && App.undoText.indexOf("Undo") === 0)
+
         // Keyboard shortcuts come from the registry, and a key on two commands is reported.
         const bindings = JSON.parse(App.keyBindingsJson())
         check("shortcut registry", bindings.length > 40 && App.keyText("tool.ruler") !== "" && bindings.every(b => window.commands[b.id] !== undefined))

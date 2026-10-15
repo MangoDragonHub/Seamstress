@@ -230,17 +230,17 @@ public sealed class PatternEditor
     private Document Doc => _workspace.Document;
 
     public string Hint => _uvMode
-        ? "UV layout of the active garment: drag a piece to move it in texture space. The checker shows texel density."
+        ? Lang.T("UV layout of the active garment: drag a piece to move it in texture space. The checker shows texel density.")
         : _tool switch
         {
-            PatternTool.Select => "Click a piece to select it, drag to move. Use the handles to move, rotate or scale it (Q/W/E/R). Click an edge to see its length. Ctrl+click adds to the selection. Double-click a piece to select all its points.",
-            PatternTool.EditPoints => "Drag a point to move it, drag an edge to curve it, double-click an edge to add a point (or inside the piece to select all its points), Delete removes the selected point. Hold Shift to snap to the grid. Click an edge to see its length.",
-            PatternTool.TransformPoints => "Click a point to select it, Ctrl+click to add, drag a box around several, or double-click a piece for all of its points. Drag an arrow to move them, the ring to rotate them, a box to scale them (Q/W/E/R choose the handles).",
-            PatternTool.Sew => _pendingEdge == null ? "Click the first edge to sew." : "Click the edge to sew it to. Esc cancels.",
-            PatternTool.Polygon => _draft.Count == 0 ? "Click to place the first corner." : "Click to add corners; click the first corner, double-click or press Enter to finish. Hold Shift to snap the side's angle and length.",
-            PatternTool.Rectangle => "Drag to draw a rectangular piece. Hold Shift for a square.",
-            PatternTool.Ellipse => "Drag to draw an elliptical piece. Hold Shift for a circle.",
-            PatternTool.Ruler => "Drag to measure a distance; the ends catch on pattern points. Hold Shift to keep to 15° steps. Click to clear.",
+            PatternTool.Select => Lang.T("Click a piece to select it, drag to move. Use the handles to move, rotate or scale it (Q/W/E/R). Click an edge to see its length. Ctrl+click adds to the selection. Double-click a piece to select all its points."),
+            PatternTool.EditPoints => Lang.T("Drag a point to move it, drag an edge to curve it, double-click an edge to add a point (or inside the piece to select all its points), Delete removes the selected point. Hold Shift to snap to the grid. Click an edge to see its length."),
+            PatternTool.TransformPoints => Lang.T("Click a point to select it, Ctrl+click to add, drag a box around several, or double-click a piece for all of its points. Drag an arrow to move them, the ring to rotate them, a box to scale them (Q/W/E/R choose the handles)."),
+            PatternTool.Sew => _pendingEdge == null ? Lang.T("Click the first edge to sew.") : Lang.T("Click the edge to sew it to. Esc cancels."),
+            PatternTool.Polygon => _draft.Count == 0 ? Lang.T("Click to place the first corner.") : Lang.T("Click to add corners; click the first corner, double-click or press Enter to finish. Hold Shift to snap the side's angle and length."),
+            PatternTool.Rectangle => Lang.T("Drag to draw a rectangular piece. Hold Shift for a square."),
+            PatternTool.Ellipse => Lang.T("Drag to draw an elliptical piece. Hold Shift for a circle."),
+            PatternTool.Ruler => Lang.T("Drag to measure a distance; the ends catch on pattern points. Hold Shift to keep to 15° steps. Click to clear."),
             _ => "",
         };
 
@@ -722,14 +722,14 @@ public sealed class PatternEditor
             delta = world - _dragStart;
             switch (_drag)
             {
-                case Drag.Pieces: _workspace.History.Begin(_workspace.SelectedPieces.Count == 1 ? "Move piece" : "Move pieces"); break;
-                case Drag.Point: _workspace.History.Begin("Move point"); break;
+                case Drag.Pieces: _workspace.History.Begin(_workspace.SelectedPieces.Count == 1 ? Lang.T("Move piece") : Lang.T("Move pieces")); break;
+                case Drag.Point: _workspace.History.Begin(Lang.T("Move point")); break;
                 case Drag.Control:
-                case Drag.Bend: _workspace.History.Begin("Curve edge"); break;
-                case Drag.Uv: _workspace.History.Begin("Move UVs"); break;
-                case Drag.PointsMove: _workspace.History.Begin(_pointStarts.Count == 1 ? "Move point" : "Move points"); break;
-                case Drag.PointsRotate: _workspace.History.Begin(_tool == PatternTool.Select ? "Rotate pieces" : "Rotate points"); break;
-                case Drag.PointsScale: _workspace.History.Begin(_tool == PatternTool.Select ? "Scale pieces" : "Scale points"); break;
+                case Drag.Bend: _workspace.History.Begin(Lang.T("Curve edge")); break;
+                case Drag.Uv: _workspace.History.Begin(Lang.T("Move UVs")); break;
+                case Drag.PointsMove: _workspace.History.Begin(_pointStarts.Count == 1 ? Lang.T("Move point") : Lang.T("Move points")); break;
+                case Drag.PointsRotate: _workspace.History.Begin(_tool == PatternTool.Select ? Lang.T("Rotate pieces") : Lang.T("Rotate points")); break;
+                case Drag.PointsScale: _workspace.History.Begin(_tool == PatternTool.Select ? Lang.T("Scale pieces") : Lang.T("Scale points")); break;
             }
         }
         _dragLast = world;
@@ -919,7 +919,7 @@ public sealed class PatternEditor
                     var outline = _draft.ToList();
                     _draft.Clear();
                     if (_dragMoved && outline.Count >= 3)
-                        _workspace.AddPiece(outline, _tool == PatternTool.Rectangle ? "Rectangle" : "Ellipse");
+                        _workspace.AddPiece(outline, _tool == PatternTool.Rectangle ? Lang.N("Rectangle") : Lang.N("Ellipse"));
                     Changed?.Invoke();
                     break;
                 }
@@ -957,7 +957,7 @@ public sealed class PatternEditor
         _draft.Clear();
         _draftCursor = null;
         if (outline.Count >= 3)
-            _workspace.AddPiece(outline, "Piece");
+            _workspace.AddPiece(outline, Lang.N("Piece"));
         Changed?.Invoke();
     }
 
