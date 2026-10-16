@@ -55,8 +55,9 @@ There is one script per platform; both take the same commands.
 
 ### Linux
 
-You need the .NET SDK 8 or newer, CMake, Ninja, a C++ compiler and Qt 6 with Qt Quick 3D. (There is no C++
-in this repository; the Qt bridge compiles a small native launcher behind the scenes.) On Debian/Ubuntu:
+You need the .NET SDK 8 or newer (9.0.200 or newer is recommended: the solution file is `.slnx`, which older SDKs
+cannot read, so the scripts then build the projects one by one), CMake, Ninja, a C++ compiler and Qt 6 with Qt Quick 3D.
+(There is no C++ in this repository; the Qt bridge compiles a small native launcher behind the scenes.) On Debian/Ubuntu:
 
 ```bash
 sudo apt install dotnet-sdk-8.0 cmake ninja-build build-essential libgl1-mesa-dev libxkbcommon-dev libxcb-cursor0
@@ -113,7 +114,8 @@ draping to be noticeably slower than on a desktop PC.
 
 ### Windows
 
-Install the [.NET SDK 8 or newer](https://dotnet.microsoft.com/download), then in PowerShell:
+Install the [.NET SDK 9.0.200 or newer](https://dotnet.microsoft.com/download) (8.x also works, see [Linux](#linux)),
+then in PowerShell:
 
 ```powershell
 .\build.ps1 run

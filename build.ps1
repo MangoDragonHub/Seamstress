@@ -180,6 +180,19 @@ function Invoke-CrossDeploy {
     if ($LASTEXITCODE -ne 0) { Fail 'deploying the ARM64 Qt failed' }
 }
 
+# The solution file is the XML format .slnx, which needs MSBuild 17.13 -- the first version in the .NET SDK 9.0.200.
+# Older SDKs do not recognize it, so they build the projects themselves, in the order the solution lists them.
+function Get-BuildTarget {
+    $sdk = $null
+    $text = (& dotnet --version | Select-Object -Last 1)
+    if ($text -and [version]::TryParse($text.Trim(), [ref]$sdk) -and
+        ($sdk.Major -gt 9 -or ($sdk.Major -eq 9 -and $sdk -ge [version]'9.0.200'))) {
+        return 'Seamstress.slnx'
+    }
+    Say "The .NET SDK $(if ($sdk) { $sdk } else { 'in use' }) cannot read Seamstress.slnx (9.0.200 or newer can); building the projects directly"
+    return @('src\Seamstress.App\Seamstress.App.csproj', 'tests\Seamstress.Tests\Seamstress.Tests.csproj')
+}
+
 function Invoke-Build {
     if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
         Fail 'The .NET SDK 8 or newer is required: https://dotnet.microsoft.com/download'
@@ -188,31 +201,35 @@ function Invoke-Build {
     if ($cross) {
         Resolve-ArmQt
         # Only the application project: the tests run on the PC doing the build, not on the target.
-        $arguments = @('build', 'src\Seamstress.App\Seamstress.App.csproj', '-c', $Configuration, '-r', "win-$Arch",
-            "-p:QtDir=$Qt", '-p:QtArch=arm64', '-p:VcVarsScript=vcvars64.bat', '-p:DeployCmd=rem', '--nologo', '-v:minimal')
+        $targets = @('src\Seamstress.App\Seamstress.App.csproj')
+        $options = @('-c', $Configuration, '-r', "win-$Arch", "-p:QtDir=$Qt", '-p:QtArch=arm64',
+            '-p:VcVarsScript=vcvars64.bat', '-p:DeployCmd=rem', '--nologo', '-v:minimal')
         if ($compiler) {
             # Visual Studio's x64-hosted ARM64 compiler; CMake and Qt take the rest from these variables.
-            $arguments += '-p:QtVcVarsScript=vcvarsamd64_arm64.bat'
+            $options += '-p:QtVcVarsScript=vcvarsamd64_arm64.bat'
             $env:CMAKE_TOOLCHAIN_FILE = Join-Path $PSScriptRoot 'packaging\windows\arm64-msvc.cmake'
             $env:QT_HOST_PATH = $HostQt
             $env:QT_REQUIRE_HOST_PATH_CHECK = 'ON'
         }
     }
     else {
-        $arguments = @('build', 'Seamstress.slnx', '-c', $Configuration, '--nologo', '-v:minimal')
+        $targets = @(Get-BuildTarget)
+        $options = @('-c', $Configuration, '--nologo', '-v:minimal')
         if ($Arch -eq 'arm64') { Resolve-ArmQt }
         if ($Qt) {
             if (-not (Test-QtPrefix $Qt)) { Fail "'$Qt' is not a Qt 6 prefix (expected lib\cmake\Qt6\Qt6Config.cmake inside it)" }
-            $arguments += "-p:QtDir=$Qt"
+            $options += "-p:QtDir=$Qt"
         }
     }
     if (-not $compiler) {
         Say 'No Visual Studio C++ tools in use: building with the bridge''s prebuilt host'
-        $arguments += '-p:QtExportAs=metadata'
+        $options += '-p:QtExportAs=metadata'
     }
     Say "Building Seamstress ($Configuration, $Arch)"
-    & dotnet @arguments
-    if ($LASTEXITCODE -ne 0) { Fail 'the build failed' }
+    foreach ($target in $targets) {
+        & dotnet build $target @options
+        if ($LASTEXITCODE -ne 0) { Fail 'the build failed' }
+    }
     if (-not (Test-Path "$bin\Seamstress.exe")) { Fail "the build finished but $bin\Seamstress.exe is missing" }
     if ($cross) { Invoke-CrossDeploy }
 }

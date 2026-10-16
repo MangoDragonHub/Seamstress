@@ -194,6 +194,14 @@ check_tools() {
     fi
 }
 
+# Seamstress.slnx is the XML solution format, which needs MSBuild 17.13 -- the first version in the .NET SDK 9.0.200.
+# Older SDKs do not recognize it, so they build the projects themselves, in the order the solution lists them.
+supports_slnx() {
+    local version; version="$(dotnet --version 2>/dev/null | tail -1)"
+    [ -n "$version" ] || return 1
+    [ "$(printf '9.0.200\n%s\n' "$version" | sort -V | head -1)" = "9.0.200" ]
+}
+
 build() {
     check_tools
     find_qt
@@ -202,9 +210,13 @@ build() {
         # Only the application project: the tests run on the machine doing the build, not on the target.
         QT_HOST_PATH="$HOST_QT" dotnet build src/Seamstress.App/Seamstress.App.csproj -c "$CONFIG" -r "linux-$ARCH" \
             -p:QtDir="$QT" --nologo -v:minimal
-    else
+    elif supports_slnx; then
         say "Building Seamstress ($CONFIG) with Qt at $QT"
         dotnet build Seamstress.slnx -c "$CONFIG" -p:QtDir="$QT" --nologo -v:minimal
+    else
+        say "The .NET SDK $(dotnet --version) cannot read Seamstress.slnx (9.0.200 or newer can); building the projects directly"
+        dotnet build src/Seamstress.App/Seamstress.App.csproj -c "$CONFIG" -p:QtDir="$QT" --nologo -v:minimal
+        dotnet build tests/Seamstress.Tests/Seamstress.Tests.csproj -c "$CONFIG" --nologo -v:minimal
     fi
     [ -x "$BIN/Seamstress" ] || fail "the build finished but $BIN/Seamstress is missing"
 }
