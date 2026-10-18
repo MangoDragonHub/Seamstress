@@ -163,10 +163,10 @@ Item {
             const w = ctx.measureText(text).width + 12
             const px = root.sx(x) + nx * (w / 2 + 5), py = root.sy(y) - ny * 15
             ctx.fillStyle = Qt.rgba(0.07, 0.07, 0.09, 0.88)
-            ctx.strokeStyle = "#ffd447"
+            ctx.strokeStyle = App.themeAnnotation
             ctx.lineWidth = 1
             ctx.beginPath(); ctx.roundedRect(Math.round(px - w / 2) + 0.5, Math.round(py - 9) + 0.5, w, 18, 4, 4); ctx.fill(); ctx.stroke()
-            ctx.fillStyle = "#ffe58a"
+            ctx.fillStyle = App.themeAnnotationFill
             ctx.fillText(text, px, py + 4)
         }
 
@@ -188,11 +188,11 @@ Item {
                 const size = root.zoom / cells
                 for (let j = 0; j < cells; j++) {
                     for (let i = 0; i < cells; i++) {
-                        ctx.fillStyle = (i + j) % 2 === 0 ? "#3b3e44" : "#55595f"
+                        ctx.fillStyle = (i + j) % 2 === 0 ? App.themeCheckerA : App.themeCheckerB
                         ctx.fillRect(root.sx(i / cells), root.sy((j + 1) / cells), size + 0.5, size + 0.5)
                     }
                 }
-                ctx.strokeStyle = "#9aa0a8"
+                ctx.strokeStyle = App.themeCheckerEdge
                 ctx.lineWidth = 1
                 ctx.strokeRect(root.sx(0), root.sy(1), root.zoom, root.zoom)
             } else {
@@ -202,12 +202,12 @@ Item {
                 ctx.lineWidth = 1
                 for (let i = Math.floor(root.wx(0) / step); i * step <= root.wx(width); i++) {
                     const x = i * step
-                    ctx.strokeStyle = i === 0 ? "#6a6f78" : (i % perMajor === 0 ? "#484c53" : "#383b41")
+                    ctx.strokeStyle = i === 0 ? App.themeGridAxis : (i % perMajor === 0 ? App.themeGridMajor : App.themeGridMinor)
                     ctx.beginPath(); ctx.moveTo(Math.round(root.sx(x)) + 0.5, 0); ctx.lineTo(Math.round(root.sx(x)) + 0.5, height); ctx.stroke()
                 }
                 for (let i = Math.floor(root.wy(height) / step); i * step <= root.wy(0); i++) {
                     const y = i * step
-                    ctx.strokeStyle = i === 0 ? "#6a6f78" : (i % perMajor === 0 ? "#484c53" : "#383b41")
+                    ctx.strokeStyle = i === 0 ? App.themeGridAxis : (i % perMajor === 0 ? App.themeGridMajor : App.themeGridMinor)
                     ctx.beginPath(); ctx.moveTo(0, Math.round(root.sy(y)) + 0.5); ctx.lineTo(width, Math.round(root.sy(y)) + 0.5); ctx.stroke()
                 }
             }
@@ -223,9 +223,9 @@ Item {
                     ctx.closePath()
                 }
                 ctx.fillRule = Qt.OddEvenFill
-                ctx.fillStyle = withAlpha("#8c96a6", 0.25)
+                ctx.fillStyle = withAlpha(App.themeGhostFill, 0.25)
                 ctx.fill()
-                ctx.strokeStyle = withAlpha("#a8b2c2", 0.4)
+                ctx.strokeStyle = withAlpha(App.themeGhostStroke, 0.4)
                 ctx.lineWidth = 1
                 ctx.stroke()
             }
@@ -236,7 +236,7 @@ Item {
                 ctx.fillStyle = withAlpha(p.color, p.active ? (root.uv ? 0.5 : 0.62) : 0.28)
                 ctx.fill()
                 ctx.lineWidth = p.selected ? 2.5 : 1.3
-                ctx.strokeStyle = p.selected ? root.accent : (p.active ? "#e8eaee" : "#8a8f98")
+                ctx.strokeStyle = p.selected ? root.accent : (p.active ? App.themeEdgeActive : App.themeEdgeIdle)
                 ctx.stroke()
             }
 
@@ -265,7 +265,7 @@ Item {
                     for (let i = 0; i < p.points.length; i += 2) {
                         const chosen = p.selectedPoint === i / 2 || (p.selectedPoints !== undefined && p.selectedPoints.indexOf(i / 2) >= 0)
                         const r = chosen ? 5 : 3.5
-                        ctx.fillStyle = chosen ? root.accent : "#f2f3f5"
+                        ctx.fillStyle = chosen ? root.accent : App.themePointFill
                         ctx.strokeStyle = "#1b1c1f"
                         ctx.lineWidth = 1
                         ctx.fillRect(root.sx(p.points[i]) - r, root.sy(p.points[i + 1]) - r, 2 * r, 2 * r)
@@ -274,16 +274,16 @@ Item {
                 }
                 if (p.controls) {
                     for (const c of p.controls) {
-                        ctx.strokeStyle = "#c9a227"
+                        ctx.strokeStyle = App.themeAnnotationDeep
                         ctx.lineWidth = 1
                         ctx.setLineDash([3, 3])
                         trace(ctx, c, false); ctx.stroke()
                         ctx.setLineDash([])
-                        ctx.fillStyle = "#ffd447"
+                        ctx.fillStyle = App.themeAnnotation
                         ctx.beginPath(); ctx.arc(root.sx(c[2]), root.sy(c[3]), 4.5, 0, Math.PI * 2); ctx.fill()
                     }
                 }
-                ctx.fillStyle = p.active ? "#f4f5f7" : "#a9adb5"
+                ctx.fillStyle = p.active ? App.themeLabelActive : App.themeLabelDim
                 ctx.font = (p.selected ? "bold " : "") + "12px sans-serif"
                 ctx.textAlign = "center"
                 const label = root.uv ? p.name + "  ·  " + (App.imperial ? (p.density * 2.54).toFixed(1) + " px/in" : p.density.toFixed(1) + " px/cm") : p.name
@@ -291,7 +291,7 @@ Item {
             }
 
             if (s.hover) {
-                ctx.strokeStyle = "#ffd447"; ctx.lineWidth = 4
+                ctx.strokeStyle = App.themeAnnotation; ctx.lineWidth = 4
                 trace(ctx, s.hover, false); ctx.stroke()
             }
             if (s.pending) {
@@ -347,11 +347,11 @@ Item {
                 }
                 ctx.strokeStyle = "#1b1c1f"; ctx.lineWidth = 1
                 if (arrow > 0) {
-                    ctx.fillStyle = "#f2f3f5"
+                    ctx.fillStyle = App.themePointFill
                     ctx.fillRect(cx - 6, cy - 6, 12, 12); ctx.strokeRect(cx - 5.5, cy - 5.5, 12, 12)
                 }
                 if (boxes > 0) {
-                    ctx.fillStyle = "#ffd447"
+                    ctx.fillStyle = App.themeAnnotation
                     ctx.fillRect(cx + even - 6, cy - even - 6, 12, 12); ctx.strokeRect(cx + even - 5.5, cy - even - 5.5, 12, 12)
                 }
             }
@@ -366,7 +366,7 @@ Item {
                 const ax = root.sx(s.ruler[0]), ay = root.sy(s.ruler[1]), bx = root.sx(s.ruler[2]), by = root.sy(s.ruler[3])
                 const len = Math.hypot(bx - ax, by - ay)
                 const ux = len > 0 ? (bx - ax) / len : 1, uy = len > 0 ? (by - ay) / len : 0
-                ctx.strokeStyle = "#ffd447"; ctx.lineWidth = 2
+                ctx.strokeStyle = App.themeAnnotation; ctx.lineWidth = 2
                 ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by)
                 for (const e of [[ax, ay], [bx, by]]) {
                     ctx.moveTo(e[0] - uy * 8, e[1] + ux * 8); ctx.lineTo(e[0] + uy * 8, e[1] - ux * 8)
@@ -392,13 +392,13 @@ Item {
                 // Scale bar: one grid square, with its size.
                 const level = root.gridLevel()
                 const len = level[0] * root.zoom, x = 10.5, y = height - 12.5
-                ctx.strokeStyle = "#c9ccd2"; ctx.lineWidth = 1
+                ctx.strokeStyle = App.themeOverlayText; ctx.lineWidth = 1
                 ctx.beginPath()
                 ctx.moveTo(x, y - 4); ctx.lineTo(x, y + 4)
                 ctx.moveTo(x, y); ctx.lineTo(x + len, y)
                 ctx.moveTo(x + len, y - 4); ctx.lineTo(x + len, y + 4)
                 ctx.stroke()
-                ctx.fillStyle = "#c9ccd2"
+                ctx.fillStyle = App.themeOverlayText
                 ctx.font = "11px sans-serif"
                 ctx.textAlign = "left"
                 ctx.fillText(root.tr("1 square = %1").arg(level[1]), x + len + 8, y + 4)

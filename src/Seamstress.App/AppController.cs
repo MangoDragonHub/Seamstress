@@ -58,6 +58,7 @@ public partial class AppController : INotifyPropertyChanged
         _editor.Changed += () => SceneRevision++;
         if (_settings.DetectMakeHuman())
             TrySaveSettings();
+        InitTheme();
         ApplyStartupOptions();
         EnsureAvatar();
     }

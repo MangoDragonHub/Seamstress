@@ -283,6 +283,17 @@ QtObject {
         App.showBodyOutline = false
         check("2D avatar switched off", !App.showBodyOutline)
         App.showBodyOutline = true
+        // Appearance: a theme applies the moment it is previewed, Revert puts the saved one back, and a theme
+        // written to a file loads again as the custom theme.
+        const themeBefore = App.themeChoice
+        App.previewTheme("light")
+        check("theme applied live", App.themeChoice === "light" && App.themeWindow === "#f0f1f3" && App.themeViewerBg === "#e9ebee")
+        App.saveThemeFile(folder + "/smoke-theme.json")
+        App.previewTheme("default")
+        App.loadThemeFile(folder + "/smoke-theme.json")
+        check("custom theme from a file", App.themeChoice === "custom" && App.hasCustomTheme && App.themeViewerBg === "#e9ebee")
+        App.revertTheme()
+        check("theme put back", App.themeChoice === themeBefore)
         App.setAvatarShape("gender", 0.9)
         check("avatar body setting stored", Math.abs(JSON.parse(App.avatarShape()).gender - 0.9) < 1e-6)
         App.resetAvatarShape()

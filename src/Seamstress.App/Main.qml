@@ -13,15 +13,15 @@ ApplicationWindow {
     minimumHeight: 560
     title: App.windowTitle
 
-    // Dark colour scheme shared by every control.
+    // The colour scheme shared by every control, from the theme chosen in Preferences ▸ Themes.
     palette {
-        window: "#2b2d31"; windowText: "#e4e6ea"
-        base: "#1e1f22"; alternateBase: "#25272b"; text: "#e4e6ea"
-        button: "#3a3d43"; buttonText: "#e4e6ea"
-        highlight: "#4f8fd9"; highlightedText: "#ffffff"
-        mid: "#4a4d54"; dark: "#191a1d"; light: "#5a5e66"; midlight: "#454850"; shadow: "#101012"
-        placeholderText: "#8c9099"; toolTipBase: "#3a3d43"; toolTipText: "#e4e6ea"
-        brightText: "#ffffff"; link: "#6aa7ee"
+        window: App.themeWindow; windowText: App.themeWindowText
+        base: App.themeBase; alternateBase: App.themeAlternateBase; text: App.themeText
+        button: App.themeButton; buttonText: App.themeButtonText
+        highlight: App.themeHighlight; highlightedText: App.themeHighlightedText
+        mid: App.themeMid; dark: App.themeDark; light: App.themeLight; midlight: App.themeMidlight; shadow: App.themeShadow
+        placeholderText: App.themePlaceholderText; toolTipBase: App.themeToolTipBase; toolTipText: App.themeToolTipText
+        brightText: App.themeBrightText; link: App.themeLink
     }
 
     // Chinese and Japanese draw some of the same characters (and punctuation) differently, so use the first regional
@@ -500,7 +500,7 @@ ApplicationWindow {
                 anchors.rightMargin: 8
                 spacing: 16
                 Label { text: App.statusText; Layout.fillWidth: true; elide: Text.ElideRight; font.pixelSize: 12 }
-                Label { text: App.simInfo; visible: text !== ""; font.pixelSize: 12; color: "#7ed491" }
+                Label { text: App.simInfo; visible: text !== ""; font.pixelSize: 12; color: App.themeInfoText }
                 Label {
                     font.pixelSize: 12
                     opacity: 0.7
@@ -647,7 +647,7 @@ ApplicationWindow {
                 visible: App.makeHumanLinked && makeHumanDialog.target.exists
                 Layout.preferredWidth: 460
                 wrapMode: Text.WordWrap
-                color: "#ffb469"
+                color: App.themeWarningText
                 text: tr("An asset with this name is already there. Sending replaces it; choose another name to keep both.")
             }
             Label {
@@ -662,7 +662,7 @@ ApplicationWindow {
                 visible: App.makeHumanLinked && App.avatarType !== "MakeHuman"
                 Layout.preferredWidth: 460
                 wrapMode: Text.WordWrap
-                color: "#ffb469"
+                color: App.themeWarningText
                 text: tr("The avatar is not the MakeHuman base mesh. Switch to Avatar ▸ MakeHuman Base Mesh and simulate the garment on it before sending.")
             }
             RowLayout {

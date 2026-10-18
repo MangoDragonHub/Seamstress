@@ -26,6 +26,8 @@ Marvelous Designer.
   menu.
 - **Languages** – English, Spanish, Brazilian Portuguese, French, Simplified Chinese and Japanese, chosen under
   *Preferences ▸ General* and switched without restarting.
+- **Themes** – the colour scheme is chosen under *Preferences ▸ Themes*: the familiar dark *Default*, a
+  *Light* one, two high-contrast schemes, or a custom theme loaded from a JSON file.
 - **Simulation** – the Simulate button sews and drapes the *active* garment only. Other garments stay as
   they are unless you link them (⇄ in the layers panel) or tick **All garments**. Cloth collides with the
   avatar, with itself and with the other garments, so a shirt settles over a skirt instead of through it.

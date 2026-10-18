@@ -766,6 +766,8 @@ MakeHuman's body.
 | --- | --- | --- |
 | General | **Interface language** | English, Español, Português (Brasil), Français, 中文（简体） or 日本語. See [Language](#language) below. |
 | General | **Measurements** | *Metric* shows centimetres, metres, millimetres and g/m². *Imperial* shows inches, oz/yd² and feet and inches for the avatar height, and the grids change to 4 in squares with a stronger line every foot. Only the interface changes: garment files and exports are the same either way. |
+| Themes | **Preset** | The colour scheme of the whole interface: *Default* (the dark grey Seamstress has always used), *Light*, *High Contrast Dark* or *High Contrast Light*. See [Themes](#themes) below. |
+| Themes | **Save Theme… / Load Theme…** | Save the current colours to a file, or load a theme file. A loaded theme is remembered as *Custom*. |
 | Viewport | **Renderer** | *Automatic* uses the GPU and falls back to CPU rendering when no GPU driver is found or the GPU failed to start last time. *GPU* and *CPU* force one or the other. Takes effect on the next start. |
 | Viewport | **Grid size** | The size of one square of the ground grid in the 3D view. 10 cm by default, 4 in with imperial units. |
 | Viewport | **Snap step** | The step a piece snaps to when you hold Shift while dragging a move arrow in the 3D view. Starts the same as the grid size; set it smaller for finer steps. |
@@ -778,9 +780,25 @@ MakeHuman's body.
 | Textures | **Texture size for texel density** | The texture resolution assumed by the texel density read-outs. |
 | Keyboard | Every shortcut | See [Keyboard shortcuts](#keyboard-shortcuts) below. |
 
-Nothing changes until you press **Save**; **Cancel** leaves everything as it was. The renderer in use is shown
-in the bottom-right corner of the 3D view. You can also force it for one run by starting Seamstress with
-`--cpu` or `--gpu`.
+Everything except the theme waits for **Save**; **Cancel** leaves it all as it was (a previewed theme is
+switched back too). The renderer in use is shown in the bottom-right corner of the 3D view. You can also
+force it for one run by starting Seamstress with `--cpu` or `--gpu`.
+
+### Themes
+
+**Preferences ▸ Themes** changes the colours of the whole interface — windows, panels, both views, the grid,
+annotations and the 3D background — and remembers the choice for the next start.
+
+![Preferences, Themes page](images/dialog-themes.png)
+
+- **Default** is the dark grey scheme Seamstress has always used. **Light** is for bright rooms.
+- **High Contrast Dark** and **High Contrast Light** push the colours apart for easier reading, in
+  particular between text, edges, the grid and the annotations.
+- Picking a preset previews it at once; **Save** keeps it, **Cancel** puts the old theme back.
+- **Save Theme…** writes the current colours to a small JSON file: a `name` and a `colors` map with one
+  `"#rrggbb"` value per role. **Load Theme…** applies such a file and remembers it as the **Custom**
+  theme. The file is plain text, so it is an easy starting point for your own theme: save one, edit the
+  colours in any text editor, and load it again. Roles you leave out fall back to the Default colours.
 
 ### Language
 

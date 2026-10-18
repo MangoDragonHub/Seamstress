@@ -121,7 +121,7 @@ Item {
         camera: root.activeCamera
 
         environment: SceneEnvironment {
-            clearColor: "#24262b"
+            clearColor: App.themeViewerBg
             backgroundMode: SceneEnvironment.Color
             antialiasingMode: SceneEnvironment.MSAA
             antialiasingQuality: SceneEnvironment.High
@@ -307,11 +307,11 @@ Item {
             if (!root.rulerPlaced)
                 return
             const a = view.mapFrom3DScene(root.rulerA), b = view.mapFrom3DScene(root.rulerB)
-            ctx.strokeStyle = "#ffd447"; ctx.lineWidth = 2
+            ctx.strokeStyle = App.themeAnnotation; ctx.lineWidth = 2
             ctx.setLineDash(root.rulerOpen ? [6, 4] : [])
             ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
             ctx.setLineDash([])
-            ctx.fillStyle = "#ffd447"; ctx.strokeStyle = "#1b1c1f"; ctx.lineWidth = 1
+            ctx.fillStyle = App.themeAnnotation; ctx.strokeStyle = "#1b1c1f"; ctx.lineWidth = 1
             for (const p of [a, b]) {
                 ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
             }
@@ -320,9 +320,9 @@ Item {
             ctx.textAlign = "center"
             const w = ctx.measureText(text).width + 12, mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - 16
             ctx.fillStyle = Qt.rgba(0.07, 0.07, 0.09, 0.88)
-            ctx.strokeStyle = "#ffd447"
+            ctx.strokeStyle = App.themeAnnotation
             ctx.beginPath(); ctx.roundedRect(Math.round(mx - w / 2) + 0.5, Math.round(my - 9) + 0.5, w, 18, 4, 4); ctx.fill(); ctx.stroke()
-            ctx.fillStyle = "#ffe58a"
+            ctx.fillStyle = App.themeAnnotationFill
             ctx.fillText(text, mx, my + 4)
         }
     }

@@ -78,7 +78,7 @@ AppDialog {
             visible: !root.shape.shaped
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            color: "#ffb469"
+            color: App.themeWarningText
             text: tr("MakeHuman's targets folder was not found next to the base mesh, so the body cannot be reshaped. It should be at data/targets beside data/3dobjs.")
         }
         Label {

@@ -16,7 +16,8 @@
 #
 # Raw files expected: overview, arranged, editpoints, sew, uv, quads, layered, bottom, pinch_before (a simulated
 # skirt), pinch (the same with --view pinch), avatar2d (a T-Shirt, --view nosel), mh_0, mh_0.5, mh_1,
-# dlg_prefs, dlg_export, dlg_bodyshape. The pixel positions below assume a 1920x1042 capture.
+# dlg_prefs, dlg_themes (--view prefsthemes), dlg_export, dlg_bodyshape. The pixel positions below assume a
+# 1920x1042 capture.
 import sys
 from PIL import Image, ImageDraw, ImageFont
 src, out = sys.argv[1], sys.argv[2]
@@ -129,3 +130,4 @@ for i, (g, text) in enumerate([("0", "Gender 0 %  (female)"), ("0.5", "Gender 50
 save(bodies, "makehuman-body-shapes")
 for n in ["dlg_prefs", "dlg_export", "dlg_bodyshape"]:
     save(load(n), n.replace("dlg_", "dialog-"))
+save(load("dlg_themes").crop((0, 0, 820, 560)), "dialog-themes")
