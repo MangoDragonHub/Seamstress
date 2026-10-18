@@ -7,6 +7,8 @@
     .\build.ps1 test            build and run the unit tests
     .\build.ps1 run [args]      build and start Seamstress
     .\build.ps1 package         dist\Seamstress-win-<arch> and a .zip of it
+    .\build.ps1 -AllX64         build and package everything for x64 in one run
+    .\build.ps1 -AllArm64       the same for ARM64
     .\build.ps1 clean           remove build output
 
     On 64-bit Windows the Qt bridge package brings its own copy of Qt, so only the .NET SDK is required.
@@ -36,6 +38,14 @@
 .PARAMETER InstallQt
     Download Qt into ~\Qt with aqtinstall if the Qt needed for -Arch is not found.
 
+.PARAMETER AllX64
+    Build (Release) and package everything for x64 in one run: the same as "package", the zip being the only
+    Windows distribution format.
+
+.PARAMETER AllArm64
+    Build (Release) and package everything for ARM64 in one run; on an x64 PC the build is cross-compiled.
+    The two -All* switches are one at a time.
+
 .PARAMETER NoCompiler
     Build without a C++ compiler even if Visual Studio is installed (uses the bridge's prebuilt host).
 #>
@@ -57,6 +67,10 @@ param(
 
     [switch]$InstallQt,
 
+    [switch]$AllX64,
+
+    [switch]$AllArm64,
+
     [switch]$NoCompiler,
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -71,6 +85,18 @@ $QtModules = @('qtquick3d', 'qtshadertools', 'qtquicktimeline')
 
 function Say($text) { Write-Host "==> $text" -ForegroundColor Cyan }
 function Fail($text) { Write-Host "error: $text" -ForegroundColor Red; exit 1 }
+
+# -AllX64 / -AllArm64 are shortcuts for one CPU: a Release build and then every package Windows has.
+if ($AllX64 -or $AllArm64) {
+    if ($AllX64 -and $AllArm64) { Fail 'Pass one of -AllX64 or -AllArm64, not both.' }
+    if ($Command -ne 'build' -and $Command -ne 'package') { Fail "-AllX64 and -AllArm64 package the application; they do not combine with '$Command'." }
+    $allArch = if ($AllX64) { 'x64' } else { 'arm64' }
+    if ($PSBoundParameters.ContainsKey('Arch') -and $Arch -ne $allArch) {
+        Fail "-Arch $Arch conflicts with $(if ($AllX64) { '-AllX64' } else { '-AllArm64' })."
+    }
+    $Arch = $allArch
+    $Command = 'package'
+}
 
 # The operating system's processor, also when this PowerShell itself runs as x64 under emulation on ARM.
 $hostArch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') { 'arm64' } else { 'x64' }
