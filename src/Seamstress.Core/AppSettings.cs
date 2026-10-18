@@ -23,6 +23,15 @@ public sealed class AppSettings
     /// <summary>Language of the interface, as a code from <see cref="Lang.Languages"/> ("en", "es", "pt", "fr", "zh", "ja").</summary>
     public string Language { get; set; } = Lang.English;
 
+    /// <summary>A key from <see cref="Theme.Presets"/>, or "custom" for the colours in <see cref="CustomTheme"/>.</summary>
+    public string Theme { get; set; } = "default";
+
+    /// <summary>The colours of the custom theme, by role name (see <see cref="Theme.Roles"/>).</summary>
+    public Dictionary<string, string> CustomTheme { get; set; } = new();
+
+    /// <summary>Name of the custom theme, from the file it was loaded from.</summary>
+    public string CustomThemeName { get; set; } = "";
+
     /// <summary>"metric" or "imperial". Only changes what the interface shows; files and exports stay metric.</summary>
     public string Units { get; set; } = "metric";
 

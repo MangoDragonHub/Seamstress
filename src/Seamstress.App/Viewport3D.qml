@@ -121,7 +121,7 @@ Item {
         camera: root.activeCamera
 
         environment: SceneEnvironment {
-            clearColor: "#24262b"
+            clearColor: App.themeViewerBg
             backgroundMode: SceneEnvironment.Color
             antialiasingMode: SceneEnvironment.MSAA
             antialiasingQuality: SceneEnvironment.High
@@ -307,11 +307,11 @@ Item {
             if (!root.rulerPlaced)
                 return
             const a = view.mapFrom3DScene(root.rulerA), b = view.mapFrom3DScene(root.rulerB)
-            ctx.strokeStyle = "#ffd447"; ctx.lineWidth = 2
+            ctx.strokeStyle = App.themeAnnotation; ctx.lineWidth = 2
             ctx.setLineDash(root.rulerOpen ? [6, 4] : [])
             ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
             ctx.setLineDash([])
-            ctx.fillStyle = "#ffd447"; ctx.strokeStyle = "#1b1c1f"; ctx.lineWidth = 1
+            ctx.fillStyle = App.themeAnnotation; ctx.strokeStyle = "#1b1c1f"; ctx.lineWidth = 1
             for (const p of [a, b]) {
                 ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
             }
@@ -320,9 +320,9 @@ Item {
             ctx.textAlign = "center"
             const w = ctx.measureText(text).width + 12, mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - 16
             ctx.fillStyle = Qt.rgba(0.07, 0.07, 0.09, 0.88)
-            ctx.strokeStyle = "#ffd447"
+            ctx.strokeStyle = App.themeAnnotation
             ctx.beginPath(); ctx.roundedRect(Math.round(mx - w / 2) + 0.5, Math.round(my - 9) + 0.5, w, 18, 4, 4); ctx.fill(); ctx.stroke()
-            ctx.fillStyle = "#ffe58a"
+            ctx.fillStyle = App.themeAnnotationFill
             ctx.fillText(text, mx, my + 4)
         }
     }
@@ -408,8 +408,13 @@ Item {
                     return
                 }
             }
+            if (e.button === Qt.LeftButton && (e.modifiers & Qt.ControlModifier)) {
+                // Rotating around the avatar is always Ctrl+drag, so it never clashes with Pinch or the Ruler.
+                mode = 1
+                return
+            }
             if (e.button === Qt.LeftButton && root.pinchMode && !(e.modifiers & Qt.ShiftModifier)) {
-                // Pinch: take hold of the cloth under the cursor. Dragging on the avatar or empty space still orbits.
+                // Pinch: take hold of the cloth under the cursor. Ctrl-drag anywhere still rotates the camera.
                 const hit = view.pick(e.x, e.y)
                 if (hit.objectHit && hit.objectHit.pid
                         && App.pinchBegin(hit.objectHit.pid, hit.scenePosition.x, hit.scenePosition.y, hit.scenePosition.z)) {
@@ -422,7 +427,7 @@ Item {
                 }
             }
             if (e.button === Qt.LeftButton && root.measuring && !(e.modifiers & Qt.ShiftModifier)) {
-                // Ruler: press on a surface to place an end. Dragging from empty space still orbits.
+                // Ruler: press on a surface to place an end. Ctrl-drag anywhere still rotates the camera.
                 const hit = view.pick(e.x, e.y)
                 if (hit.objectHit) {
                     if (root.rulerOpen) {
@@ -438,7 +443,8 @@ Item {
                     return
                 }
             }
-            mode = (e.button === Qt.LeftButton && !(e.modifiers & Qt.ShiftModifier)) ? 1 : 2
+            // Plain left-drag belongs to the current tool; the camera pans with Shift or the middle/right button.
+            mode = (e.button === Qt.LeftButton && !(e.modifiers & Qt.ShiftModifier)) ? 0 : 2
         }
         onPositionChanged: (e) => {
             const dx = e.x - lastX, dy = e.y - lastY
@@ -588,9 +594,9 @@ Item {
         elide: Text.ElideRight
         opacity: 0.55
         font.pixelSize: 11
-        text: root.measuring ? tr("Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Drag elsewhere: orbit")
-            : root.pinchMode ? tr("Pinch: drag the cloth to pull it  ·  Drag elsewhere: orbit  ·  Shift-drag: pan  ·  Wheel: zoom")
-                            : tr("Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap")
+        text: root.measuring ? tr("Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Ctrl-drag: orbit")
+            : root.pinchMode ? tr("Pinch: drag the cloth to pull it  ·  Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom")
+                            : tr("Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap")
     }
     Label {
         id: rendererLabel

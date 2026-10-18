@@ -12,7 +12,9 @@ Marvelous Designer.
 - **2D pattern view** – draw pieces (polygon, rectangle, ellipse), move them, edit points, curve edges, and
   sew edges together with the Sew tool. Seams are colour-coded, with dots marking the ends that meet. **Cut
   Hole** (right-click menu) cuts one selected piece in the shape of another lying on it, for pocket openings
-  and the like; the cut-out becomes a new piece, and the hole's edges can be sewn like any other.
+  and the like; the cut-out becomes a new piece, and the hole's edges can be sewn like any other. A faint
+  front view of the avatar is drawn behind the pieces, so you can see where the garment will fall on the
+  body; **View ▸ 2D: Show Avatar** hides it.
 - **3D view** – shows the sewn pieces on an avatar. Orbit, pan, zoom, click to select, and drag the arrows and
   rings on a selected piece to move and rotate it. **Pinch** lets you drag the cloth itself, during or after
   simulation, to tug bunched-up areas into place. **Ortho** switches to an orthographic camera. **View ▸ 3D:
@@ -24,6 +26,8 @@ Marvelous Designer.
   menu.
 - **Languages** – English, Spanish, Brazilian Portuguese, French, Simplified Chinese and Japanese, chosen under
   *Preferences ▸ General* and switched without restarting.
+- **Themes** – the colour scheme is chosen under *Preferences ▸ Themes*: the familiar dark *Default*, a
+  *Light* one, two high-contrast schemes, or a custom theme loaded from a JSON file.
 - **Simulation** – the Simulate button sews and drapes the *active* garment only. Other garments stay as
   they are unless you link them (⇄ in the layers panel) or tick **All garments**. Cloth collides with the
   avatar, with itself and with the other garments, so a shirt settles over a skirt instead of through it.
@@ -50,6 +54,7 @@ There is one script per platform; both take the same commands.
 | Build and run the tests | `./build.sh test` | `.\build.ps1 test` |
 | Build and start the app | `./build.sh run` | `.\build.ps1 run` |
 | Package | `./build.sh package` / `appimage` / `flatpak` | `.\build.ps1 package` |
+| Package everything for one CPU | `./build.sh --all-x64` / `--all-arm64` | `.\build.ps1 -AllX64` / `-AllArm64` |
 | Remove build output | `./build.sh clean` | `.\build.ps1 clean` |
 | Build for 64-bit ARM | `--arch arm64` | `-Arch arm64` |
 
@@ -78,6 +83,8 @@ Packages, all written to `dist/`:
 - `./build.sh flatpak` — `Seamstress.flatpak`; install with `flatpak install --user dist/Seamstress.flatpak`.
   Needs `flatpak-builder` and the runtimes
   `flatpak install flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08`.
+- `./build.sh --all-x64` (or `--all-arm64`, whose packages are named for the processor) — the three packages
+  above for that CPU in one run, all from a single build.
 
 An AppImage or tarball runs on distributions at least as new as the one it was built on, so build releases on an
 older distribution (the CI workflow uses Ubuntu 22.04).
@@ -100,7 +107,8 @@ There are two ways to make it:
 
   The first run creates a build container (Ubuntu 24.04 with a cross-compiler and the ARM64 libraries, about
   1.7 GB) and downloads Qt for ARM64 next to the x86_64 Qt, whose tools the build uses. Nothing is emulated, so
-  it takes about as long as a normal build. `test` and `run` need the board.
+  it takes about as long as a normal build. `test` and `run` need the board. `./build.sh --all-arm64 --install-qt`
+  makes all three packages for the board in one run.
 
 The packages are named for the processor: `Seamstress-linux-arm64/` and its `.tar.gz`,
 `Seamstress-aarch64.AppImage` and `Seamstress-aarch64.flatpak`. Cross-building the Flatpak needs no ARM64 runtime
@@ -125,6 +133,8 @@ On 64-bit Windows the bridge package ships its own Qt, so nothing else is needed
 are installed the bridge uses them; if not, the script switches to the bridge's prebuilt launcher.
 `.\build.ps1 package` produces `dist\Seamstress-win-x64.zip`; the unzipped app needs the .NET 8 runtime installed.
 If PowerShell refuses to run the script, start it with `powershell -ExecutionPolicy Bypass -File build.ps1`.
+`-AllX64` and `-AllArm64` are the build-and-package-for-one-processor shortcuts; on Windows the zip is the only
+distribution format, so they amount to `package` with that processor.
 
 **Windows on ARM** (Snapdragon laptops, Surface Pro X and similar): the bridge does not bring Qt for ARM64, so
 add `-InstallQt` to download it into `~\Qt` (or pass `-Qt <prefix>`):

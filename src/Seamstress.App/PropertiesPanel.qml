@@ -390,7 +390,7 @@ Pane {
                         text: root.sel.material && root.sel.material.textureName !== ""
                             ? (root.sel.material.textureMissing ? "⚠ " + tr("missing:") + " " : "") + root.sel.material.textureName : tr("None")
                         opacity: root.sel.material && root.sel.material.textureName !== "" ? 1 : 0.5
-                        color: root.sel.material && root.sel.material.textureMissing ? "#ff8c69" : palette.windowText
+                        color: root.sel.material && root.sel.material.textureMissing ? App.themeWarningText : palette.windowText
                     }
                     Button { text: "…"; implicitWidth: 30; implicitHeight: 24; onClicked: root.pickTexture() }
                     Button {

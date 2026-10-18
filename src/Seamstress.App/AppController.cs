@@ -1,6 +1,8 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using Qt.Quick;
 using Seamstress.Core;
@@ -30,6 +32,10 @@ public partial class AppController : INotifyPropertyChanged
     private string _avatarKey = "";
     private Task<Avatar?>? _avatarTask;
     private string _avatarTaskKey = "";
+    private int _avatarRevision;
+    private Avatar? _outlineAvatar;
+    private string _outlineJson = "[]";
+    private bool _showBodyOutline = true;
 
     private int _sceneRevision, _layersRevision, _selectionRevision, _viewportRevision, _errorRevision;
     private string _status = "";
@@ -52,6 +58,7 @@ public partial class AppController : INotifyPropertyChanged
         _editor.Changed += () => SceneRevision++;
         if (_settings.DetectMakeHuman())
             TrySaveSettings();
+        InitTheme();
         ApplyStartupOptions();
         EnsureAvatar();
     }
@@ -95,6 +102,9 @@ public partial class AppController : INotifyPropertyChanged
     public int SelectionRevision { get => _selectionRevision; private set { _selectionRevision = value; Notify(); } }
     public int ViewportRevision { get => _viewportRevision; private set { _viewportRevision = value; Notify(); } }
     public int ErrorRevision { get => _errorRevision; private set { _errorRevision = value; Notify(); } }
+
+    /// <summary>Goes up when the avatar was built or replaced, so the 2D view reads its outline again.</summary>
+    public int AvatarRevision { get => _avatarRevision; private set { _avatarRevision = value; Notify(); } }
 
     public string WindowTitle
     {
@@ -254,6 +264,52 @@ public partial class AppController : INotifyPropertyChanged
     // ---------------------------------------------------------------- 2D viewport
 
     public string PatternScene() => _editor.SceneJson(_settings.TextureResolution);
+
+    /// <summary>Whether the faded front view of the avatar is drawn behind the pattern.</summary>
+    public bool ShowBodyOutline
+    {
+        get => _showBodyOutline;
+        set
+        {
+            if (_showBodyOutline == value)
+                return;
+            _showBodyOutline = value;
+            Notify();
+        }
+    }
+
+    /// <summary>
+    /// The current avatar's outline as seen from the front, in pattern centimetres: a list of loops
+    /// ([[x,y,…],…]), the first one outermost. The outline is traced once per avatar.
+    /// </summary>
+    public string BodyOutline()
+    {
+        if (ReferenceEquals(_avatar, _outlineAvatar))
+            return _outlineJson;
+        _outlineAvatar = _avatar;
+        _outlineJson = _avatar == null ? "[]" : OutlineJson(Silhouette.FrontOutline(_avatar.Mesh));
+        return _outlineJson;
+    }
+
+    private static string OutlineJson(List<Vector2[]> loops)
+    {
+        var sb = new StringBuilder("[");
+        for (int i = 0; i < loops.Count; i++)
+        {
+            if (i > 0)
+                sb.Append(',');
+            sb.Append('[');
+            for (int k = 0; k < loops[i].Length; k++)
+            {
+                if (k > 0)
+                    sb.Append(',');
+                sb.Append(loops[i][k].X.ToString("0.##", CultureInfo.InvariantCulture)).Append(',');
+                sb.Append(loops[i][k].Y.ToString("0.##", CultureInfo.InvariantCulture));
+            }
+            sb.Append(']');
+        }
+        return sb.Append(']').ToString();
+    }
 
     /// <summary>Shift is held in the 2D view: the drawing tools keep their proportions (see PatternEditor.Constrain).</summary>
     public bool Constrain
@@ -475,6 +531,7 @@ public partial class AppController : INotifyPropertyChanged
                 Fail(Lang.T("Could not load the avatar."), task.Exception?.GetBaseException() ?? new Exception(Lang.T("Unknown error")));
             }
             ViewportRevision++;
+            AvatarRevision++;
             EnsureAvatar();
             if (_startWhenAvatarReady && _avatarTask == null)
             {

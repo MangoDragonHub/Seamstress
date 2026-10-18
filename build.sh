@@ -7,12 +7,17 @@
 #   ./build.sh package         self-contained folder + tarball in dist/        (Linux)
 #   ./build.sh appimage        dist/Seamstress-<arch>.AppImage                 (Linux)
 #   ./build.sh flatpak         dist/Seamstress.flatpak (x86_64), dist/Seamstress-aarch64.flatpak (ARM64)
+#   ./build.sh --all-x64       build and package everything for x64 in one run  (Linux)
+#   ./build.sh --all-arm64     the same for ARM64; on an x86_64 PC the build runs in the container
 #   ./build.sh clean           remove build output
 #
 # Options (before or after the command):
 #   --arch <x64|arm64> CPU to build for; the default is this machine's. On an x86_64 PC, arm64 cross-compiles
 #                      inside a container (needs podman or docker) for a Raspberry Pi 4/5 or other 64-bit ARM board
-#   --debug            build the Debug configuration
+#   --all-x64          build (Release), stage and package everything for x64 at once: the tarball, the AppImage
+#                      and the Flatpak, from a single build
+#   --all-arm64        the same for ARM64, named for the processor; the two --all-* options are one at a time
+#   --debug            build the Debug configuration (the --all-* packages are always Release)
 #   --qt <dir>         Qt 6 prefix for the target CPU (the folder containing lib/cmake/Qt6);
 #                      otherwise $QtDir, then ~/Qt/<version>/gcc_64 or gcc_arm64
 #   --host-qt <dir>    when cross-compiling, the x86_64 Qt whose tools (moc, qmlcachegen...) the build runs;
@@ -32,6 +37,8 @@ COMMAND="build"
 QT=""
 HOST_QT=""
 ARCH=""
+ARCH_OPT=""
+ALL=""
 INSTALL_QT=0
 RUN_ARGS=()
 
@@ -39,13 +46,19 @@ while [ $# -gt 0 ]; do
     case "$1" in
         build|test|run|package|appimage|flatpak|clean|stage) COMMAND="$1"; shift
             if [ "$COMMAND" = "run" ]; then RUN_ARGS=("$@"); break; fi ;;
-        --arch) ARCH="$2"; shift 2 ;;
+        --arch) ARCH="$2"; ARCH_OPT="$2"; shift 2 ;;
+        --all-x64)
+            [ -z "$ALL" ] || { echo "--all-x64 and --all-arm64 are one at a time" >&2; exit 2; }
+            ALL=x64; shift ;;
+        --all-arm64)
+            [ -z "$ALL" ] || { echo "--all-x64 and --all-arm64 are one at a time" >&2; exit 2; }
+            ALL=arm64; shift ;;
         --debug) CONFIG="Debug"; shift ;;
         --release) CONFIG="Release"; shift ;;
         --qt) QT="$2"; shift 2 ;;
         --host-qt) HOST_QT="$2"; shift 2 ;;
         --install-qt) INSTALL_QT=1; shift ;;
-        -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "Unknown argument: $1 (try --help)" >&2; exit 2 ;;
     esac
 done
@@ -53,6 +66,17 @@ done
 say()  { printf '\033[1m==> %s\033[0m\n' "$*"; }
 fail() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || fail "$1 is required${2:+ ($2)}"; }
+
+# --all-x64 / --all-arm64 are shortcuts for one CPU: a Release build and then every package Linux has.
+if [ -n "$ALL" ]; then
+    [ "$COMMAND" = build ] || fail "--all-$ALL is a package command of its own; run it without another command"
+    if [ -n "$ARCH_OPT" ]; then
+        case "$ARCH_OPT" in x64|x86_64|amd64) ARCH_OPT=x64 ;; arm64|aarch64) ARCH_OPT=arm64 ;; esac
+        [ "$ARCH_OPT" = "$ALL" ] || fail "--arch $ARCH_OPT and --all-$ALL choose different processors"
+    fi
+    ARCH="$ALL"
+    COMMAND="dist"
+fi
 
 case "$(uname -m)" in
     x86_64|amd64) HOST_ARCH=x64 ;;
@@ -338,16 +362,25 @@ stage() {
     echo "    $(du -sh "$STAGE" | cut -f1) in $(find "$STAGE" -type f | wc -l) files"
 }
 
-package() {
-    stage
+tar_stage() {
     say "Creating dist/$(basename "$STAGE").tar.gz"
     tar -C "$DIST" -czf "$STAGE.tar.gz" "$(basename "$STAGE")"
     echo "    Unpack anywhere and start it with ./seamstress.sh"
 }
 
+package() {
+    stage
+    tar_stage
+}
+
 appimage() {
     stage
-    # The tool runs on the build machine; the AppImage runtime it embeds is for the target CPU.
+    make_appimage
+}
+
+# The AppImage is put together from the staged folder; appimagetool runs on this machine and embeds the target
+# CPU's runtime, so a cross-compiled ARM64 build works here as well.
+make_appimage() {
     local tool_arch
     tool_arch="$(uname -m)"
     local tool="$TOOLS/appimagetool-$tool_arch.AppImage" appdir="$DIST/AppDir-$ARCH" image="$DIST/Seamstress-$GNU_ARCH.AppImage"
@@ -377,6 +410,8 @@ appimage() {
     echo "    $(du -h "$image" | cut -f1)  dist/$(basename "$image")"
 }
 
+# Puts the staged folder into a Flatpak. With "staged" as the argument, the folder is already there (the
+# cross-compiling and --all-* pipelines call it that way); otherwise it is built first.
 flatpak_bundle() {
     need flatpak
     local work="$DIST/flatpak-$ARCH" bundle="$DIST/Seamstress.flatpak"
@@ -406,7 +441,7 @@ flatpak_bundle() {
         flatpak build-export --arch="$GNU_ARCH" "$work/repo" "$work/build" >/dev/null
     else
         need flatpak-builder "package 'flatpak-builder'"
-        stage
+        [ "${1:-}" = staged ] || stage
         say "Building the Flatpak"
         rm -rf "$work/build"
         mkdir -p "$work"
@@ -422,12 +457,21 @@ flatpak_bundle() {
     echo "    Install with: flatpak install --user dist/$(basename "$bundle")"
 }
 
+# Every package for one CPU: the tarball, the AppImage and the Flatpak, from a single Release build.
+dist() {
+    stage
+    tar_stage
+    make_appimage
+    flatpak_bundle staged
+}
+
 # ---------------------------------------------------------------------------------------------- commands
 
 if [ "$CROSS" = 1 ] && [ "$IN_CONTAINER" != 1 ]; then
     case "$COMMAND" in
         test|run) fail "'$COMMAND' needs an ARM64 machine; copy the package over (./build.sh --arch arm64 package) or build there" ;;
         clean) ;;
+        dist) find_qt; run_in_container stage; tar_stage; make_appimage; flatpak_bundle staged; say "Done"; exit 0 ;;
         flatpak) find_qt; run_in_container stage; flatpak_bundle; say "Done"; exit 0 ;;
         *) find_qt; run_in_container "$COMMAND"; exit 0 ;;
     esac
@@ -441,6 +485,7 @@ case "$COMMAND" in
     package)  package ;;
     appimage) appimage ;;
     flatpak)  flatpak_bundle ;;
+    dist)     dist ;;
     clean)
         say "Removing build output"
         rm -rf "$DIST" src/*/bin src/*/obj tests/*/bin tests/*/obj ;;

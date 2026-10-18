@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import QtCore
 
-// Preferences, one page per topic: language and units, the 3D viewport, MakeHuman, textures, and keyboard shortcuts.
+// Preferences, one page per topic: language and units, themes, the 3D viewport, MakeHuman, textures, and keyboard shortcuts.
 AppDialog {
     id: root
     title: tr("Preferences")
@@ -17,12 +18,25 @@ AppDialog {
 
     // Set while the Keyboard page waits for a key, so the key does not also run its command.
     readonly property bool recording: keyboard.recordingRow >= 0
-    readonly property var pages: ["General", "Viewport", "MakeHuman", "Textures", "Keyboard"]
-    readonly property var pageTitles: [tr("General"), tr("Viewport"), tr("MakeHuman"), tr("Textures"), tr("Keyboard")]
+    readonly property var pages: ["General", "Themes", "Viewport", "MakeHuman", "Textures", "Keyboard"]
+    readonly property var pageTitles: [tr("General"), tr("Themes"), tr("Viewport"), tr("MakeHuman"), tr("Textures"), tr("Keyboard")]
     // [{code, name}], each language named in itself.
     readonly property var languages: JSON.parse(App.languagesJson())
     property int page: 0
+    // The theme the radios show; PreviewTheme applies it as soon as a radio is clicked, Cancel puts the saved one back.
+    property string themeChoice: "default"
     function openPage(name) { page = Math.max(0, pages.indexOf(name)); open() }
+    function chooseTheme(key) {
+        themeChoice = key
+        App.previewTheme(key)
+    }
+    function syncTheme() {
+        themeDefault.checked = themeChoice === "default"
+        themeLight.checked = themeChoice === "light"
+        themeHcDark.checked = themeChoice === "hcdark"
+        themeHcLight.checked = themeChoice === "hclight"
+        themeCustom.checked = themeChoice === "custom"
+    }
 
     function load() {
         userFolder.text = App.settingMakeHumanUserFolder
@@ -38,6 +52,8 @@ AppDialog {
         shownImperial = units.currentIndex === 1
         gridSize.text = shownLength(App.gridSizeCm)
         snapStep.text = shownLength(App.snapStepCm)
+        themeChoice = App.themeChoice
+        syncTheme()
         keyboard.load()
     }
 
@@ -60,12 +76,14 @@ AppDialog {
 
     onAboutToShow: load()
     onClosed: keyboard.recordingRow = -1
+    onRejected: App.revertTheme()
     onAccepted: {
         App.savePreferences(userFolder.text, baseMesh.text, command.text,
                             ["auto", "gpu", "cpu"][renderer.currentIndex], resolution.model[resolution.currentIndex], author.text,
                             license.editText, units.currentIndex === 1 ? "imperial" : "metric", typedCm(gridSize), typedCm(snapStep),
                             languages[language.currentIndex].code)
         App.saveKeyBindings(JSON.stringify(keyboard.chosen()))
+        App.saveTheme(themeChoice)
     }
 
     component Note: Label {
@@ -144,6 +162,68 @@ AppDialog {
                         Note {
                             Layout.columnSpan: 2
                             text: tr("Changes the units shown and typed in the interface. Garment files and exports are not affected.")
+                        }
+                    }
+                }
+                Item { Layout.fillHeight: true }
+            }
+
+            // ---------------------------------------------------------- Themes
+            ColumnLayout {
+                spacing: 14
+                GroupBox {
+                    title: tr("Preset")
+                    Layout.fillWidth: true
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 6
+                        ButtonGroup { id: themePresets }
+                        RadioButton {
+                            id: themeDefault
+                            text: tr("Default")
+                            ButtonGroup.group: themePresets
+                            onClicked: root.chooseTheme("default")
+                        }
+                        RadioButton {
+                            id: themeLight
+                            text: tr("Light")
+                            ButtonGroup.group: themePresets
+                            onClicked: root.chooseTheme("light")
+                        }
+                        RadioButton {
+                            id: themeHcDark
+                            text: tr("High Contrast Dark")
+                            ButtonGroup.group: themePresets
+                            onClicked: root.chooseTheme("hcdark")
+                        }
+                        RadioButton {
+                            id: themeHcLight
+                            text: tr("High Contrast Light")
+                            ButtonGroup.group: themePresets
+                            onClicked: root.chooseTheme("hclight")
+                        }
+                        RadioButton {
+                            id: themeCustom
+                            text: App.customThemeName !== "" ? tr("Custom (%1)").arg(App.customThemeName) : tr("Custom")
+                            enabled: App.hasCustomTheme
+                            ButtonGroup.group: themePresets
+                            onClicked: root.chooseTheme("custom")
+                        }
+                    }
+                }
+                GroupBox {
+                    title: tr("Custom Theme")
+                    Layout.fillWidth: true
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 8
+                        RowLayout {
+                            spacing: 8
+                            Button { text: tr("Save Theme…"); onClicked: saveThemeDialog.open() }
+                            Button { text: tr("Load Theme…"); onClicked: loadThemeDialog.open() }
+                        }
+                        Note {
+                            text: tr("A theme is a small JSON file of colours: load one to use it, or edit a saved file in a text editor and load it again. The chosen theme is remembered the next time Seamstress is opened.")
                         }
                     }
                 }
@@ -435,7 +515,7 @@ AppDialog {
                                 Layout.preferredWidth: 210
                                 text: keyRow.listening ? root.tr("Press a key…") : keyRow.keys === "" ? "—" : keyRow.keys.split("\n").join(",  ")
                                 highlighted: keyRow.listening
-                                palette.buttonText: !keyRow.listening && keyboard.clashes(keyRow.keys) ? "#ff7b72" : root.palette.buttonText
+                                palette.buttonText: !keyRow.listening && keyboard.clashes(keyRow.keys) ? App.themeDangerText : root.palette.buttonText
                                 onClicked: {
                                     keyboard.recordingRow = keyRow.listening ? -1 : keyRow.index
                                     if (keyboard.recordingRow >= 0)
@@ -484,7 +564,7 @@ AppDialog {
                     Layout.fillWidth: true
                     visible: keyboard.conflicts.length > 0
                     wrapMode: Text.WordWrap
-                    color: "#ff7b72"
+                    color: App.themeDangerText
                     font.pixelSize: 11
                     text: keyboard.conflicts.map(c => tr("%1 is used by %2.").arg(c.key).arg(c.names.join(tr(" and ")))).join("  ")
                           + "  " + tr("A key given to two commands does nothing until one of them is changed.")
@@ -504,5 +584,26 @@ AppDialog {
         title: tr("MakeHuman Base Mesh (base.obj)")
         nameFilters: ["Wavefront OBJ (*.obj)"]
         onAccepted: baseMesh.text = App.pathFromUrl(selectedFile.toString())
+    }
+    FileDialog {
+        id: saveThemeDialog
+        title: tr("Save Theme")
+        fileMode: FileDialog.SaveFile
+        nameFilters: [tr("Seamstress themes") + " (*.json)"]
+        currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
+        currentFile: currentFolder + "/" + (App.customThemeName !== "" ? App.fileName(App.customThemeName) : "seamstress-theme") + ".json"
+        onAccepted: App.saveThemeFile(selectedFile.toString())
+    }
+    FileDialog {
+        id: loadThemeDialog
+        title: tr("Load Theme")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [tr("Seamstress themes") + " (*.json)"]
+        currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
+        onAccepted: {
+            App.loadThemeFile(selectedFile.toString())
+            root.themeChoice = App.themeChoice
+            root.syncTheme()
+        }
     }
 }

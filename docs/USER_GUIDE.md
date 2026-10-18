@@ -81,7 +81,7 @@ From here, the rest of this guide explains each area in detail, including how to
 | 2 | **Tools** | Pick what the mouse does in the 2D view; undo and redo; switch the 2D view between pattern and UV layout. |
 | 3 | **Simulation controls** | **Simulate** starts and stops the cloth simulation. **All garments** widens it from the active garment to every visible one. **Reset** returns pieces to their flat arrangement. |
 | 4 | **Layers** | Every garment, the groups inside it and its pieces. Select, rename, hide, group, delete. |
-| 5 | **3D Garment view** | The avatar and the garments on it. Orbit around, select pieces, move and rotate them with the handles. |
+| 5 | **3D Garment view** | The avatar and the garments on it. Ctrl-drag to orbit around, select pieces, move and rotate them with the handles. |
 | 6 | **2D Pattern view** | Where pieces are drawn, shaped and sewn. Also shows the UV layout. |
 | 7 | **Properties** | Settings of whatever is selected: topology, 3D arrangement, fabric physics, material, UVs, seams, simulation. |
 | 8 | **Status bar** | Hints for the current tool, simulation progress, and the total face count. |
@@ -175,6 +175,13 @@ in imperial. Every few squares there is a stronger line (every tenth square in m
 **Moving around:** scroll to zoom about the cursor; drag with the middle or right mouse button (or
 Alt+left-drag) to pan; press **F** to frame everything. A right-click without dragging opens the Edit menu.
 
+**The body** is drawn faintly behind the pieces: a front view of the same avatar you see in 3D (the mannequin
+or a MakeHuman mesh), at its true size, standing on the origin, so you can see where the pattern falls on the
+body without the body getting in the way. It follows the avatar: switching base mesh under **Avatar** or
+changing the body shape redraws it. **View ▸ 2D: Show Avatar** turns it off and on.
+
+![The avatar's front view drawn faintly behind the T-shirt pieces](images/avatar-2d.png)
+
 ### Drawing pieces
 
 New pieces go into the active garment. If there is none, one is created.
@@ -221,7 +228,7 @@ Pick the **Ruler** (**M**).
   corner to corner is exact. Hold **Shift** to keep the line to 15° steps.
 - **In the 3D view**, click a point on the cloth or the avatar, then click a second one; the far end follows the
   pointer until you do. You can also drag from the first point to the second. The distance is straight across,
-  not along the surface. Dragging from empty space still orbits the camera.
+  not along the surface. Ctrl+dragging from empty space still orbits the camera.
 
 The ruler stays until you measure again, click empty space, press **Esc**, or pick another tool. It never
 changes the pattern.
@@ -344,7 +351,7 @@ simulation pulls each stitch shut.
 
 | To | Do this |
 | --- | --- |
-| Orbit | Drag with the left mouse button |
+| Orbit | Ctrl+drag with the left mouse button |
 | Pan | Shift+drag, or drag with the middle or right button |
 | Zoom | Scroll |
 | Select a piece | Click it (Ctrl+click adds to the selection). Click empty space to deselect |
@@ -445,8 +452,8 @@ body.
   cloth settle for a moment after you let go, and stops again. The whole pinch is one undo step (**Ctrl+Z**).
 - The cloth still collides with the avatar and other garments, so you can pull it over a shoulder or smooth it
   down against the body, but not drag it through.
-- While Pinch is on, dragging on the avatar or on empty space still orbits the camera, Shift+drag pans, and the
-  move/rotate handles are hidden. Turn Pinch off to get them back.
+- While Pinch is on, Ctrl+drag orbits the camera, Shift+drag pans, and the move/rotate handles are hidden. Turn
+  Pinch off to get them back.
 - About 5 cm of cloth around the cursor is held; cloth further away is moved only by the fabric pulling on it.
 - Only garments that are being simulated can be pinched. If another garment is the active one and a simulation
   is already running, stop it first or tick **All garments**.
@@ -759,6 +766,8 @@ MakeHuman's body.
 | --- | --- | --- |
 | General | **Interface language** | English, Español, Português (Brasil), Français, 中文（简体） or 日本語. See [Language](#language) below. |
 | General | **Measurements** | *Metric* shows centimetres, metres, millimetres and g/m². *Imperial* shows inches, oz/yd² and feet and inches for the avatar height, and the grids change to 4 in squares with a stronger line every foot. Only the interface changes: garment files and exports are the same either way. |
+| Themes | **Preset** | The colour scheme of the whole interface: *Default* (the dark grey Seamstress has always used), *Light*, *High Contrast Dark* or *High Contrast Light*. See [Themes](#themes) below. |
+| Themes | **Save Theme… / Load Theme…** | Save the current colours to a file, or load a theme file. A loaded theme is remembered as *Custom*. |
 | Viewport | **Renderer** | *Automatic* uses the GPU and falls back to CPU rendering when no GPU driver is found or the GPU failed to start last time. *GPU* and *CPU* force one or the other. Takes effect on the next start. |
 | Viewport | **Grid size** | The size of one square of the ground grid in the 3D view. 10 cm by default, 4 in with imperial units. |
 | Viewport | **Snap step** | The step a piece snaps to when you hold Shift while dragging a move arrow in the 3D view. Starts the same as the grid size; set it smaller for finer steps. |
@@ -771,9 +780,25 @@ MakeHuman's body.
 | Textures | **Texture size for texel density** | The texture resolution assumed by the texel density read-outs. |
 | Keyboard | Every shortcut | See [Keyboard shortcuts](#keyboard-shortcuts) below. |
 
-Nothing changes until you press **Save**; **Cancel** leaves everything as it was. The renderer in use is shown
-in the bottom-right corner of the 3D view. You can also force it for one run by starting Seamstress with
-`--cpu` or `--gpu`.
+Everything except the theme waits for **Save**; **Cancel** leaves it all as it was (a previewed theme is
+switched back too). The renderer in use is shown in the bottom-right corner of the 3D view. You can also
+force it for one run by starting Seamstress with `--cpu` or `--gpu`.
+
+### Themes
+
+**Preferences ▸ Themes** changes the colours of the whole interface — windows, panels, both views, the grid,
+annotations and the 3D background — and remembers the choice for the next start.
+
+![Preferences, Themes page](images/dialog-themes.png)
+
+- **Default** is the dark grey scheme Seamstress has always used. **Light** is for bright rooms.
+- **High Contrast Dark** and **High Contrast Light** push the colours apart for easier reading, in
+  particular between text, edges, the grid and the annotations.
+- Picking a preset previews it at once; **Save** keeps it, **Cancel** puts the old theme back.
+- **Save Theme…** writes the current colours to a small JSON file: a `name` and a `colors` map with one
+  `"#rrggbb"` value per role. **Load Theme…** applies such a file and remembers it as the **Custom**
+  theme. The file is plain text, so it is an easy starting point for your own theme: save one, edit the
+  colours in any text editor, and load it again. Roles you leave out fall back to the Default colours.
 
 ### Language
 
@@ -856,7 +881,8 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 
 | | 2D view | 3D view |
 | --- | --- | --- |
-| Left button | The current tool | Drag to orbit; click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it |
+| Left button | The current tool | Click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it |
+| Ctrl + drag | — | Orbit around the avatar |
 | Ctrl or Shift + click | Add to the selection | Add to the selection |
 | Shift while drawing | Square, circle, or a snapped polygon side | — |
 | Shift + drag | — | Pan |
