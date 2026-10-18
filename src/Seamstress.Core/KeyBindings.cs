@@ -50,6 +50,7 @@ public static class KeyBindings
 
         new("view.uv", "View", "Pattern / UV Layout", new[] { "U" }),
         new("view.frame", "View", "Frame All in 2D", new[] { "F" }),
+        new("view.avatar2d", "View", "2D: Show Avatar", Array.Empty<string>()),
         new("view.ortho", "View", "3D: Orthographic", new[] { "5", "Num+5" }),
         new("view.front", "View", "3D: Front", new[] { "1", "Num+1" }),
         new("view.side", "View", "3D: Side", new[] { "3", "Num+3" }),

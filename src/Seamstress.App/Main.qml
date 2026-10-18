@@ -184,6 +184,7 @@ ApplicationWindow {
         "handles.scale": () => App.gizmoMode = "Scale",
         "view.uv": () => App.uvMode = !App.uvMode,
         "view.frame": () => patternView.frameAll(),
+        "view.avatar2d": () => App.showBodyOutline = !App.showBodyOutline,
         "view.ortho": () => viewport.orthographic = !viewport.orthographic,
         "view.front": () => viewport.setView(0, -5),
         "view.side": () => viewport.setView(90, -5),
@@ -324,6 +325,7 @@ ApplicationWindow {
                 title: tr("&View")
                 MenuItem { text: tr("2D: Pattern"); checkable: true; checked: !App.uvMode; onTriggered: App.uvMode = false }
                 KeyMenuItem { text: tr("2D: UV Layout"); command: "view.uv"; checkable: true; checked: App.uvMode; onTriggered: App.uvMode = true }
+                KeyMenuItem { text: tr("2D: Show Avatar"); command: "view.avatar2d"; checkable: true; checked: App.showBodyOutline; onTriggered: App.showBodyOutline = checked }
                 KeyMenuItem { text: tr("Frame All in 2D"); command: "view.frame"; onTriggered: patternView.frameAll() }
                 MenuSeparator {}
                 KeyMenuItem { text: tr("3D: Orthographic"); command: "view.ortho"; checkable: true; checked: viewport.orthographic; onTriggered: viewport.orthographic = checked }

@@ -252,6 +252,9 @@ public partial class AppController
             if (options.View.Contains("gizmo" + mode.ToString().ToLowerInvariant()))
                 _editor.GizmoMode = mode;
         }
+        // For documentation screenshots: "--view nosel" starts with nothing selected.
+        if (options.View.Contains("nosel"))
+            _workspace.ClearSelection();
         if (options.SelectPiece != null)
         {
             // A piece, group or garment by name; "seam" selects the first seam.

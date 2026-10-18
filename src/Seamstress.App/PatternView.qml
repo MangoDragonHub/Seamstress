@@ -10,6 +10,8 @@ Item {
 
     function tr(text) { App.languageRevision; return App.tr(text) }
     property var scene: ({ mode: "pattern", tool: "Select", pieces: [], seams: [], bounds: [-20, -20, 120, 100] })
+    // The avatar's front-view outline, in centimetres: the faded body scale reference.
+    property var body: []
     property real zoom: 5
     property real panX: 40
     property real panY: 40
@@ -49,6 +51,7 @@ Item {
 
     function refresh() {
         scene = JSON.parse(App.patternScene())
+        refreshBody()
         // Re-frame when switching between pattern and UV space, and the first time there is something to show.
         if (scene.mode !== framedMode || (!framedOnce && scene.pieces.length > 0)) {
             framedMode = scene.mode
@@ -59,11 +62,35 @@ Item {
         canvas.requestPaint()
     }
 
+    // Called again whenever a freshly built avatar arrives.
+    function refreshBody() {
+        body = JSON.parse(App.bodyOutline())
+        // An empty document opens on the figure, as long as the user has not moved the view.
+        if (body.length > 0 && !framedOnce && !userAdjusted)
+            frameAll()
+        else
+            canvas.requestPaint()
+    }
+
+    function bodyBounds() {
+        let b = null
+        for (const loop of body) {
+            for (let i = 0; i < loop.length; i += 2) {
+                b = b === null ? [loop[i], loop[i + 1], loop[i], loop[i + 1]]
+                               : [Math.min(b[0], loop[i]), Math.min(b[1], loop[i + 1]), Math.max(b[2], loop[i]), Math.max(b[3], loop[i + 1])]
+            }
+        }
+        return b
+    }
+
     function frameAll() {
         if (width <= 0 || height <= 0)
             return
         userAdjusted = false
-        const b = scene.bounds
+        let b = scene.bounds
+        const shown = !root.uv && App.showBodyOutline ? bodyBounds() : null
+        if (shown !== null)
+            b = [Math.min(b[0], shown[0]), Math.min(b[1], shown[1]), Math.max(b[2], shown[2]), Math.max(b[3], shown[3])]
         const w = Math.max(b[2] - b[0], 1e-6), h = Math.max(b[3] - b[1], 1e-6)
         const margin = 48
         zoom = Math.min((width - 2 * margin) / w, (height - 2 * margin) / h)
@@ -79,6 +106,8 @@ Item {
     Connections {
         target: App
         function onSceneRevisionChanged() { Qt.callLater(root.refresh) }
+        function onAvatarRevisionChanged() { root.refreshBody() }
+        function onShowBodyOutlineChanged() { canvas.requestPaint() }
         function onImperialChanged() { canvas.requestPaint() }
         function onLanguageRevisionChanged() { canvas.requestPaint() }
     }
@@ -181,6 +210,24 @@ Item {
                     ctx.strokeStyle = i === 0 ? "#6a6f78" : (i % perMajor === 0 ? "#484c53" : "#383b41")
                     ctx.beginPath(); ctx.moveTo(0, Math.round(root.sy(y)) + 0.5); ctx.lineTo(width, Math.round(root.sy(y)) + 0.5); ctx.stroke()
                 }
+            }
+
+            // The avatar as a faded front view, so the size of a piece can be judged against the body.
+            if (!root.uv && App.showBodyOutline && root.body.length > 0) {
+                ctx.beginPath()
+                for (const loop of root.body) {
+                    for (let i = 0; i < loop.length; i += 2) {
+                        if (i === 0) ctx.moveTo(root.sx(loop[i]), root.sy(loop[i + 1]))
+                        else ctx.lineTo(root.sx(loop[i]), root.sy(loop[i + 1]))
+                    }
+                    ctx.closePath()
+                }
+                ctx.fillRule = Qt.OddEvenFill
+                ctx.fillStyle = withAlpha("#8c96a6", 0.25)
+                ctx.fill()
+                ctx.strokeStyle = withAlpha("#a8b2c2", 0.4)
+                ctx.lineWidth = 1
+                ctx.stroke()
             }
 
             const showPoints = (s.tool === "EditPoints" || s.tool === "TransformPoints") && !root.uv

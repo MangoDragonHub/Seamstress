@@ -10,12 +10,12 @@
 #   --select <name|seam>  select a piece or garment by name        --tool <tool>        start with that tool
 #   --uv                  show the UV layout                       --quads              use quad topology
 #   --view checker,wire   3D display options                       --avatar MakeHuman   use that avatar
-#   --view prefs|export|bodyshape   capture that dialog instead of the main window
+#   --view nosel          start with nothing selected              --view prefs|export|bodyshape   capture that dialog instead of the main window
 #   --gender <0..1>       use the MakeHuman avatar with that gender (raw files mh_0, mh_0.5, mh_1)
 #   --view propsbottom    scroll the properties panel to its end
 #
 # Raw files expected: overview, arranged, editpoints, sew, uv, quads, layered, bottom, pinch_before (a simulated
-# skirt), pinch (the same with --view pinch), mh_0, mh_0.5, mh_1,
+# skirt), pinch (the same with --view pinch), avatar2d (a T-Shirt, --view nosel), mh_0, mh_0.5, mh_1,
 # dlg_prefs, dlg_export, dlg_bodyshape. The pixel positions below assume a 1920x1042 capture.
 import sys
 from PIL import Image, ImageDraw, ImageFont
@@ -92,6 +92,8 @@ d = ImageDraw.Draw(sw)
 sw_off = (806, 380)
 save(sw, "seams")
 save(load("sew").crop((1590, 72, 1920, 470)), "seam-properties")
+# The faded avatar behind the pieces in the 2D view
+save(load("avatar2d").crop((806, 72, 1587, 1016)), "avatar-2d")
 
 # 6. Gizmo with callouts
 g = load("overview").crop((330, 290, 760, 640))

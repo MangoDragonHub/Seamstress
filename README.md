@@ -12,7 +12,9 @@ Marvelous Designer.
 - **2D pattern view** – draw pieces (polygon, rectangle, ellipse), move them, edit points, curve edges, and
   sew edges together with the Sew tool. Seams are colour-coded, with dots marking the ends that meet. **Cut
   Hole** (right-click menu) cuts one selected piece in the shape of another lying on it, for pocket openings
-  and the like; the cut-out becomes a new piece, and the hole's edges can be sewn like any other.
+  and the like; the cut-out becomes a new piece, and the hole's edges can be sewn like any other. A faint
+  front view of the avatar is drawn behind the pieces, so you can see where the garment will fall on the
+  body; **View ▸ 2D: Show Avatar** hides it.
 - **3D view** – shows the sewn pieces on an avatar. Orbit, pan, zoom, click to select, and drag the arrows and
   rings on a selected piece to move and rotate it. **Pinch** lets you drag the cloth itself, during or after
   simulation, to tug bunched-up areas into place. **Ortho** switches to an orthographic camera. **View ▸ 3D:

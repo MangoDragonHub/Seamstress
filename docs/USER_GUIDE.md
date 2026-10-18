@@ -175,6 +175,13 @@ in imperial. Every few squares there is a stronger line (every tenth square in m
 **Moving around:** scroll to zoom about the cursor; drag with the middle or right mouse button (or
 Alt+left-drag) to pan; press **F** to frame everything. A right-click without dragging opens the Edit menu.
 
+**The body** is drawn faintly behind the pieces: a front view of the same avatar you see in 3D (the mannequin
+or a MakeHuman mesh), at its true size, standing on the origin, so you can see where the pattern falls on the
+body without the body getting in the way. It follows the avatar: switching base mesh under **Avatar** or
+changing the body shape redraws it. **View ▸ 2D: Show Avatar** turns it off and on.
+
+![The avatar's front view drawn faintly behind the T-shirt pieces](images/avatar-2d.png)
+
 ### Drawing pieces
 
 New pieces go into the active garment. If there is none, one is created.

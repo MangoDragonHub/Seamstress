@@ -278,6 +278,11 @@ QtObject {
         check("reopen", App.open(base + ".garment.json") && scene().pieces.length === 7)
         check("reopened with its hole", scene().pieces.filter(p => p.holes !== undefined).length === 1)
         check("viewport lists the pieces", JSON.parse(App.viewportModels()).models.length === 7)
+        // The faded front view of the avatar in the 2D view, and its switch under View.
+        check("2D avatar outline", JSON.parse(App.bodyOutline()).length === 1 && JSON.parse(App.bodyOutline())[0].length > 6)
+        App.showBodyOutline = false
+        check("2D avatar switched off", !App.showBodyOutline)
+        App.showBodyOutline = true
         App.setAvatarShape("gender", 0.9)
         check("avatar body setting stored", Math.abs(JSON.parse(App.avatarShape()).gender - 0.9) < 1e-6)
         App.resetAvatarShape()
