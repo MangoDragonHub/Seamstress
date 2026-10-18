@@ -81,7 +81,7 @@ From here, the rest of this guide explains each area in detail, including how to
 | 2 | **Tools** | Pick what the mouse does in the 2D view; undo and redo; switch the 2D view between pattern and UV layout. |
 | 3 | **Simulation controls** | **Simulate** starts and stops the cloth simulation. **All garments** widens it from the active garment to every visible one. **Reset** returns pieces to their flat arrangement. |
 | 4 | **Layers** | Every garment, the groups inside it and its pieces. Select, rename, hide, group, delete. |
-| 5 | **3D Garment view** | The avatar and the garments on it. Orbit around, select pieces, move and rotate them with the handles. |
+| 5 | **3D Garment view** | The avatar and the garments on it. Ctrl-drag to orbit around, select pieces, move and rotate them with the handles. |
 | 6 | **2D Pattern view** | Where pieces are drawn, shaped and sewn. Also shows the UV layout. |
 | 7 | **Properties** | Settings of whatever is selected: topology, 3D arrangement, fabric physics, material, UVs, seams, simulation. |
 | 8 | **Status bar** | Hints for the current tool, simulation progress, and the total face count. |
@@ -228,7 +228,7 @@ Pick the **Ruler** (**M**).
   corner to corner is exact. Hold **Shift** to keep the line to 15° steps.
 - **In the 3D view**, click a point on the cloth or the avatar, then click a second one; the far end follows the
   pointer until you do. You can also drag from the first point to the second. The distance is straight across,
-  not along the surface. Dragging from empty space still orbits the camera.
+  not along the surface. Ctrl+dragging from empty space still orbits the camera.
 
 The ruler stays until you measure again, click empty space, press **Esc**, or pick another tool. It never
 changes the pattern.
@@ -351,7 +351,7 @@ simulation pulls each stitch shut.
 
 | To | Do this |
 | --- | --- |
-| Orbit | Drag with the left mouse button |
+| Orbit | Ctrl+drag with the left mouse button |
 | Pan | Shift+drag, or drag with the middle or right button |
 | Zoom | Scroll |
 | Select a piece | Click it (Ctrl+click adds to the selection). Click empty space to deselect |
@@ -452,8 +452,8 @@ body.
   cloth settle for a moment after you let go, and stops again. The whole pinch is one undo step (**Ctrl+Z**).
 - The cloth still collides with the avatar and other garments, so you can pull it over a shoulder or smooth it
   down against the body, but not drag it through.
-- While Pinch is on, dragging on the avatar or on empty space still orbits the camera, Shift+drag pans, and the
-  move/rotate handles are hidden. Turn Pinch off to get them back.
+- While Pinch is on, Ctrl+drag orbits the camera, Shift+drag pans, and the move/rotate handles are hidden. Turn
+  Pinch off to get them back.
 - About 5 cm of cloth around the cursor is held; cloth further away is moved only by the fabric pulling on it.
 - Only garments that are being simulated can be pinched. If another garment is the active one and a simulation
   is already running, stop it first or tick **All garments**.
@@ -863,7 +863,8 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 
 | | 2D view | 3D view |
 | --- | --- | --- |
-| Left button | The current tool | Drag to orbit; click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it |
+| Left button | The current tool | Click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it |
+| Ctrl + drag | — | Orbit around the avatar |
 | Ctrl or Shift + click | Add to the selection | Add to the selection |
 | Shift while drawing | Square, circle, or a snapped polygon side | — |
 | Shift + drag | — | Pan |

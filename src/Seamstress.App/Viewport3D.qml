@@ -408,8 +408,13 @@ Item {
                     return
                 }
             }
+            if (e.button === Qt.LeftButton && (e.modifiers & Qt.ControlModifier)) {
+                // Rotating around the avatar is always Ctrl+drag, so it never clashes with Pinch or the Ruler.
+                mode = 1
+                return
+            }
             if (e.button === Qt.LeftButton && root.pinchMode && !(e.modifiers & Qt.ShiftModifier)) {
-                // Pinch: take hold of the cloth under the cursor. Dragging on the avatar or empty space still orbits.
+                // Pinch: take hold of the cloth under the cursor. Ctrl-drag anywhere still rotates the camera.
                 const hit = view.pick(e.x, e.y)
                 if (hit.objectHit && hit.objectHit.pid
                         && App.pinchBegin(hit.objectHit.pid, hit.scenePosition.x, hit.scenePosition.y, hit.scenePosition.z)) {
@@ -422,7 +427,7 @@ Item {
                 }
             }
             if (e.button === Qt.LeftButton && root.measuring && !(e.modifiers & Qt.ShiftModifier)) {
-                // Ruler: press on a surface to place an end. Dragging from empty space still orbits.
+                // Ruler: press on a surface to place an end. Ctrl-drag anywhere still rotates the camera.
                 const hit = view.pick(e.x, e.y)
                 if (hit.objectHit) {
                     if (root.rulerOpen) {
@@ -438,7 +443,8 @@ Item {
                     return
                 }
             }
-            mode = (e.button === Qt.LeftButton && !(e.modifiers & Qt.ShiftModifier)) ? 1 : 2
+            // Plain left-drag belongs to the current tool; the camera pans with Shift or the middle/right button.
+            mode = (e.button === Qt.LeftButton && !(e.modifiers & Qt.ShiftModifier)) ? 0 : 2
         }
         onPositionChanged: (e) => {
             const dx = e.x - lastX, dy = e.y - lastY
@@ -588,9 +594,9 @@ Item {
         elide: Text.ElideRight
         opacity: 0.55
         font.pixelSize: 11
-        text: root.measuring ? tr("Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Drag elsewhere: orbit")
-            : root.pinchMode ? tr("Pinch: drag the cloth to pull it  ·  Drag elsewhere: orbit  ·  Shift-drag: pan  ·  Wheel: zoom")
-                            : tr("Drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap")
+        text: root.measuring ? tr("Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Ctrl-drag: orbit")
+            : root.pinchMode ? tr("Pinch: drag the cloth to pull it  ·  Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom")
+                            : tr("Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap")
     }
     Label {
         id: rendererLabel
