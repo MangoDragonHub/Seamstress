@@ -47,7 +47,7 @@ public partial class AppController
                 {
                     bool any = garment.Groups.Any(g => g.ParentId == group.Id) || garment.Pieces.Any(p => p.GroupId == group.Id);
                     Row(group.Id, "group", group.Name, depth, group.Visible, group.Expanded, _workspace.SelectedLayerId == group.Id, any,
-                        $",\"garment\":{Q(garment.Id)}");
+                        $",\"garment\":{Q(garment.Id)},\"parentId\":{Q(group.ParentId)}");
                     if (group.Expanded)
                         Children(group.Id, depth + 1);
                 }
@@ -55,7 +55,7 @@ public partial class AppController
                 {
                     var material = doc.FindMaterial(piece.MaterialId);
                     Row(piece.Id, "piece", piece.Name, depth, piece.Visible, false, _workspace.SelectedPieces.Contains(piece.Id), false,
-                        $",\"garment\":{Q(garment.Id)},\"color\":{Q(material?.Color ?? "#C8CED8")}");
+                        $",\"garment\":{Q(garment.Id)},\"groupId\":{Q(piece.GroupId)},\"color\":{Q(material?.Color ?? "#C8CED8")}");
                 }
             }
             Children(null, 1);
@@ -64,18 +64,25 @@ public partial class AppController
         return sb.ToString();
     }
 
-    /// <summary>Groups of the active garment, for the "Move to" menu.</summary>
+    /// <summary>Groups of every garment, plus each garment's top level, for the "Move to" menu. Names include the garment so they stay distinct.</summary>
     public string GroupChoices()
     {
-        var garment = _workspace.ActiveGarment;
+        var doc = _workspace.Document;
         var sb = new StringBuilder("[");
-        if (garment != null)
+        bool first = true;
+        foreach (var garment in doc.Garments)
         {
-            for (int i = 0; i < garment.Groups.Count; i++)
+            if (!first)
+                sb.Append(',');
+            first = false;
+            sb.Append("{\"id\":\"\",\"garment\":").Append(Q(garment.Id));
+            sb.Append(",\"name\":").Append(Q(garment.Name + " / " + Lang.T("(Top level)"))).Append('}');
+
+            foreach (var group in garment.Groups)
             {
-                if (i > 0)
-                    sb.Append(',');
-                sb.Append("{\"id\":").Append(Q(garment.Groups[i].Id)).Append(",\"name\":").Append(Q(garment.Groups[i].Name)).Append('}');
+                sb.Append(',');
+                sb.Append("{\"id\":").Append(Q(group.Id)).Append(",\"garment\":").Append(Q(garment.Id));
+                sb.Append(",\"name\":").Append(Q(garment.Name + " / " + group.Name)).Append('}');
             }
         }
         return sb.Append(']').ToString();

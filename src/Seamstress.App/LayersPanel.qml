@@ -31,6 +31,28 @@ Pane {
         function onLayersRevisionChanged() { Qt.callLater(root.refresh) }
     }
 
+    // Layers can be dragged onto a garment (its top level) or a group, in any garment.
+    function canDrop(dragSource, targetRow) {
+        if (!dragSource || dragSource.modelData === undefined)
+            return false
+        const from = dragSource.modelData
+        if (from.kind === "garment" || from.id === targetRow.id)
+            return false
+        if (targetRow.kind === "group" && from.kind === "group"
+            && (targetRow.id === from.id || isDescendant(targetRow.id, from.id)))
+            return false
+        return true
+    }
+    function isDescendant(groupId, ancestorId) {
+        let current = rows.find(r => r.id === groupId)
+        for (let guard = 0; current && current.parentId && guard < 64; guard++) {
+            if (current.parentId === ancestorId)
+                return true
+            current = rows.find(r => r.id === current.parentId)
+        }
+        return false
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -56,12 +78,62 @@ Pane {
                 required property var modelData
                 width: list.width
                 height: 26
-                color: modelData.selected ? Qt.alpha(palette.highlight, 0.45)
-                     : (modelData.kind === "garment" && modelData.active ? Qt.alpha(palette.highlight, 0.14) : "transparent")
+                property bool dropHover: false
+                property real grabX: 0
+                property real grabY: 0
+                color: row.dropHover ? Qt.alpha(palette.highlight, 0.7)
+                     : (modelData.selected ? Qt.alpha(palette.highlight, 0.45)
+                     : (modelData.kind === "garment" && modelData.active ? Qt.alpha(palette.highlight, 0.14) : "transparent"))
+
+                // A copy of the row that follows the cursor during a drag; kept in the window overlay so the
+                // list cannot clip it.
+                Rectangle {
+                    id: dragProxy
+                    parent: Overlay.overlay
+                    width: row.width
+                    height: row.height
+                    visible: rowMouse.drag.active || gripMouse.drag.active
+                    z: 1000
+                    radius: 4
+                    color: palette.highlight
+                    opacity: 0.9
+                    border.color: palette.highlightedText
+                    border.width: 1
+
+                    Label {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8 + row.modelData.depth * 14
+                        anchors.rightMargin: 8
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                        text: row.modelData.name
+                        color: palette.highlightedText
+                    }
+
+                    Drag.active: rowMouse.drag.active || gripMouse.drag.active
+                    Drag.source: row
+                    Drag.keys: ["seamstress-layer"]
+                    Drag.mimeData: ({ "application/x-seamstress-layer": row.modelData.id })
+                    Drag.hotSpot.x: row.grabX
+                    Drag.hotSpot.y: row.grabY
+                }
 
                 MouseArea {
+                    id: rowMouse
                     anchors.fill: parent
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    drag.target: row.modelData.kind === "garment" ? null : dragProxy
+                    drag.threshold: 12
+                    drag.smoothed: false
+                    onPressed: (e) => {
+                        if (e.button === Qt.LeftButton && row.modelData.kind !== "garment") {
+                            row.grabX = e.x
+                            row.grabY = e.y
+                            const p = row.mapToItem(Overlay.overlay, 0, 0)
+                            dragProxy.x = p.x
+                            dragProxy.y = p.y
+                        }
+                    }
                     onClicked: (e) => {
                         if (e.button === Qt.RightButton) {
                             if (!row.modelData.selected)
@@ -75,6 +147,29 @@ Pane {
                         }
                     }
                     onDoubleClicked: (e) => { if (e.button === Qt.LeftButton) root.editingId = row.modelData.id }
+                    // Internal drags are cancelled when Drag.active becomes false on release, so
+                    // deliver the drop explicitly while the target still contains the drag.
+                    onReleased: if (dragProxy.Drag.active) dragProxy.Drag.drop()
+                }
+
+                DropArea {
+                    anchors.fill: parent
+                    keys: ["seamstress-layer"]
+                    onEntered: (drag) => {
+                        row.dropHover = root.canDrop(drag.source, row.modelData)
+                        if (row.dropHover)
+                            drag.accept()
+                    }
+                    onExited: row.dropHover = false
+                    onDropped: (drop) => {
+                        row.dropHover = false
+                        if (!drop.source || drop.source.modelData === undefined || !root.canDrop(drop.source, row.modelData))
+                            return
+                        const from = drop.source.modelData, to = row.modelData
+                        const garmentId = to.kind === "garment" ? to.id : to.garment
+                        const groupId = to.kind === "garment" ? "" : (to.kind === "group" ? to.id : (to.groupId || ""))
+                        App.moveLayer(from.id, garmentId, groupId)
+                    }
                 }
 
                 RowLayout {
@@ -82,6 +177,34 @@ Pane {
                     anchors.leftMargin: 6 + row.modelData.depth * 14
                     anchors.rightMargin: 6
                     spacing: 4
+
+                    // Drag handle: pieces and groups can be dragged into a group or another garment.
+                    Label {
+                        Layout.preferredWidth: 8
+                        text: "⋮⋮"
+                        font.pixelSize: 10
+                        opacity: row.modelData.kind === "garment" ? 0 : 0.35
+                        MouseArea {
+                            id: gripMouse
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            enabled: row.modelData.kind !== "garment"
+                            preventStealing: true
+                            drag.target: dragProxy
+                            drag.threshold: 4
+                            drag.smoothed: false
+                            cursorShape: Qt.OpenHandCursor
+                            onPressed: (e) => {
+                                const p = mapToItem(row, e.x, e.y)
+                                row.grabX = p.x
+                                row.grabY = p.y
+                                const g = row.mapToItem(Overlay.overlay, 0, 0)
+                                dragProxy.x = g.x
+                                dragProxy.y = g.y
+                            }
+                            onReleased: if (dragProxy.Drag.active) dragProxy.Drag.drop()
+                        }
+                    }
 
                     // Fold arrow for garments and groups.
                     Label {
@@ -216,7 +339,7 @@ Pane {
                     required property var modelData
                     text: modelData.name
                     enabled: modelData.id !== root.menuId
-                    onTriggered: App.moveToGroup(root.menuId, modelData.id)
+                    onTriggered: App.moveLayer(root.menuId, modelData.garment, modelData.id)
                 }
                 onObjectAdded: (index, object) => moveMenu.insertItem(index + 1, object)
                 onObjectRemoved: (index, object) => moveMenu.removeItem(object)

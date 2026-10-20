@@ -515,19 +515,108 @@ public sealed class Workspace
     }
 
     /// <summary>Moves a piece or group into a group of the same garment, or to the garment's top level when null.</summary>
-    public void MoveToGroup(string id, string? groupId)
+    public void MoveToGroup(string id, string? groupId) => MoveLayer(id, null, groupId);
+
+    /// <summary>
+    /// Moves a piece or group into a group or to the top level of another garment, or within its own garment. A group
+    /// brings its pieces and sub-groups along. Seams between pieces that move together come along; seams to pieces
+    /// left behind are dropped. The destination garment becomes the active one.
+    /// </summary>
+    public void MoveLayer(string id, string? garmentId, string? groupId)
     {
-        History.Execute(Lang.T("Move layer"), doc =>
+        var doc = Document;
+        var source = doc.GarmentOfPiece(id);
+        LayerGroup? movingGroup = null;
+        if (source == null)
         {
-            foreach (var garment in doc.Garments)
+            foreach (var g in doc.Garments)
             {
-                if (groupId != null && garment.FindGroup(groupId) == null)
-                    continue;
-                if (garment.FindPiece(id) is { } piece)
-                    piece.GroupId = groupId;
-                else if (garment.FindGroup(id) is { } group && (groupId == null || !garment.IsGroupWithin(groupId, id)))
+                movingGroup = g.FindGroup(id);
+                if (movingGroup != null)
+                {
+                    source = g;
+                    break;
+                }
+            }
+        }
+        if (source == null)
+            return;
+        if (movingGroup == null && source.FindPiece(id) == null)
+            return;
+
+        // The group's owner wins over the garment id, so callers only need to pass the group they dropped onto.
+        var target = groupId != null
+            ? doc.Garments.FirstOrDefault(g => g.FindGroup(groupId) != null)
+            : garmentId != null ? doc.FindGarment(garmentId) : source;
+        if (target == null)
+            return;
+
+        bool pieceMove = movingGroup == null;
+        if (pieceMove && source == target && source.FindPiece(id)!.GroupId == groupId)
+            return;
+        if (!pieceMove && source == target)
+        {
+            if (groupId == id || (groupId != null && source.IsGroupWithin(groupId, id)))
+                return; // a group cannot go inside itself
+            if (movingGroup!.ParentId == groupId)
+                return;
+        }
+
+        string sourceId = source.Id, targetId = target.Id;
+        History.Execute(Lang.T("Move layer"), d =>
+        {
+            var from = d.FindGarment(sourceId)!;
+            var to = d.FindGarment(targetId)!;
+            var movedPieces = new HashSet<string>();
+            if (pieceMove)
+            {
+                var piece = from.FindPiece(id);
+                if (piece == null)
+                    return;
+                if (from != to)
+                {
+                    from.Pieces.Remove(piece);
+                    to.Pieces.Add(piece);
+                    movedPieces.Add(piece.Id);
+                }
+                piece.GroupId = groupId;
+            }
+            else
+            {
+                var group = from.FindGroup(id);
+                if (group == null)
+                    return;
+                if (from != to)
+                {
+                    foreach (var piece in from.Pieces.Where(p => p.GroupId != null && from.IsGroupWithin(p.GroupId, id)).ToList())
+                    {
+                        from.Pieces.Remove(piece);
+                        to.Pieces.Add(piece);
+                        movedPieces.Add(piece.Id);
+                    }
+                    var groups = from.Groups.Where(g => from.IsGroupWithin(g.Id, id)).ToList();
+                    foreach (var moved in groups)
+                        from.Groups.Remove(moved);
+                    foreach (var moved in groups)
+                        to.Groups.Add(moved);
+                    group = to.FindGroup(id);
+                }
+                if (group != null)
                     group.ParentId = groupId;
             }
+
+            if (from != to)
+            {
+                var seams = from.Seams.Where(s => movedPieces.Contains(s.A.PieceId) && movedPieces.Contains(s.B.PieceId)).ToList();
+                from.Seams.RemoveAll(s => movedPieces.Contains(s.A.PieceId) || movedPieces.Contains(s.B.PieceId));
+                to.Seams.AddRange(seams);
+            }
+
+            // Make the result visible: open the destination garment and the group that received the layer.
+            to.Expanded = true;
+            if (groupId != null && to.FindGroup(groupId) is { } parent)
+                parent.Expanded = true;
+            ActiveGarmentId = to.Id;
         });
     }
 
