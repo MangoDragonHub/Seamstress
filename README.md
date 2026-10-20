@@ -132,6 +132,9 @@ then in PowerShell:
 On 64-bit Windows the bridge package ships its own Qt, so nothing else is needed. If Visual Studio's C++ tools
 are installed the bridge uses them; if not, the script switches to the bridge's prebuilt launcher.
 `.\build.ps1 package` produces `dist\Seamstress-win-x64.zip`; the unzipped app needs the .NET 8 runtime installed.
+If that runtime is missing, the launcher says so and offers the download instead of closing silently (a
+`-NoCompiler` build uses the bridge's prebuilt launcher, which cannot carry that check).
+The Visual C++ runtime rides along in the package, so the VC++ Redistributable does not have to be installed.
 If PowerShell refuses to run the script, start it with `powershell -ExecutionPolicy Bypass -File build.ps1`.
 `-AllX64` and `-AllArm64` are the build-and-package-for-one-processor shortcuts; on Windows the zip is the only
 distribution format, so they amount to `package` with that processor.

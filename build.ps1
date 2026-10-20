@@ -191,6 +191,7 @@ function Test-CppToolchain {
     return [bool]$found
 }
 
+<<<<<<< Updated upstream
 # The bridge's Qt tools (windeployqt) and the Qt DLLs they copy import the MSVC runtime
 # (vcruntime140.dll and friends), which the bridge package does not ship. Without it windeployqt.exe cannot
 # even start, and the build fails at the deployment step with the bare "Error deploying Qt binaries!".
@@ -221,6 +222,68 @@ function Show-DeployError {
     & (Join-Path $package.FullName 'tools\qt\bin\windeployqt.exe') --qmldir (Resolve-Path 'src\Seamstress.App').Path `
         --no-translations --release --no-compiler-runtime $exe
     Write-Host "    windeployqt exited with $LASTEXITCODE"
+=======
+# The Visual C++ runtime the native launcher links against. The bridge deploys Qt with --no-compiler-runtime
+# (Qt.Bridge.targets), so nothing else puts these next to the executable, and on a PC without the VC++ Redistributable
+# Windows stops with "The code execution cannot proceed because MSVCP140.dll was not found" -- no .NET runtime helps.
+# These are the files the Visual C++ 2015-2022 Redistributable installs, which Microsoft allows shipping with an app
+# (vccorlib140.dll is left out: it is only for C++/CX).
+$CrtDlls = @('concrt140.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll', 'msvcp140_atomic_wait.dll',
+    'msvcp140_codecvt_ids.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')
+
+# The version of the C++ standard library in a folder, or 0 when it holds none.
+function Get-CrtVersion($dir) {
+    $file = Join-Path $dir 'msvcp140.dll'
+    if (Test-Path $file) { return [version]([Diagnostics.FileVersionInfo]::GetVersionInfo($file).FileVersion) }
+    return [version]'0.0'
+}
+
+# The newest runtime that can be found, because the C++ standard library is forward- but not backward-compatible:
+# Qt 6.11 is built against a 14.5x runtime, so an older one (Visual Studio 2022 17.6 carries 14.36) makes the
+# application crash at startup with an access violation inside MSVCP140.dll.
+function Find-CrtSource {
+    $subdir = if ($Arch -eq 'arm64') { 'arm64' } else { 'x64' }
+    $roots = @()
+    # A Developer PowerShell points VCToolsRedistDir at <Visual Studio>\VC\Redist\MSVC\<toolset>.
+    if ($env:VCToolsRedistDir) { $roots += Split-Path ($env:VCToolsRedistDir.TrimEnd('\')) -Parent }
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (Test-Path $vswhere) {
+        foreach ($vs in @(& $vswhere -products * -property installationPath)) {
+            if ($vs) { $roots += Join-Path $vs 'VC\Redist\MSVC' }
+        }
+    }
+    $candidates = @()
+    foreach ($root in $roots) {
+        # <root>\14.36.32532\x64\Microsoft.VC143.CRT
+        foreach ($crt in Get-ChildItem (Join-Path $root "*\$subdir\Microsoft.VC*.CRT") -Directory -ErrorAction SilentlyContinue) {
+            $candidates += $crt.FullName
+        }
+    }
+    # The redistributable installed on this PC, which Windows Update keeps current, is usually the newest one there is.
+    # Only for this PC's own processor: System32 holds no runtime for another one.
+    if (-not $cross) { $candidates += (Join-Path $env:SystemRoot 'System32') }
+    return $candidates | Sort-Object { Get-CrtVersion $_ } -Descending | Select-Object -First 1
+}
+
+function Add-CrtRuntime($destination) {
+    $source = Find-CrtSource
+    $version = if ($source) { Get-CrtVersion $source } else { [version]'0.0' }
+    if ($version -eq 0) {
+        Write-Host "warning: no Visual C++ runtime for $Arch was found; the build needs the VC++ 2015-2022 Redistributable installed to run" -ForegroundColor Yellow
+        return
+    }
+    # Cross-compiling takes the ARM64 runtime from Visual Studio, whose version follows the installed toolset. If that
+    # is older than the one this PC runs, the package carries the crash below to ARM64 PCs.
+    if ($cross -and $version -lt (Get-CrtVersion (Join-Path $env:SystemRoot 'System32'))) {
+        Write-Host "warning: the ARM64 Visual C++ runtime ($version) is older than this PC's $(Get-CrtVersion (Join-Path $env:SystemRoot 'System32')); update the ARM64 build tools in Visual Studio or the package may not start on ARM64 PCs" -ForegroundColor Yellow
+    }
+    $copied = 0
+    foreach ($name in $CrtDlls) {
+        $file = Join-Path $source $name
+        if (Test-Path $file) { Copy-Item $file $destination -Force; $copied++ }
+    }
+    Say "Added the Visual C++ runtime $version ($copied files)"
+>>>>>>> Stashed changes
 }
 
 # Deploys the ARM64 Qt next to a cross-compiled build. The bridge would run the ARM64 Qt's own windeployqt, which an
@@ -298,6 +361,7 @@ function Invoke-Build {
         }
     }
     if (-not (Test-Path "$bin\Seamstress.exe")) { Fail "the build finished but $bin\Seamstress.exe is missing" }
+    Add-CrtRuntime $bin
     if ($cross) { Invoke-CrossDeploy }
 }
 

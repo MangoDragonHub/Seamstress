@@ -51,24 +51,65 @@
     <QtResource Include="icons/seamstress.svg" />
   </ItemGroup>
 
-  <!-- The native host the bridge generates gives .NET about one second to start, then quits with ".NET host not ready
-       after timeout". A Raspberry Pi 4 or an RK3399 board starting from an SD card can need longer, so the limit is
-       raised to 30 seconds. The wait still ends as soon as .NET is up or has exited.
+  <!-- The bridge generates the native host's main.cpp itself, so the two things it does not offer are patched here.
+       First, .NET gets about one second to start, then the host quits with ".NET host not ready after timeout"; a
+       Raspberry Pi 4 or an RK3399 board starting from an SD card can need longer, so the limit is raised to 30 seconds
+       (the wait still ends as soon as .NET is up or has exited).
+       Second, when no .NET 8+ runtime is installed, loadApp fails and runApp then returns 0 without a word, so the
+       application closes as if it had run: such a PC gets a dialog with the download link instead.
        The bridge rewrites main.cpp on every build because the edited file differs from what it generates; when the
        edited result is the same as last time, the file gets its old time back so that it is not compiled again. -->
-  <Target Name="SeamstressLongerHostStartup" AfterTargets="QtBridgeGenerate" BeforeTargets="QtBridgeBuild"
+  <Target Name="SeamstressPatchHostMain" AfterTargets="QtBridgeGenerate" BeforeTargets="QtBridgeBuild"
     Condition="'$(QtGenSourceCode)' == 'true' and Exists('$(ProjectQtNativeSourceDir)/cpp/main.cpp')">
     <PropertyGroup>
       <_SeamstressHostMain>$(ProjectQtNativeSourceDir)/cpp/main.cpp</_SeamstressHostMain>
       <_SeamstressHostLast>$(ProjectDir)$(IntermediateOutputPath)seamstress-host-main.cpp</_SeamstressHostLast>
       <_SeamstressHostSource>$([System.IO.File]::ReadAllText('$(_SeamstressHostMain)'))</_SeamstressHostSource>
       <_SeamstressHostLimit>constexpr int maxTries = 10000;</_SeamstressHostLimit>
+      <!-- Inserted in front of QT_DOTNET_HOST, whose line is repeated at the end so that this value ends in a plain
+           statement rather than in a newline the property system may trim. -->
+      <_SeamstressHostMissingDotNet>#ifdef Q_OS_WINDOWS
+#include &lt;QDesktopServices&gt;
+#include &lt;QUrl&gt;
+#include &lt;windows.h&gt;
+// No .NET 8+ runtime could be loaded: without this the application would just close without a word.
+static void SeamstressMissingDotNet()
+{
+    if (MessageBoxW(nullptr, L"Seamstress needs the .NET 8 runtime (or newer), which is not installed.\n\n"
+        L"Download it now?", L"Seamstress", MB_YESNO | MB_ICONERROR | MB_TASKMODAL) == IDYES)
+        QDesktopServices::openUrl(QUrl(QStringLiteral("https://dotnet.microsoft.com/download/dotnet/8.0")));
+}
+#else
+static void SeamstressMissingDotNet() {}
+#endif
+
+QT_DOTNET_HOST(appName);</_SeamstressHostMissingDotNet>
+      <!-- The check for the failed host is two lines in the generated file; the 8 spaces on the second line are part
+           of what is matched, so both values continue at column 0. -->
+      <_SeamstressHostExitCheck>if (dotNetExited)
+        return dotNetResult;</_SeamstressHostExitCheck>
+      <_SeamstressHostExitCheckFixed>if (dotNetExited)
+    {
+        if (dotNetResult == -4) SeamstressMissingDotNet();
+        return dotNetResult;
+    }</_SeamstressHostExitCheckFixed>
     </PropertyGroup>
-    <Warning Condition="!$(_SeamstressHostSource.Contains('$(_SeamstressHostLimit)')) and !$(_SeamstressHostSource.Contains('maxTries = 300000;'))"
+    <PropertyGroup>
+      <_SeamstressHostSource Condition="$(_SeamstressHostSource.Contains('$(_SeamstressHostLimit)'))"
+        >$(_SeamstressHostSource.Replace('$(_SeamstressHostLimit)', 'constexpr int maxTries = 300000;'))</_SeamstressHostSource>
+      <_SeamstressHostSource Condition="$(_SeamstressHostSource.Contains('dotNetResult = dotNetHost.runApp();'))"
+        >$(_SeamstressHostSource.Replace('dotNetResult = dotNetHost.runApp();', 'dotNetResult = dotNetHost.isLoaded() ? dotNetHost.runApp() : -4;'))</_SeamstressHostSource>
+      <_SeamstressHostSource Condition="$(_SeamstressHostSource.Contains('$(_SeamstressHostExitCheck)'))"
+        >$(_SeamstressHostSource.Replace('$(_SeamstressHostExitCheck)', '$(_SeamstressHostExitCheckFixed)'))</_SeamstressHostSource>
+      <_SeamstressHostSource Condition="$(_SeamstressHostSource.Contains('QT_DOTNET_HOST(appName);')) and !$(_SeamstressHostSource.Contains('static void SeamstressMissingDotNet()'))"
+        >$(_SeamstressHostSource.Replace('QT_DOTNET_HOST(appName);', '$(_SeamstressHostMissingDotNet)'))</_SeamstressHostSource>
+    </PropertyGroup>
+    <Warning Condition="!$(_SeamstressHostSource.Contains('maxTries = 300000;'))"
       Text="Seamstress: the bridge's generated host changed; its .NET start-up timeout was not raised." />
-    <WriteLinesToFile Condition="$(_SeamstressHostSource.Contains('$(_SeamstressHostLimit)'))"
-      File="$(_SeamstressHostMain)" Overwrite="true"
-      Lines="$([MSBuild]::Escape($(_SeamstressHostSource.Replace('$(_SeamstressHostLimit)', 'constexpr int maxTries = 300000;'))))" />
+    <Warning Condition="!$(_SeamstressHostSource.Contains('SeamstressMissingDotNet();'))"
+      Text="Seamstress: the bridge's generated host changed; the missing-.NET dialog was not added." />
+    <WriteLinesToFile File="$(_SeamstressHostMain)" Overwrite="true"
+      Lines="$([MSBuild]::Escape($(_SeamstressHostSource)))" />
     <GetFileHash Files="$(_SeamstressHostMain)">
       <Output TaskParameter="Hash" PropertyName="_SeamstressHostHash" />
     </GetFileHash>
