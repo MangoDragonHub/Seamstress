@@ -696,6 +696,8 @@ public partial class AppController : INotifyPropertyChanged
 
     public void Ungroup(string groupId) => _workspace.Ungroup(groupId);
     public void MoveToGroup(string id, string groupId) => _workspace.MoveToGroup(id, string.IsNullOrEmpty(groupId) ? null : groupId);
+    public void MoveLayer(string id, string garmentId, string groupId) => _workspace.MoveLayer(
+        id, string.IsNullOrEmpty(garmentId) ? null : garmentId, string.IsNullOrEmpty(groupId) ? null : groupId);
     public void Rename(string id, string name) => _workspace.Rename(id, name);
     public void SetVisible(string id, bool visible) => _workspace.SetVisible(id, visible);
     public void SetExpanded(string id, bool expanded) => _workspace.SetExpanded(id, expanded);

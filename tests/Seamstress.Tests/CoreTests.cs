@@ -764,6 +764,73 @@ public class DocumentTests
     }
 
     [Fact]
+    public void MovingAPieceToAnotherGarmentDropsItsSeams()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        ws.AddTemplate("Skirt");
+        var shirt = ws.Document.Garments[0];
+        var skirt = ws.Document.Garments[1];
+        var front = shirt.Pieces[0];
+        Assert.Contains(shirt.Seams, s => s.A.PieceId == front.Id || s.B.PieceId == front.Id);
+
+        ws.MoveLayer(front.Id, skirt.Id, null);
+
+        Assert.Same(skirt, ws.Document.GarmentOfPiece(front.Id));
+        Assert.DoesNotContain(shirt.Pieces, p => p.Id == front.Id);
+        Assert.Null(skirt.FindPiece(front.Id)!.GroupId);
+        Assert.DoesNotContain(shirt.Seams, s => s.A.PieceId == front.Id || s.B.PieceId == front.Id);
+        Assert.Equal(skirt.Id, ws.ActiveGarmentId);
+
+        ws.History.Undo();
+        Assert.NotNull(ws.Document.Garments[0].FindPiece(front.Id));
+        Assert.Null(ws.Document.Garments[1].FindPiece(front.Id));
+    }
+
+    [Fact]
+    public void MovingAGroupToAnotherGarmentBringsItsPiecesAndInnerSeams()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        ws.AddTemplate("Skirt");
+        var shirt = ws.Document.Garments[0];
+        var skirt = ws.Document.Garments[1];
+        var sleeves = Assert.Single(shirt.Groups);
+        var sleeveIds = shirt.Pieces.Where(p => p.GroupId == sleeves.Id).Select(p => p.Id).ToList();
+        Assert.Equal(2, sleeveIds.Count);
+        int innerSeams = shirt.Seams.Count(s => sleeveIds.Contains(s.A.PieceId) && sleeveIds.Contains(s.B.PieceId));
+        Assert.Equal(2, innerSeams);
+
+        ws.MoveLayer(sleeves.Id, skirt.Id, null);
+
+        Assert.Contains(skirt.Groups, g => g.Id == sleeves.Id);
+        Assert.DoesNotContain(shirt.Pieces, p => sleeveIds.Contains(p.Id));
+        Assert.All(sleeveIds, id => Assert.Equal(sleeves.Id, skirt.FindPiece(id)!.GroupId));
+        Assert.DoesNotContain(shirt.Seams, s => sleeveIds.Contains(s.A.PieceId) || sleeveIds.Contains(s.B.PieceId));
+        Assert.Equal(innerSeams, skirt.Seams.Count(s => sleeveIds.Contains(s.A.PieceId) && sleeveIds.Contains(s.B.PieceId)));
+        Assert.Equal(2 + innerSeams, skirt.Seams.Count);
+    }
+
+    [Fact]
+    public void MovingAPieceIntoAGroupOfAnotherGarment()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        ws.AddTemplate("Skirt");
+        var shirt = ws.Document.Garments[0];
+        var skirt = ws.Document.Garments[1];
+        var group = ws.AddGroup(skirt.Id);
+        Assert.NotNull(group);
+        string pieceId = shirt.Pieces[0].Id;
+
+        ws.MoveLayer(pieceId, skirt.Id, group!.Id);
+
+        Assert.Equal(group.Id, skirt.FindPiece(pieceId)!.GroupId);
+        Assert.True(skirt.Expanded);
+        Assert.True(group.Expanded);
+    }
+
+    [Fact]
     public void SliderDragMergesIntoOneUndoStep()
     {
         var ws = new Workspace();
