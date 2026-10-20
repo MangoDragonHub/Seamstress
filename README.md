@@ -136,6 +136,11 @@ If PowerShell refuses to run the script, start it with `powershell -ExecutionPol
 `-AllX64` and `-AllArm64` are the build-and-package-for-one-processor shortcuts; on Windows the zip is the only
 distribution format, so they amount to `package` with that processor.
 
+Qt's DLLs need the [Microsoft Visual C++ 2015-2022 Redistributable (x64)](https://aka.ms/vs/17/release/vc_redist.x64.exe),
+which is not part of Windows and not shipped with the bridge package. A machine without it (a fresh virtual
+machine, for instance) fails the build with `Error deploying Qt binaries!` -- the bridge's `windeployqt` cannot
+start -- and the app does not run either. Visual Studio's C++ tools install the runtime as well.
+
 **Windows on ARM** (Snapdragon laptops, Surface Pro X and similar): the bridge does not bring Qt for ARM64, so
 add `-InstallQt` to download it into `~\Qt` (or pass `-Qt <prefix>`):
 

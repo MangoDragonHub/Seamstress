@@ -191,6 +191,38 @@ function Test-CppToolchain {
     return [bool]$found
 }
 
+# The bridge's Qt tools (windeployqt) and the Qt DLLs they copy import the MSVC runtime
+# (vcruntime140.dll and friends), which the bridge package does not ship. Without it windeployqt.exe cannot
+# even start, and the build fails at the deployment step with the bare "Error deploying Qt binaries!".
+function Test-MsvcRuntime {
+    $folders = @(Join-Path $env:SystemRoot 'System32')
+    if (Test-Path (Join-Path $env:SystemRoot 'Sysnative')) { $folders += (Join-Path $env:SystemRoot 'Sysnative') }
+    foreach ($dll in @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll')) {
+        if (-not ($folders | Where-Object { Test-Path (Join-Path $_ $dll) })) { return $false }
+    }
+    return $true
+}
+
+# The bridge runs windeployqt with its output discarded, so a failed deployment says only "Error deploying Qt
+# binaries!". Running the same command again, with its output, shows what actually went wrong.
+function Show-DeployError {
+    # A successful deployment leaves Qt's DLLs next to the app; without them the deployment is what failed.
+    if (Test-Path (Join-Path $bin 'Qt6Core.dll')) { return }
+    $root = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+    $package = Get-ChildItem (Join-Path $root 'qtgroup.qt.bridge.csharp.win-*') -Directory -ErrorAction SilentlyContinue |
+        ForEach-Object { Get-ChildItem $_.FullName -Directory -ErrorAction SilentlyContinue } |
+        Sort-Object { try { [version]($_.Name -replace '-.*$', '') } catch { [version]'0.0' } } -Descending |
+        Where-Object { Test-Path (Join-Path $_.FullName 'tools\qt\bin\windeployqt.exe') } |
+        Select-Object -First 1
+    if (-not $package) { return }
+    $exe = Join-Path $bin 'Seamstress.exe'
+    if (-not (Test-Path $exe)) { return }
+    Say 'Running windeployqt again, with its output, to show why the deployment failed'
+    & (Join-Path $package.FullName 'tools\qt\bin\windeployqt.exe') --qmldir (Resolve-Path 'src\Seamstress.App').Path `
+        --no-translations --release --no-compiler-runtime $exe
+    Write-Host "    windeployqt exited with $LASTEXITCODE"
+}
+
 # Deploys the ARM64 Qt next to a cross-compiled build. The bridge would run the ARM64 Qt's own windeployqt, which an
 # x64 PC cannot start, so the x64 Qt's windeployqt is pointed at the ARM64 Qt instead.
 function Invoke-CrossDeploy {
@@ -223,6 +255,12 @@ function Invoke-Build {
     if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
         Fail 'The .NET SDK 8 or newer is required: https://dotnet.microsoft.com/download'
     }
+    if (-not (Test-MsvcRuntime)) {
+        Write-Host 'warning: the Microsoft Visual C++ 2015-2022 Redistributable (x64) is not installed.' -ForegroundColor Yellow
+        Write-Host '    The bridge''s Qt tools and the application itself need it; without it the build fails at the' -ForegroundColor Yellow
+        Write-Host '    deployment step with "Error deploying Qt binaries!", and the app does not start.' -ForegroundColor Yellow
+        Write-Host '    Install it from https://aka.ms/vs/17/release/vc_redist.x64.exe' -ForegroundColor Yellow
+    }
     $compiler = -not $NoCompiler -and (Test-CppToolchain)
     if ($cross) {
         Resolve-ArmQt
@@ -254,7 +292,10 @@ function Invoke-Build {
     Say "Building Seamstress ($Configuration, $Arch)"
     foreach ($target in $targets) {
         & dotnet build $target @options
-        if ($LASTEXITCODE -ne 0) { Fail 'the build failed' }
+        if ($LASTEXITCODE -ne 0) {
+            Show-DeployError
+            Fail 'the build failed'
+        }
     }
     if (-not (Test-Path "$bin\Seamstress.exe")) { Fail "the build finished but $bin\Seamstress.exe is missing" }
     if ($cross) { Invoke-CrossDeploy }
