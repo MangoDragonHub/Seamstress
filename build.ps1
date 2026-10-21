@@ -227,7 +227,7 @@ function Show-DeployError {
 # (vccorlib140.dll is left out: it is only for C++/CX).
 $CrtDlls = @('concrt140.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll', 'msvcp140_atomic_wait.dll',
     'msvcp140_codecvt_ids.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')
-
+}
 # The version of the C++ standard library in a folder, or 0 when it holds none.
 function Get-CrtVersion($dir) {
     $file = Join-Path $dir 'msvcp140.dll'
