@@ -41,18 +41,25 @@ public partial class AppController
             if (!garment.Expanded)
                 continue;
 
+            var order = garment.OrderedLayerIds();
             void Children(string? parent, int depth)
             {
-                foreach (var group in garment.Groups.Where(g => g.ParentId == parent))
+                foreach (string id in order)
                 {
-                    bool any = garment.Groups.Any(g => g.ParentId == group.Id) || garment.Pieces.Any(p => p.GroupId == group.Id);
-                    Row(group.Id, "group", group.Name, depth, group.Visible, group.Expanded, _workspace.SelectedLayerId == group.Id, any,
-                        $",\"garment\":{Q(garment.Id)},\"parentId\":{Q(group.ParentId)}");
-                    if (group.Expanded)
-                        Children(group.Id, depth + 1);
-                }
-                foreach (var piece in garment.Pieces.Where(p => p.GroupId == parent))
-                {
+                    if (garment.FindGroup(id) is { } group)
+                    {
+                        if (group.ParentId != parent)
+                            continue;
+                        bool any = garment.Groups.Any(g => g.ParentId == group.Id) || garment.Pieces.Any(p => p.GroupId == group.Id);
+                        Row(group.Id, "group", group.Name, depth, group.Visible, group.Expanded, _workspace.SelectedLayerId == group.Id, any,
+                            $",\"garment\":{Q(garment.Id)},\"parentId\":{Q(group.ParentId)}");
+                        if (group.Expanded)
+                            Children(group.Id, depth + 1);
+                        continue;
+                    }
+                    var piece = garment.FindPiece(id);
+                    if (piece == null || piece.GroupId != parent)
+                        continue;
                     var material = doc.FindMaterial(piece.MaterialId);
                     Row(piece.Id, "piece", piece.Name, depth, piece.Visible, false, _workspace.SelectedPieces.Contains(piece.Id), false,
                         $",\"garment\":{Q(garment.Id)},\"groupId\":{Q(piece.GroupId)},\"color\":{Q(material?.Color ?? "#C8CED8")}");

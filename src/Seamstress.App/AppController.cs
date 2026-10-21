@@ -696,8 +696,11 @@ public partial class AppController : INotifyPropertyChanged
 
     public void Ungroup(string groupId) => _workspace.Ungroup(groupId);
     public void MoveToGroup(string id, string groupId) => _workspace.MoveToGroup(id, string.IsNullOrEmpty(groupId) ? null : groupId);
-    public void MoveLayer(string id, string garmentId, string groupId) => _workspace.MoveLayer(
-        id, string.IsNullOrEmpty(garmentId) ? null : garmentId, string.IsNullOrEmpty(groupId) ? null : groupId);
+    /// <summary>Moves a layer, and the rest of the selected pieces when it is one of them.</summary>
+    public void MoveLayer(string id, string garmentId, string groupId, string beforeId) => _workspace.MoveLayers(
+        _workspace.LayersToMove(id), string.IsNullOrEmpty(garmentId) ? null : garmentId,
+        string.IsNullOrEmpty(groupId) ? null : groupId, string.IsNullOrEmpty(beforeId) ? null : beforeId);
+    public int LayersToMoveCount(string id) => _workspace.LayersToMove(id).Count;
     public void Rename(string id, string name) => _workspace.Rename(id, name);
     public void SetVisible(string id, bool visible) => _workspace.SetVisible(id, visible);
     public void SetExpanded(string id, bool expanded) => _workspace.SetExpanded(id, expanded);

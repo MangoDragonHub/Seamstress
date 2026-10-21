@@ -527,7 +527,8 @@ colour).
 | Hide or show | Click the circle at the right of the row. Hidden garments are neither simulated nor exported |
 | Fold a garment or group | Click the arrow at the left |
 | Group pieces | Select them, then **Ctrl+G** or right-click ▸ **Group Selected Pieces** |
-| Move into a group | Right-click ▸ **Move to Group**. Groups can be nested |
+| Move into a group | Drag the row (or its **⋮⋮** handle) onto the middle of a group, or onto a garment for its top level. Or right-click ▸ **Move to Group**. Groups can be nested |
+| Reorder | Drag the row onto the top or bottom edge of another row; a line shows where it will go. Works across groups and garments. Dragging one of several selected pieces (or using **Move to Group** on it) moves them all, side by side and in their current order |
 | Ungroup | Right-click the group ▸ **Ungroup**; its contents move up one level |
 | Link for simulation | The **⇄** button on a garment row (see [Simulation](#which-garments-are-simulated)) |
 | Add | **+ Garment** and **+ Group** at the bottom |

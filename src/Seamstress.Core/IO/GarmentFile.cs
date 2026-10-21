@@ -110,6 +110,14 @@ public static class GarmentFile
                     WritePiece(w, p);
                 w.WriteEndArray();
 
+                // Order of groups and pieces among their siblings in the layers panel.
+                var order = g.OrderedLayerIds();
+                if (g.LayerOrder.Count > 0)
+                {
+                    w.WritePropertyName("layerOrder");
+                    w.WriteRawValue("[" + string.Join(", ", order.Select(Quote)) + "]");
+                }
+
                 // "edge" n is the edge that starts at point n of the piece (counting from 0, outline first, then holes).
                 w.WritePropertyName("seams");
                 w.WriteRawValue(Lines(g.Seams.Select(s =>
@@ -282,6 +290,14 @@ public static class GarmentFile
             }
             foreach (var p in Items(g, "pieces"))
                 garment.Pieces.Add(ReadPiece(p));
+            if (g.TryGetProperty("layerOrder", out var layerOrder) && layerOrder.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var id in layerOrder.EnumerateArray())
+                {
+                    if (id.ValueKind == JsonValueKind.String && id.GetString() is { } value)
+                        garment.LayerOrder.Add(value);
+                }
+            }
             foreach (var s in Items(g, "seams"))
             {
                 var seam = new Seam();

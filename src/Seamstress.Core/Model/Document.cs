@@ -84,6 +84,12 @@ public sealed class Garment
     public List<PatternPiece> Pieces { get; set; } = new();
     public List<Seam> Seams { get; set; } = new();
 
+    /// <summary>
+    /// Ids of groups and pieces in the order the layers panel lists them among their siblings. Layers missing from it
+    /// (new ones, or everything in files saved before layers could be reordered) follow the listed ones, groups first.
+    /// </summary>
+    public List<string> LayerOrder { get; set; } = new();
+
     public Garment Clone() => new()
     {
         Id = Id,
@@ -96,6 +102,7 @@ public sealed class Garment
         Groups = Groups.Select(g => g.Clone()).ToList(),
         Pieces = Pieces.Select(p => p.Clone()).ToList(),
         Seams = Seams.Select(s => s.Clone()).ToList(),
+        LayerOrder = new List<string>(LayerOrder),
     };
 
     public PatternPiece? FindPiece(string? id) => Pieces.FirstOrDefault(p => p.Id == id);
@@ -103,6 +110,44 @@ public sealed class Garment
 
     public float EffectiveParticleDistance(PatternPiece piece)
         => Math.Clamp(piece.ParticleDistance ?? ParticleDistance, 0.3f, 20f);
+
+    /// <summary>Every group and piece id in layers-panel order; only the order among siblings is meaningful.</summary>
+    public List<string> OrderedLayerIds()
+    {
+        var rank = new Dictionary<string, int>();
+        for (int i = 0; i < LayerOrder.Count; i++)
+            rank.TryAdd(LayerOrder[i], i);
+        return Groups.Select(g => g.Id).Concat(Pieces.Select(p => p.Id))
+            .Select((id, i) => (id, i))
+            .OrderBy(t => rank.TryGetValue(t.id, out int r) ? r : LayerOrder.Count + t.i)
+            .Select(t => t.id)
+            .ToList();
+    }
+
+    /// <summary>Every group and piece id from top to bottom, as the layers panel lists them with every group open.</summary>
+    public List<string> LayerTree()
+    {
+        var order = OrderedLayerIds();
+        var result = new List<string>();
+        void Visit(string? parentId)
+        {
+            foreach (string id in order)
+            {
+                if (FindPiece(id) is { } piece)
+                {
+                    if (piece.GroupId == parentId)
+                        result.Add(id);
+                }
+                else if (FindGroup(id) is { } group && group.ParentId == parentId)
+                {
+                    result.Add(id);
+                    Visit(id);
+                }
+            }
+        }
+        Visit(null);
+        return result;
+    }
 
     /// <summary>True when <paramref name="groupId"/> is <paramref name="ancestorId"/> or nested inside it.</summary>
     public bool IsGroupWithin(string? groupId, string ancestorId)

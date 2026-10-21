@@ -1,6 +1,7 @@
 {
   " and ": "と",
   "%1 (your login name) when empty": "空欄の場合は %1（ログイン名）",
+  "%1 and %2 more": "%1 ほか %2 件",
   "%1 faces": "%1 面",
   "%1 faces  ·  %2 verts": "%1 面  ·  %2 頂点",
   "%1 faces total": "合計 %1 面",
