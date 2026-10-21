@@ -190,8 +190,6 @@ function Test-CppToolchain {
     $found = & $vswhere -latest -products * -requires $component -property installationPath
     return [bool]$found
 }
-
-<<<<<<< Updated upstream
 # The bridge's Qt tools (windeployqt) and the Qt DLLs they copy import the MSVC runtime
 # (vcruntime140.dll and friends), which the bridge package does not ship. Without it windeployqt.exe cannot
 # even start, and the build fails at the deployment step with the bare "Error deploying Qt binaries!".
@@ -222,7 +220,6 @@ function Show-DeployError {
     & (Join-Path $package.FullName 'tools\qt\bin\windeployqt.exe') --qmldir (Resolve-Path 'src\Seamstress.App').Path `
         --no-translations --release --no-compiler-runtime $exe
     Write-Host "    windeployqt exited with $LASTEXITCODE"
-=======
 # The Visual C++ runtime the native launcher links against. The bridge deploys Qt with --no-compiler-runtime
 # (Qt.Bridge.targets), so nothing else puts these next to the executable, and on a PC without the VC++ Redistributable
 # Windows stops with "The code execution cannot proceed because MSVCP140.dll was not found" -- no .NET runtime helps.
