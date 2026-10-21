@@ -830,6 +830,186 @@ public class DocumentTests
         Assert.True(group.Expanded);
     }
 
+    /// <summary>Ids directly inside a group (or at the top level when null), in layers-panel order.</summary>
+    private static List<string> LayersIn(Garment garment, string? parentId) => garment.OrderedLayerIds()
+        .Where(id => garment.FindPiece(id) is { } p ? p.GroupId == parentId : garment.FindGroup(id)!.ParentId == parentId)
+        .ToList();
+
+    [Fact]
+    public void LayersCanBeReorderedAndPlacedAboveGroups()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        var shirt = ws.Document.Garments[0];
+        var sleeves = Assert.Single(shirt.Groups);
+        var top = LayersIn(shirt, null);
+        Assert.Equal(sleeves.Id, top[0]); // groups come first until something is reordered
+        string front = top[1], back = top[2];
+
+        // A piece can go above a group, and before another piece.
+        ws.MoveLayer(back, null, null, sleeves.Id);
+        Assert.Equal(new[] { back, sleeves.Id, front }, LayersIn(ws.Document.Garments[0], null));
+        ws.MoveLayer(front, null, null, back);
+        Assert.Equal(new[] { front, back, sleeves.Id }, LayersIn(ws.Document.Garments[0], null));
+
+        // No position means the end.
+        ws.MoveLayer(front, null, null);
+        Assert.Equal(new[] { back, sleeves.Id, front }, LayersIn(ws.Document.Garments[0], null));
+
+        // Inside a group, and into a group at a given spot.
+        var inner = LayersIn(ws.Document.Garments[0], sleeves.Id);
+        ws.MoveLayer(inner[1], null, sleeves.Id, inner[0]);
+        Assert.Equal(new[] { inner[1], inner[0] }, LayersIn(ws.Document.Garments[0], sleeves.Id));
+        ws.MoveLayer(back, null, sleeves.Id, inner[0]);
+        Assert.Equal(new[] { inner[1], back, inner[0] }, LayersIn(ws.Document.Garments[0], sleeves.Id));
+
+        ws.History.Undo();
+        Assert.Equal(new[] { inner[1], inner[0] }, LayersIn(ws.Document.Garments[0], sleeves.Id));
+        Assert.Equal(new[] { back, sleeves.Id, front }, LayersIn(ws.Document.Garments[0], null));
+    }
+
+    [Fact]
+    public void DroppingALayerWhereItAlreadyIsAddsNoUndoStep()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        var shirt = ws.Document.Garments[0];
+        var top = LayersIn(shirt, null);
+        string lastStep = ws.History.UndoName;
+
+        ws.MoveLayer(top[1], null, null, top[2]);
+        ws.MoveLayer(top[2], null, null);
+        ws.MoveLayer(top[1], null, null, top[1]);
+
+        Assert.Equal(lastStep, ws.History.UndoName);
+    }
+
+    [Fact]
+    public void MovingToAnotherGarmentCanChooseThePosition()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        ws.AddTemplate("Skirt");
+        var shirt = ws.Document.Garments[0];
+        var skirt = ws.Document.Garments[1];
+        var sleeves = Assert.Single(shirt.Groups);
+        var inner = LayersIn(shirt, sleeves.Id);
+        ws.MoveLayer(inner[1], null, sleeves.Id, inner[0]);
+        string first = LayersIn(ws.Document.Garments[1], null)[0];
+
+        ws.MoveLayer(sleeves.Id, skirt.Id, null, first);
+
+        skirt = ws.Document.Garments[1];
+        Assert.Equal(sleeves.Id, LayersIn(skirt, null)[0]);
+        Assert.Equal(first, LayersIn(skirt, null)[1]);
+        Assert.Equal(new[] { inner[1], inner[0] }, LayersIn(skirt, sleeves.Id)); // the group keeps its own order
+        Assert.DoesNotContain(sleeves.Id, ws.Document.Garments[0].LayerOrder);
+    }
+
+    [Fact]
+    public void DraggingOneOfSeveralSelectedPiecesMovesThemAllTogether()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        var shirt = ws.Document.Garments[0];
+        var sleeves = Assert.Single(shirt.Groups);
+        var top = LayersIn(shirt, null);
+        string front = top[1], back = top[2];
+        string sleeve = LayersIn(shirt, sleeves.Id)[1];
+
+        ws.SelectPiece(back);
+        ws.SelectPiece(sleeve, additive: true);
+        var ids = ws.LayersToMove(back);
+        Assert.Equal(back, ids[0]);
+        Assert.Equal(2, ids.Count);
+
+        // They land side by side in the order the panel showed them: the sleeve was above the back.
+        ws.MoveLayers(ids, null, null, front);
+        Assert.Equal(new[] { sleeves.Id, sleeve, back, front }, LayersIn(ws.Document.Garments[0], null));
+
+        // Dropping the selection where it already is changes nothing.
+        string lastStep = ws.History.UndoName;
+        ws.MoveLayers(ws.LayersToMove(sleeve), null, null, back);
+        Assert.Equal(lastStep, ws.History.UndoName);
+
+        ws.History.Undo();
+        Assert.Equal(sleeves.Id, ws.Document.Garments[0].FindPiece(sleeve)!.GroupId);
+        Assert.Equal(top, LayersIn(ws.Document.Garments[0], null));
+    }
+
+    [Fact]
+    public void OnlySelectedPiecesMoveTogether()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        var shirt = ws.Document.Garments[0];
+        var sleeves = Assert.Single(shirt.Groups);
+        string front = LayersIn(shirt, null)[1], back = LayersIn(shirt, null)[2];
+
+        ws.SelectPiece(front);
+        Assert.Equal(new[] { back }, ws.LayersToMove(back)); // not part of the selection
+        ws.SelectLayer(sleeves.Id);
+        string sleeve = LayersIn(shirt, sleeves.Id)[0];
+        Assert.Equal(new[] { sleeve }, ws.LayersToMove(sleeve)); // selected only because its group is
+    }
+
+    [Fact]
+    public void MovingSeveralPiecesToAnotherGarmentKeepsTheSeamsBetweenThem()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        ws.AddTemplate("Skirt");
+        var shirt = ws.Document.Garments[0];
+        var skirt = ws.Document.Garments[1];
+        var seam = shirt.Seams.First(s => s.A.PieceId != s.B.PieceId
+            && shirt.FindPiece(s.A.PieceId)!.GroupId == null && shirt.FindPiece(s.B.PieceId)!.GroupId == null);
+        var pair = new[] { seam.A.PieceId, seam.B.PieceId };
+        int between = shirt.Seams.Count(s => pair.Contains(s.A.PieceId) && pair.Contains(s.B.PieceId));
+
+        ws.MoveLayers(pair, skirt.Id, null);
+
+        shirt = ws.Document.Garments[0];
+        skirt = ws.Document.Garments[1];
+        Assert.All(pair, id => Assert.NotNull(skirt.FindPiece(id)));
+        Assert.Equal(between, skirt.Seams.Count(s => pair.Contains(s.A.PieceId) && pair.Contains(s.B.PieceId)));
+        Assert.DoesNotContain(shirt.Seams, s => pair.Contains(s.A.PieceId) || pair.Contains(s.B.PieceId));
+        Assert.Equal(pair.Order(), LayersIn(skirt, null).TakeLast(2).Order());
+    }
+
+    [Fact]
+    public void APieceMovedWithItsGroupStaysInside()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        var shirt = ws.Document.Garments[0];
+        var sleeves = Assert.Single(shirt.Groups);
+        string sleeve = LayersIn(shirt, sleeves.Id)[0];
+        var group = ws.AddGroup(shirt.Id)!;
+
+        ws.MoveLayers(new[] { sleeve, sleeves.Id }, null, group.Id);
+
+        shirt = ws.Document.Garments[0];
+        Assert.Equal(group.Id, shirt.FindGroup(sleeves.Id)!.ParentId);
+        Assert.Equal(sleeves.Id, shirt.FindPiece(sleeve)!.GroupId);
+    }
+
+    [Fact]
+    public void LayerOrderSurvivesSaving()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        var shirt = ws.Document.Garments[0];
+        var top = LayersIn(shirt, null);
+        Assert.DoesNotContain("layerOrder", GarmentFile.Serialize(ws.Document));
+        ws.MoveLayer(top[2], null, null, top[0]);
+
+        string json = GarmentFile.Serialize(ws.Document);
+        var loaded = GarmentFile.Deserialize(json);
+
+        Assert.Equal(new[] { top[2], top[0], top[1] }, LayersIn(loaded.Garments[0], null));
+        Assert.Equal(json, GarmentFile.Serialize(loaded));
+    }
+
     [Fact]
     public void SliderDragMergesIntoOneUndoStep()
     {

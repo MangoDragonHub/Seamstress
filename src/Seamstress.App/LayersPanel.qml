@@ -31,17 +31,49 @@ Pane {
         function onLayersRevisionChanged() { Qt.callLater(root.refresh) }
     }
 
-    // Layers can be dragged onto a garment (its top level) or a group, in any garment.
-    function canDrop(dragSource, targetRow) {
+    // Where a dragged layer lands when dropped at height y of a row: dropping on a garment puts it at the end of the
+    // garment's top level, the middle of a group puts it inside that group, and the upper or lower part of a row puts
+    // it just before or after that row among its siblings, in any garment. Null when it cannot go there.
+    function dropTarget(dragSource, to, y, height) {
         if (!dragSource || dragSource.modelData === undefined)
-            return false
+            return null
         const from = dragSource.modelData
-        if (from.kind === "garment" || from.id === targetRow.id)
-            return false
-        if (targetRow.kind === "group" && from.kind === "group"
-            && (targetRow.id === from.id || isDescendant(targetRow.id, from.id)))
-            return false
-        return true
+        if (from.kind === "garment" || from.id === to.id)
+            return null
+        let place
+        if (to.kind === "garment") {
+            place = { zone: "into", garment: to.id, group: "", before: "" }
+        } else {
+            const parent = (to.kind === "group" ? to.parentId : to.groupId) || ""
+            const edge = to.kind === "group" ? 0.25 : 0.5
+            if (y < height * edge) {
+                place = { zone: "before", garment: to.garment, group: parent, before: to.id }
+            } else if (y >= height * (1 - edge)) {
+                // Just below an open group is the top of its contents.
+                if (to.kind === "group" && to.expanded && to.hasChildren)
+                    place = { zone: "after", garment: to.garment, group: to.id, before: firstChild(to) }
+                else
+                    place = { zone: "after", garment: to.garment, group: parent, before: nextSibling(to) }
+            } else {
+                place = { zone: "into", garment: to.garment, group: to.id, before: "" }
+            }
+        }
+        if (from.kind === "group" && place.group !== "" && (place.group === from.id || isDescendant(place.group, from.id)))
+            return null
+        return place
+    }
+    function nextSibling(r) {
+        for (let i = rows.findIndex(x => x.id === r.id) + 1; i > 0 && i < rows.length; i++) {
+            if (rows[i].depth < r.depth)
+                break
+            if (rows[i].depth === r.depth)
+                return rows[i].id
+        }
+        return ""
+    }
+    function firstChild(r) {
+        const i = rows.findIndex(x => x.id === r.id)
+        return i >= 0 && i + 1 < rows.length && rows[i + 1].depth === r.depth + 1 ? rows[i + 1].id : ""
     }
     function isDescendant(groupId, ancestorId) {
         let current = rows.find(r => r.id === groupId)
@@ -78,10 +110,19 @@ Pane {
                 required property var modelData
                 width: list.width
                 height: 26
-                property bool dropHover: false
+                property string dropZone: ""
                 property real grabX: 0
                 property real grabY: 0
-                color: row.dropHover ? Qt.alpha(palette.highlight, 0.7)
+                property int dragCount: 1  // dragging one of several selected pieces takes them all
+                function startDrag(x, y) {
+                    grabX = x
+                    grabY = y
+                    dragCount = App.layersToMoveCount(modelData.id)
+                    const p = mapToItem(Overlay.overlay, 0, 0)
+                    dragProxy.x = p.x
+                    dragProxy.y = p.y
+                }
+                color: row.dropZone === "into" ? Qt.alpha(palette.highlight, 0.7)
                      : (modelData.selected ? Qt.alpha(palette.highlight, 0.45)
                      : (modelData.kind === "garment" && modelData.active ? Qt.alpha(palette.highlight, 0.14) : "transparent"))
 
@@ -106,7 +147,7 @@ Pane {
                         anchors.rightMargin: 8
                         verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
-                        text: row.modelData.name
+                        text: row.dragCount > 1 ? tr("%1 and %2 more").arg(row.modelData.name).arg(row.dragCount - 1) : row.modelData.name
                         color: palette.highlightedText
                     }
 
@@ -126,13 +167,8 @@ Pane {
                     drag.threshold: 12
                     drag.smoothed: false
                     onPressed: (e) => {
-                        if (e.button === Qt.LeftButton && row.modelData.kind !== "garment") {
-                            row.grabX = e.x
-                            row.grabY = e.y
-                            const p = row.mapToItem(Overlay.overlay, 0, 0)
-                            dragProxy.x = p.x
-                            dragProxy.y = p.y
-                        }
+                        if (e.button === Qt.LeftButton && row.modelData.kind !== "garment")
+                            row.startDrag(e.x, e.y)
                     }
                     onClicked: (e) => {
                         if (e.button === Qt.RightButton) {
@@ -155,21 +191,35 @@ Pane {
                 DropArea {
                     anchors.fill: parent
                     keys: ["seamstress-layer"]
+                    function track(drag) {
+                        const place = root.dropTarget(drag.source, row.modelData, drag.y, row.height)
+                        row.dropZone = place ? place.zone : ""
+                    }
                     onEntered: (drag) => {
-                        row.dropHover = root.canDrop(drag.source, row.modelData)
-                        if (row.dropHover)
-                            drag.accept()
+                        drag.accept()
+                        track(drag)
                     }
-                    onExited: row.dropHover = false
+                    onPositionChanged: (drag) => track(drag)
+                    onExited: row.dropZone = ""
                     onDropped: (drop) => {
-                        row.dropHover = false
-                        if (!drop.source || drop.source.modelData === undefined || !root.canDrop(drop.source, row.modelData))
-                            return
-                        const from = drop.source.modelData, to = row.modelData
-                        const garmentId = to.kind === "garment" ? to.id : to.garment
-                        const groupId = to.kind === "garment" ? "" : (to.kind === "group" ? to.id : (to.groupId || ""))
-                        App.moveLayer(from.id, garmentId, groupId)
+                        row.dropZone = ""
+                        const place = root.dropTarget(drop.source, row.modelData, drop.y, row.height)
+                        if (place)
+                            App.moveLayer(drop.source.modelData.id, place.garment, place.group, place.before)
                     }
+                }
+
+                // Insertion line for dropping before or after this row; below an open group it is indented to show
+                // the layer goes in at the top of the group.
+                Rectangle {
+                    visible: row.dropZone === "before" || row.dropZone === "after"
+                    x: 6 + (row.modelData.depth + (row.dropZone === "after" && row.modelData.kind === "group"
+                            && row.modelData.expanded && row.modelData.hasChildren ? 1 : 0)) * 14
+                    width: row.width - x - 6
+                    height: 2
+                    y: row.dropZone === "before" ? 0 : row.height - height
+                    z: 2
+                    color: palette.highlight
                 }
 
                 RowLayout {
@@ -178,7 +228,7 @@ Pane {
                     anchors.rightMargin: 6
                     spacing: 4
 
-                    // Drag handle: pieces and groups can be dragged into a group or another garment.
+                    // Drag handle: pieces and groups can be dragged into a group or another garment, or reordered.
                     Label {
                         Layout.preferredWidth: 8
                         text: "⋮⋮"
@@ -196,11 +246,7 @@ Pane {
                             cursorShape: Qt.OpenHandCursor
                             onPressed: (e) => {
                                 const p = mapToItem(row, e.x, e.y)
-                                row.grabX = p.x
-                                row.grabY = p.y
-                                const g = row.mapToItem(Overlay.overlay, 0, 0)
-                                dragProxy.x = g.x
-                                dragProxy.y = g.y
+                                row.startDrag(p.x, p.y)
                             }
                             onReleased: if (dragProxy.Drag.active) dragProxy.Drag.drop()
                         }
@@ -332,14 +378,14 @@ Pane {
             id: moveMenu
             title: tr("Move to Group")
             enabled: root.menuKind !== "garment"
-            MenuItem { text: tr("(Top level)"); onTriggered: App.moveToGroup(root.menuId, "") }
+            MenuItem { text: tr("(Top level)"); onTriggered: App.moveLayer(root.menuId, "", "", "") }
             Instantiator {
                 model: root.groupChoices
                 delegate: MenuItem {
                     required property var modelData
                     text: modelData.name
                     enabled: modelData.id !== root.menuId
-                    onTriggered: App.moveLayer(root.menuId, modelData.garment, modelData.id)
+                    onTriggered: App.moveLayer(root.menuId, modelData.garment, modelData.id, "")
                 }
                 onObjectAdded: (index, object) => moveMenu.insertItem(index + 1, object)
                 onObjectRemoved: (index, object) => moveMenu.removeItem(object)

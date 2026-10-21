@@ -1,6 +1,7 @@
 {
   " and ": "和",
   "%1 (your login name) when empty": "留空时为 %1（你的登录名）",
+  "%1 and %2 more": "%1 及另外 %2 项",
   "%1 faces": "%1 个面",
   "%1 faces  ·  %2 verts": "%1 个面  ·  %2 个顶点",
   "%1 faces total": "共 %1 个面",

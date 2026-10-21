@@ -1,6 +1,7 @@
 {
   " and ": " et ",
   "%1 (your login name) when empty": "%1 (votre nom d’utilisateur) si vide",
+  "%1 and %2 more": "%1 et %2 de plus",
   "%1 faces": "%1 faces",
   "%1 faces  ·  %2 verts": "%1 faces  ·  %2 sommets",
   "%1 faces total": "%1 faces au total",
