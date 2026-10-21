@@ -280,7 +280,6 @@ function Add-CrtRuntime($destination) {
         if (Test-Path $file) { Copy-Item $file $destination -Force; $copied++ }
     }
     Say "Added the Visual C++ runtime $version ($copied files)"
->>>>>>> Stashed changes
 }
 
 # Deploys the ARM64 Qt next to a cross-compiled build. The bridge would run the ARM64 Qt's own windeployqt, which an
