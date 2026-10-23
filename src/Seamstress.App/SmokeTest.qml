@@ -218,6 +218,40 @@ QtObject {
               && App.undoText === "Undo Cut hole" && selection().count === 1)
         check("hole points shown for editing", holed[0].points.length === 16)
 
+        // Pinning: the brush exposes the cloth vertices, pins them, and Unpin All removes them again.
+        const pinPiece = selection().piece
+        const pinData = JSON.parse(App.pinVertices(pinPiece.id))
+        const pinCount = pinData.length / 6
+        check("pin brush lists mesh vertices", pinData.length > 0 && pinData.length % 6 === 0)
+        App.pinBrush = true
+        check("pin brush on", App.pinBrush)
+        App.pinClick(pinPiece.id, pinData[0], pinData[1], pinData[2], false)
+        check("pin click selects the nearest vertex", App.pinSelectionCount === 1)
+        App.pinClick(pinPiece.id, pinData[0], pinData[1], pinData[2], true)
+        check("shift-click removes it again", App.pinSelectionCount === 0)
+        const boxed = viewport.pinBoxSelect(pinPiece.id, 0, 0, viewport.width, viewport.height)
+        check("QML box selection projects vertices", boxed > 0 && boxed <= pinCount && App.pinSelectionCount === boxed)
+        const everyVertex = Array.from({ length: pinCount }, (_, i) => i).join(",")
+        App.pinBoxSelect(pinPiece.id, everyVertex, false)
+        check("vertices selected with the brush", App.pinSelectionCount === pinCount)
+        const selectedOverlay = JSON.parse(App.viewportModels())
+        check("brush selection highlighted", selectedOverlay.pinSelection !== "")
+        App.pinSelectedVertices()
+        check("all vertices pinned", App.pinSelectionCount === 0 && App.undoText.indexOf("Pin") >= 0)
+        const pinnedOverlay = JSON.parse(App.viewportModels())
+        check("pinned vertices highlighted", pinnedOverlay.pins !== "" && pinnedOverlay.pinSelection === "")
+        App.undo()
+        check("pins undone", JSON.parse(App.viewportModels()).pins === "")
+        App.redo()
+        check("pins redone", JSON.parse(App.viewportModels()).pins !== "")
+        App.unpinAll()
+        check("unpin all", JSON.parse(App.viewportModels()).pins === "")
+        viewport.pinMenuRequested()
+        check("pin menu opens", pinMenu.visible)
+        pinMenu.close()
+        App.pinBrush = false
+        check("pin brush off", !App.pinBrush)
+
         // Send to MakeHuman suggests the garment's name and says where the asset would go (nothing is written here).
         check("send dialog suggests the garment name", App.activeGarmentName() !== "")
         const info = JSON.parse(App.makeHumanAssetInfo("Summer Skirt/v2"))

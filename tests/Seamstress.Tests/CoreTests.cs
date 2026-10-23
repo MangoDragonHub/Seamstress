@@ -228,6 +228,8 @@ public class DocumentTests
         var mesh = ws.MeshFor(doc.Garments[1]).Pieces[0];
         doc.Garments[1].Pieces[0].Drape = Mesher.Arrange(doc.Garments[1].Pieces[0], mesh).SelectMany(p => new[] { p.X, p.Y, p.Z }).ToArray();
         doc.Garments[1].Pieces[0].DrapeKey = mesh.Key;
+        doc.Garments[1].Pieces[0].Pins = new HashSet<int> { 0, 3, 7 };
+        doc.Garments[1].Pieces[0].PinKey = mesh.Key;
 
         string json = GarmentFile.Serialize(doc);
         var loaded = GarmentFile.Deserialize(json);
@@ -238,6 +240,8 @@ public class DocumentTests
         Assert.Equal(doc.Garments[0].Groups.Count, loaded.Garments[0].Groups.Count);
         Assert.NotNull(loaded.Garments[0].Pieces[0].Points[2].Curve);
         Assert.Equal(mesh.Key, loaded.Garments[1].Pieces[0].DrapeKey);
+        Assert.Equal(new[] { 0, 3, 7 }, loaded.Garments[1].Pieces[0].Pins.OrderBy(i => i));
+        Assert.Equal(mesh.Key, loaded.Garments[1].Pieces[0].PinKey);
         Assert.Contains("\"at\": [", json);
     }
 

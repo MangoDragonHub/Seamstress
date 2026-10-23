@@ -7,6 +7,7 @@ using System.Text.Json;
 using Qt.Quick;
 using Seamstress.Core;
 using Seamstress.Core.Editing;
+using Seamstress.Core.Geometry;
 using Seamstress.Core.IO;
 using Seamstress.Core.Model;
 using Seamstress.Core.Simulation;
@@ -42,6 +43,7 @@ public partial class AppController : INotifyPropertyChanged
     private string _simInfo = "";
     private string _lastError = "";
     private bool _simulateAll;
+    private bool _pinBrush;
     private bool _refreshQueued;
     private bool _startWhenAvatarReady;
 
@@ -87,6 +89,7 @@ public partial class AppController : INotifyPropertyChanged
             Notify(nameof(Simulating));
             Notify(nameof(HasFile));
             Notify(nameof(AvatarType));
+            Notify(nameof(PinSelectionCount));
             EnsureAvatar();
         }
         finally
@@ -160,6 +163,26 @@ public partial class AppController : INotifyPropertyChanged
         get => _simulateAll;
         set { if (_simulateAll != value) { _simulateAll = value; Notify(); } }
     }
+
+    /// <summary>The 3D pin brush: clicks and drags choose cloth vertices instead of pieces.</summary>
+    public bool PinBrush
+    {
+        get => _pinBrush;
+        set
+        {
+            if (_pinBrush == value)
+                return;
+            _pinBrush = value;
+            if (!value)
+                _workspace.ClearPinSelection();
+            Notify();
+            StatusText = value
+                ? Lang.T("Pin: click cloth vertices, or drag a box around them  ·  Right-click: Pin menu")
+                : _editor.Hint;
+        }
+    }
+
+    public int PinSelectionCount => _workspace.PinSelectionCount;
 
     public string CheckerTexture => _viewport.CheckerUrl;
     public string GizmoArrow => _viewport.ArrowUrl;
@@ -391,6 +414,129 @@ public partial class AppController : INotifyPropertyChanged
             _workspace.ClearSelection();
         else
             _workspace.SelectPiece(pieceId, additive);
+    }
+
+    /// <summary>Makes the garment under the pointer the one Simulate acts on, without clearing a brush selection.</summary>
+    public void Activate3D(string pieceId)
+    {
+        if (_workspace.Document.GarmentOfPiece(pieceId) is { } garment)
+            _workspace.SetActiveGarment(garment.Id);
+    }
+
+    // ---------------------------------------------------------------- pinning
+
+    /// <summary>Brush click: selects the cloth vertex nearest to the point picked in the 3D view.</summary>
+    public void PinClick(string pieceId, double x, double y, double z, bool additive)
+    {
+        if (!_pinBrush)
+            return;
+        var garment = _workspace.Document.GarmentOfPiece(pieceId);
+        if (garment == null)
+            return;
+        var piece = garment.FindPiece(pieceId);
+        var mesh = _workspace.MeshFor(garment).Find(pieceId);
+        if (piece == null || mesh == null)
+            return;
+        var positions = Mesher.CurrentPositions(piece, mesh);
+        var point = new Vector3((float)x, (float)y, (float)z);
+        int nearest = -1;
+        float best = float.MaxValue;
+        for (int i = 0; i < positions.Length; i++)
+        {
+            float distance = Vector3.DistanceSquared(positions[i], point);
+            if (distance < best)
+            {
+                best = distance;
+                nearest = i;
+            }
+        }
+        if (nearest < 0)
+        {
+            if (!additive)
+                _workspace.ClearPinSelection();
+            return;
+        }
+        _workspace.SetActiveGarment(garment.Id);
+        if (additive)
+            _workspace.TogglePinVertex(pieceId, nearest);
+        else
+            _workspace.SelectPinVertices(pieceId, new[] { nearest }, false);
+    }
+
+    /// <summary>The vertices of one piece as [x,y,z,nx,ny,nz,...], for the brush's box selection.</summary>
+    public string PinVertices(string pieceId)
+    {
+        var garment = _workspace.Document.GarmentOfPiece(pieceId);
+        if (garment == null)
+            return "[]";
+        var piece = garment.FindPiece(pieceId);
+        var mesh = _workspace.MeshFor(garment).Find(pieceId);
+        if (piece == null || mesh == null)
+            return "[]";
+        var positions = Mesher.CurrentPositions(piece, mesh);
+        var normals = Mesher.ComputeNormals(positions, mesh.ShownTriangles(piece.FlipNormals));
+        var sb = new StringBuilder(positions.Length * 64);
+        sb.Append('[');
+        for (int i = 0; i < positions.Length; i++)
+        {
+            if (i > 0)
+                sb.Append(',');
+            var p = positions[i];
+            var n = normals[i];
+            sb.Append(p.X.ToString("0.#####", CultureInfo.InvariantCulture)).Append(',')
+              .Append(p.Y.ToString("0.#####", CultureInfo.InvariantCulture)).Append(',')
+              .Append(p.Z.ToString("0.#####", CultureInfo.InvariantCulture)).Append(',')
+              .Append(n.X.ToString("0.#####", CultureInfo.InvariantCulture)).Append(',')
+              .Append(n.Y.ToString("0.#####", CultureInfo.InvariantCulture)).Append(',')
+              .Append(n.Z.ToString("0.#####", CultureInfo.InvariantCulture));
+        }
+        return sb.Append(']').ToString();
+    }
+
+    public void PinBoxSelect(string pieceId, string indices, bool additive)
+    {
+        if (!_pinBrush)
+            return;
+        var garment = _workspace.Document.GarmentOfPiece(pieceId);
+        var mesh = garment == null ? null : _workspace.MeshFor(garment).Find(pieceId);
+        if (garment == null || mesh == null)
+            return;
+        var vertices = new List<int>();
+        foreach (string part in indices.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out int index)
+                && index >= 0 && index < mesh.VertexCount)
+                vertices.Add(index);
+        }
+        _workspace.SetActiveGarment(garment.Id);
+        _workspace.SelectPinVertices(pieceId, vertices, additive);
+    }
+
+    public void ClearPinSelection() => _workspace.ClearPinSelection();
+
+    public void PinSelectedVertices()
+    {
+        int count = _workspace.PinSelectedVertices();
+        StatusText = count == 0 ? Lang.T("No vertices selected")
+            : count == 1 ? Lang.T("Pinned 1 vertex")
+            : Lang.F("Pinned {0} vertices", count);
+    }
+
+    public void UnpinSelectedVertices()
+    {
+        bool hadSelection = PinSelectionCount > 0;
+        int count = _workspace.UnpinSelectedVertices();
+        StatusText = count == 0 ? (hadSelection ? Lang.T("No pins to remove") : Lang.T("No vertices selected"))
+            : count == 1 ? Lang.T("Unpinned 1 vertex")
+            : Lang.F("Unpinned {0} vertices", count);
+    }
+
+    public void UnpinAll()
+    {
+        int count = _workspace.UnpinAll();
+        StatusText = count == 0 ? Lang.T("No pins to remove")
+            : count == 1 ? Lang.T("Unpinned 1 vertex")
+            : Lang.F("Unpinned {0} vertices", count);
     }
 
     // Move/rotate handles in the 3D view. Offsets and angles are totals since the drag began.

@@ -159,7 +159,7 @@ maps what you already know to where it lives here.
   it with the Edit Points tool; each part is then its own edge.
 - **Units.** Patterns are in centimetres; 3D positions are in metres. To work in inches instead, switch
   **Measurements** to Imperial in [Preferences](#preferences).
-- **Not available yet:** internal lines and darts, pins, seam allowance, linked symmetric patterns, trims
+- **Not available yet:** internal lines and darts, seam allowance, linked symmetric patterns, trims
   (buttons, zippers), pressure and wind, animation, and avatar posing or measurement editing.
 
 ---
@@ -457,6 +457,27 @@ body.
 - About 5 cm of cloth around the cursor is held; cloth further away is moved only by the fabric pulling on it.
 - Only garments that are being simulated can be pinched. If another garment is the active one and a simulation
   is already running, stop it first or tick **All garments**.
+
+### Pinning the cloth
+
+Pins hold vertices still while the rest of the garment simulates, which is handy for keeping a hem, a strap or
+a neckline where you want it. Turn on **Pin** in the 3D view (or **View ▸ 3D: Pin Vertices**), then:
+
+- **Click** a piece of cloth to select the nearest vertex; the selection is shown in yellow.
+- **Drag a box** across the cloth to select every vertex inside it on the side facing you. A plain click
+  replaces the selection; **Shift-click** or **Ctrl-click** adds a vertex, or removes one that is already
+  selected.
+- **Right-click** the cloth to open the Pin menu: **Pin Selected Vertices**, **Unpin Selected Vertices**,
+  **Clear Vertex Selection**, and **Unpin All on Selected Garments**. Pinned vertices are marked in orange.
+- **Unpin All** (also in the **Simulation** menu) clears every pin on the selected garments. With nothing
+  selected it uses the garment you last clicked in the 3D view.
+
+Pins are applied when the solver starts, so they freeze the cloth from the beginning of the next run. To pin
+after a simulation, let it stop (or stop it), select vertices on the draped cloth, pin them, and simulate
+again: the pinned vertices stay where they are while the rest settles. Each pin or unpin is one undo step.
+
+Pins are saved with the project. Changing a piece's shape or the garment's particle distance rebuilds its
+mesh, which makes the old vertex numbers meaningless, so those edits remove the piece's pins.
 
 ---
 

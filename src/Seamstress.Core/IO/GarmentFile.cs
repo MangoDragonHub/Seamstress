@@ -208,6 +208,15 @@ public static class GarmentFile
             w.WriteRawValue(sb.ToString());
             w.WriteEndObject();
         }
+        if (p.Pins.Count > 0 && p.PinKey != null)
+        {
+            // Vertices held in place during simulation, for the mesh they were chosen on.
+            w.WriteStartObject("pins");
+            w.WriteString("mesh", p.PinKey);
+            w.WritePropertyName("vertices");
+            w.WriteRawValue("[" + string.Join(", ", p.Pins.OrderBy(i => i)) + "]");
+            w.WriteEndObject();
+        }
         w.WriteEndObject();
     }
 
@@ -399,6 +408,17 @@ public static class GarmentFile
                 piece.Drape = values;
                 piece.DrapeKey = Str(drape, "mesh");
             }
+        }
+        if (p.TryGetProperty("pins", out var pins) && pins.ValueKind == JsonValueKind.Object
+            && pins.TryGetProperty("vertices", out var vertices) && vertices.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var vertex in vertices.EnumerateArray())
+            {
+                if (vertex.ValueKind == JsonValueKind.Number && vertex.TryGetInt32(out int index) && index >= 0)
+                    piece.Pins.Add(index);
+            }
+            if (piece.Pins.Count > 0)
+                piece.PinKey = Str(pins, "mesh");
         }
         return piece;
     }

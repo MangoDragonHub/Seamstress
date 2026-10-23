@@ -264,6 +264,15 @@ public sealed class PatternPiece
     /// <summary>Fingerprint of the mesh topology the drape belongs to.</summary>
     public string? DrapeKey { get; set; }
 
+    /// <summary>
+    /// Simulation vertices held in place. A pinned vertex is not moved by the cloth solver until it is unpinned.
+    /// The indices are only meaningful for the mesh identified by <see cref="PinKey"/>.
+    /// </summary>
+    public HashSet<int> Pins { get; set; } = new();
+
+    /// <summary>Fingerprint of the mesh topology the pins belong to.</summary>
+    public string? PinKey { get; set; }
+
     public PatternPiece Clone() => new()
     {
         Id = Id,
@@ -281,6 +290,8 @@ public sealed class PatternPiece
         FlipNormals = FlipNormals,
         Drape = Drape, // drape arrays are replaced, never mutated in place, so sharing is safe
         DrapeKey = DrapeKey,
+        Pins = new HashSet<int>(Pins),
+        PinKey = PinKey,
     };
 
     /// <summary>Points of the outline and of every hole.</summary>
@@ -349,6 +360,12 @@ public sealed class PatternPiece
     {
         Drape = null;
         DrapeKey = null;
+    }
+
+    public void ClearPins()
+    {
+        Pins.Clear();
+        PinKey = null;
     }
 }
 

@@ -158,6 +158,14 @@ public sealed partial class ClothSolver
                 solver._clothThickness[p] = MathF.Max(physics.Thickness, 0.5f) * 0.001f;
                 solver._pieceOf[p] = pi;
             }
+            if (cloth.Simulated && cloth.Piece.PinKey == mesh.Key)
+            {
+                foreach (int index in cloth.Piece.Pins)
+                {
+                    if (index >= 0 && index < mesh.VertexCount)
+                        solver._invMass[off + index] = 0f;
+                }
+            }
             foreach (int index in mesh.Triangles)
                 triangles.Add(off + index);
             if (!cloth.Simulated)

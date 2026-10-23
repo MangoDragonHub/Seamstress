@@ -21,6 +21,14 @@ public sealed class Workspace
     public string? SelectedSeamId { get; private set; }
     public (string PieceId, int Index)? SelectedPoint { get; private set; }
 
+    /// <summary>Mesh vertices selected with the 3D pin brush, by piece id; not part of the document.</summary>
+    public Dictionary<string, HashSet<int>> PinSelection { get; } = new();
+    private readonly Dictionary<string, string> _pinSelectionKeys = new();
+    public int PinSelectionCount => PinSelection.Sum(p => p.Value.Count);
+
+    /// <summary>The mesh fingerprint a brush selection was made on, so a rebuilt mesh does not reuse its indices.</summary>
+    public string? PinSelectionKey(string pieceId) => _pinSelectionKeys.GetValueOrDefault(pieceId);
+
     /// <summary>The garment or group row highlighted in the layers panel, if any.</summary>
     public string? SelectedLayerId { get; private set; }
 
@@ -60,7 +68,32 @@ public sealed class Workspace
         }
         var mesh = Mesher.Build(garment);
         _meshes[garment.Id] = (key, mesh);
+        PrunePins(garment, mesh);
         return mesh;
+    }
+
+    /// <summary>Pins and brush selections only make sense on the mesh they were placed on; drop them when it is rebuilt.</summary>
+    private void PrunePins(Garment garment, GarmentMesh mesh)
+    {
+        foreach (var pieceMesh in mesh.Pieces)
+        {
+            if (PinSelectionKey(pieceMesh.PieceId) is { } selectionKey && selectionKey != pieceMesh.Key)
+            {
+                PinSelection.Remove(pieceMesh.PieceId);
+                _pinSelectionKeys.Remove(pieceMesh.PieceId);
+            }
+            var piece = garment.FindPiece(pieceMesh.PieceId);
+            if (piece == null || piece.Pins.Count == 0)
+                continue;
+            if (piece.PinKey != pieceMesh.Key)
+                piece.ClearPins();
+            else
+            {
+                piece.Pins.RemoveWhere(index => index < 0 || index >= pieceMesh.VertexCount);
+                if (piece.Pins.Count == 0)
+                    piece.PinKey = null;
+            }
+        }
     }
 
     private static string MeshKey(Garment garment)
@@ -138,6 +171,8 @@ public sealed class Workspace
         SelectedSeamId = null;
         SelectedPoint = null;
         SelectedLayerId = null;
+        PinSelection.Clear();
+        _pinSelectionKeys.Clear();
     }
 
     public void ClearSelection()
@@ -167,6 +202,15 @@ public sealed class Workspace
         SelectionChanged?.Invoke();
     }
 
+    /// <summary>Makes a garment the one Simulate works on, without touching the selection.</summary>
+    public void SetActiveGarment(string garmentId)
+    {
+        if (ActiveGarmentId == garmentId || Document.FindGarment(garmentId) == null)
+            return;
+        ActiveGarmentId = garmentId;
+        SelectionChanged?.Invoke();
+    }
+
     public void SelectSeam(string seamId)
     {
         ClearSelectionState();
@@ -183,6 +227,201 @@ public sealed class Workspace
         SelectedPoint = (pieceId, index);
         ActiveGarmentId = Document.GarmentOfPiece(pieceId)?.Id ?? ActiveGarmentId;
         SelectionChanged?.Invoke();
+    }
+
+    // ---------------------------------------------------------------- pinning
+
+    public void ClearPinSelection()
+    {
+        if (PinSelection.Count == 0 && _pinSelectionKeys.Count == 0)
+            return;
+        PinSelection.Clear();
+        _pinSelectionKeys.Clear();
+        SelectionChanged?.Invoke();
+    }
+
+    private string? CurrentMeshKey(string pieceId)
+    {
+        var garment = Document.GarmentOfPiece(pieceId);
+        return garment == null ? null : MeshFor(garment).Find(pieceId)?.Key;
+    }
+
+    public void TogglePinVertex(string pieceId, int vertex)
+    {
+        if (vertex < 0 || Document.FindPiece(pieceId) == null || CurrentMeshKey(pieceId) is not { } key)
+            return;
+        if (!PinSelection.TryGetValue(pieceId, out var vertices))
+            PinSelection[pieceId] = vertices = new HashSet<int>();
+        _pinSelectionKeys[pieceId] = key;
+        if (!vertices.Remove(vertex))
+            vertices.Add(vertex);
+        if (vertices.Count == 0)
+        {
+            PinSelection.Remove(pieceId);
+            _pinSelectionKeys.Remove(pieceId);
+        }
+        SelectionChanged?.Invoke();
+    }
+
+    /// <summary>Adds (or replaces) the brush selection on one piece with mesh vertex indices.</summary>
+    public void SelectPinVertices(string pieceId, IEnumerable<int> vertices, bool additive)
+    {
+        if (Document.FindPiece(pieceId) == null || CurrentMeshKey(pieceId) is not { } key)
+            return;
+        if (!additive)
+        {
+            PinSelection.Clear();
+            _pinSelectionKeys.Clear();
+        }
+        if (!PinSelection.TryGetValue(pieceId, out var selected))
+            PinSelection[pieceId] = selected = new HashSet<int>();
+        _pinSelectionKeys[pieceId] = key;
+        foreach (int vertex in vertices)
+        {
+            if (vertex >= 0)
+                selected.Add(vertex);
+        }
+        if (selected.Count == 0)
+        {
+            PinSelection.Remove(pieceId);
+            _pinSelectionKeys.Remove(pieceId);
+        }
+        SelectionChanged?.Invoke();
+    }
+
+    /// <summary>Relates every selected mesh vertex to the current mesh of its piece.</summary>
+    private List<(string PieceId, string Key, int[] Vertices)> PinTargets()
+    {
+        var targets = new List<(string PieceId, string Key, int[] Vertices)>();
+        foreach (var (pieceId, selection) in PinSelection.ToArray())
+        {
+            var garment = Document.GarmentOfPiece(pieceId);
+            var mesh = garment == null ? null : MeshFor(garment).Find(pieceId);
+            if (mesh == null || PinSelectionKey(pieceId) != mesh.Key)
+            {
+                PinSelection.Remove(pieceId);
+                _pinSelectionKeys.Remove(pieceId);
+                continue;
+            }
+            var vertices = selection.Where(index => index >= 0 && index < mesh.VertexCount).Distinct().OrderBy(i => i).ToArray();
+            if (vertices.Length > 0)
+                targets.Add((pieceId, mesh.Key, vertices));
+        }
+        return targets;
+    }
+
+    /// <summary>Pins every vertex chosen with the brush. Returns how many were pinned.</summary>
+    public int PinSelectedVertices()
+    {
+        var targets = PinTargets();
+        if (targets.Count == 0)
+        {
+            ClearPinSelection();
+            return 0;
+        }
+        int count = targets.Sum(t => t.Vertices.Length);
+        History.Execute(count == 1 ? Lang.T("Pin vertex") : Lang.F("Pin {0} vertices", count), doc =>
+        {
+            foreach (var (pieceId, key, vertices) in targets)
+            {
+                var piece = doc.FindPiece(pieceId);
+                if (piece == null)
+                    continue;
+                if (piece.PinKey != key)
+                    piece.ClearPins();
+                piece.PinKey = key;
+                foreach (int vertex in vertices)
+                    piece.Pins.Add(vertex);
+            }
+        });
+        PinSelection.Clear();
+        SelectionChanged?.Invoke();
+        return count;
+    }
+
+    /// <summary>Unpins every vertex chosen with the brush. Returns how many were unpinned.</summary>
+    public int UnpinSelectedVertices()
+    {
+        var targets = PinTargets();
+        int count = targets.Sum(t =>
+        {
+            var piece = Document.FindPiece(t.PieceId);
+            return piece != null && piece.PinKey == t.Key ? t.Vertices.Count(piece.Pins.Contains) : 0;
+        });
+        if (count == 0)
+        {
+            ClearPinSelection();
+            return 0;
+        }
+        History.Execute(count == 1 ? Lang.T("Unpin vertex") : Lang.F("Unpin {0} vertices", count), doc =>
+        {
+            foreach (var (pieceId, key, vertices) in targets)
+            {
+                var piece = doc.FindPiece(pieceId);
+                if (piece == null)
+                    continue;
+                if (piece.PinKey != key)
+                {
+                    piece.ClearPins();
+                    continue;
+                }
+                foreach (int vertex in vertices)
+                    piece.Pins.Remove(vertex);
+                if (piece.Pins.Count == 0)
+                    piece.PinKey = null;
+            }
+        });
+        PinSelection.Clear();
+        SelectionChanged?.Invoke();
+        return count;
+    }
+
+    /// <summary>Garments that Unpin All acts on: those with selected pieces, else the brushed ones, else the active one.</summary>
+    public List<Garment> PinTargetGarments()
+    {
+        var targetIds = SelectedPieceObjects()
+            .Select(p => Document.GarmentOfPiece(p.Id)?.Id)
+            .OfType<string>()
+            .ToHashSet();
+        if (targetIds.Count == 0)
+        {
+            foreach (string pieceId in PinSelection.Keys)
+            {
+                if (Document.GarmentOfPiece(pieceId) is { } garment)
+                    targetIds.Add(garment.Id);
+            }
+        }
+        if (targetIds.Count == 0 && ActiveGarment is { } active)
+            targetIds.Add(active.Id);
+        return Document.Garments.Where(g => targetIds.Contains(g.Id)).ToList();
+    }
+
+    public int PinnedVertexCount(IEnumerable<Garment> garments)
+        => garments.Sum(g => g.Pieces.Sum(p => p.Pins.Count));
+
+    /// <summary>Removes every pin from the garments Unpin All acts on. Returns how many were removed.</summary>
+    public int UnpinAll()
+    {
+        var garments = PinTargetGarments();
+        var ids = garments.Select(g => g.Id).ToHashSet();
+        int count = PinnedVertexCount(garments);
+        if (count == 0)
+            return 0;
+        History.Execute(count == 1 ? Lang.T("Unpin vertex") : Lang.F("Unpin {0} vertices", count), doc =>
+        {
+            foreach (var garment in doc.Garments.Where(g => ids.Contains(g.Id)))
+            {
+                foreach (var piece in garment.Pieces)
+                    piece.ClearPins();
+            }
+        });
+        foreach (string pieceId in PinSelection.Keys.Where(id => Document.GarmentOfPiece(id) is { } g && ids.Contains(g.Id)).ToList())
+        {
+            PinSelection.Remove(pieceId);
+            _pinSelectionKeys.Remove(pieceId);
+        }
+        SelectionChanged?.Invoke();
+        return count;
     }
 
     /// <summary>Selects a row of the layers panel: a garment, a group (with everything inside) or a piece.</summary>
@@ -249,6 +488,12 @@ public sealed class Workspace
         }
         foreach (var id in _meshes.Keys.Where(id => Document.FindGarment(id) == null).ToList())
             _meshes.Remove(id);
+        foreach (string id in PinSelection.Keys.Where(id => Document.FindPiece(id) == null).ToList())
+        {
+            PinSelection.Remove(id);
+            _pinSelectionKeys.Remove(id);
+            changed = true;
+        }
         if (changed)
             SelectionChanged?.Invoke();
     }
