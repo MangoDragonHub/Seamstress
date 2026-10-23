@@ -90,6 +90,8 @@ public static class GarmentFile
                 w.WriteBoolean("visible", g.Visible);
                 w.WriteBoolean("simulateWithOthers", g.SimulateWithOthers);
                 w.WriteNumber("particleDistance", g.ParticleDistance);
+                if (g.Thickness is { } thickness)
+                    w.WriteNumber("thickness", thickness);
                 w.WriteString("topology", g.Topology == MeshTopology.Quads ? "quads" : "triangles");
 
                 w.WriteStartArray("groups");
@@ -286,6 +288,8 @@ public static class GarmentFile
             garment.Visible = Bool(g, "visible", true);
             garment.SimulateWithOthers = Bool(g, "simulateWithOthers", false);
             garment.ParticleDistance = Math.Clamp(Num(g, "particleDistance", garment.ParticleDistance), 0.3f, 20f);
+            if (g.TryGetProperty("thickness", out var thickness) && thickness.ValueKind == JsonValueKind.Number)
+                garment.Thickness = Math.Clamp(thickness.GetSingle(), 1f, 50f);
             garment.Topology = string.Equals(Str(g, "topology"), "quads", StringComparison.OrdinalIgnoreCase)
                 ? MeshTopology.Quads : MeshTopology.Triangles;
             foreach (var gr in Items(g, "groups"))

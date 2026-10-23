@@ -111,6 +111,10 @@ public partial class AppController
             var mesh = garment.Pieces.Count > 0 ? _workspace.MeshFor(garment) : null;
             sb.Append(",\"garment\":{\"id\":").Append(Q(garment.Id)).Append(",\"name\":").Append(Q(garment.Name));
             sb.Append(",\"particleDistance\":").Append(N(garment.ParticleDistance));
+            if (garment.Thickness is { } thickness)
+                sb.Append(",\"thickness\":").Append(N(thickness));
+            else
+                sb.Append(",\"thickness\":null");
             sb.Append(",\"faces\":").Append(mesh?.FaceCount ?? 0).Append(",\"vertices\":").Append(mesh?.VertexCount ?? 0);
             sb.Append(",\"quads\":").Append(mesh?.QuadCount ?? 0).Append(",\"topology\":\"").Append(garment.Topology).Append('"');
             sb.Append(",\"pieces\":").Append(garment.Pieces.Count).Append(",\"seams\":").Append(garment.Seams.Count);

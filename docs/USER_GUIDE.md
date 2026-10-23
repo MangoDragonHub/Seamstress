@@ -590,7 +590,7 @@ apply immediately; dragging a slider counts as a single undo step.
 | **Bend** | Resistance to folding. Low values give many small wrinkles; high values give stiff, smooth cloth. |
 | **Damping** | How quickly motion dies out. |
 | **Friction** | Grip against the avatar and other cloth. |
-| **Thickness** | Collision thickness in millimetres: how far the cloth sits off the body and other layers. |
+| **Thickness** | Collision thickness in millimetres: how far the cloth sits off the body and other layers. The 3D view shows the fabric as a solid shell. A garment-wide thickness overrides it. |
 
 With several pieces selected, a change applies to all of them.
 
@@ -604,6 +604,11 @@ With several pieces selected, a change applies to all of them.
   wrinkles and slower simulation. The face and vertex counts update as you drag.
 - **Faces** chooses **Triangles** (even, near-equilateral) or **Quads** (a grid along the fabric grain).
 - **Piece override** gives the selected piece its own particle distance; 0 means "use the garment's".
+
+**Garment Thickness** — tick **Use one thickness for the whole garment** to give every piece in the active
+garment the same collision thickness. The slider is in centimetres. This overrides the per-piece **Thickness**
+under Fabric Physics for that garment only, so a shirt can be 1 cm and a skirt 2 cm. The 3D view extrudes the
+surface into a closed shell at that thickness; the slider updates it immediately.
 
 ![Quad topology with the Wire overlay on](images/topology-quads.png)
 

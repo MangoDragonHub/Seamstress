@@ -9,6 +9,7 @@ public sealed class ClothPiece
 {
     public required PatternPiece Piece { get; init; }
     public required PieceMesh Mesh { get; init; }
+    public required Garment Source { get; init; }
     public required int Offset { get; init; }
 
     /// <summary>False for pieces of garments that are only present as obstacles.</summary>
@@ -103,7 +104,15 @@ public sealed partial class ClothSolver
             {
                 var piece = garmentMesh.Garment.FindPiece(mesh.PieceId)!;
                 offsets[mesh] = count;
-                pieces.Add(new ClothPiece { Piece = piece, Mesh = mesh, Offset = count, Simulated = isSimulated, Garment = garmentCount });
+                pieces.Add(new ClothPiece
+                {
+                    Piece = piece,
+                    Mesh = mesh,
+                    Source = garmentMesh.Garment,
+                    Offset = count,
+                    Simulated = isSimulated,
+                    Garment = garmentCount,
+                });
                 count += mesh.VertexCount;
             }
             garmentCount++;
@@ -145,6 +154,7 @@ public sealed partial class ClothSolver
                 area[c] += triArea / 3;
             }
             float density = MathF.Max(physics.Density, 5f) / 1000f; // g/m² to kg/m²
+            float thickness = cloth.Source.EffectiveThicknessMm(cloth.Piece);
             for (int i = 0; i < mesh.VertexCount; i++)
             {
                 int p = off + i;
@@ -152,10 +162,10 @@ public sealed partial class ClothSolver
                 solver._previous[p] = positions[i];
                 float mass = MathF.Max(area[i] * density, 1e-7f);
                 solver._invMass[p] = cloth.Simulated ? 1f / mass : 0f;
-                solver._thickness[p] = MathF.Max(physics.Thickness, 0.1f) * 0.001f + SkinOffset;
+                solver._thickness[p] = MathF.Max(thickness, 0.1f) * 0.001f + SkinOffset;
                 solver._friction[p] = Math.Clamp(physics.Friction / 100f, 0, 1) * 1.5f;
                 solver._drag[p] = 0.2f + Math.Clamp(physics.Damping, 0, 100) * 0.06f;
-                solver._clothThickness[p] = MathF.Max(physics.Thickness, 0.5f) * 0.001f;
+                solver._clothThickness[p] = MathF.Max(thickness, 0.5f) * 0.001f;
                 solver._pieceOf[p] = pi;
             }
             if (cloth.Simulated && cloth.Piece.PinKey == mesh.Key)

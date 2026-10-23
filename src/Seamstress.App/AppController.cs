@@ -883,6 +883,8 @@ public partial class AppController : INotifyPropertyChanged
     }
 
     public void SetSimulateWithOthers(string garmentId, bool value) => _workspace.SetSimulateWithOthers(garmentId, value);
+    public void SetGarmentThicknessEnabled(string garmentId, bool enabled) => _workspace.SetGarmentThicknessEnabled(garmentId, enabled);
+    public void SetGarmentThickness(string garmentId, double millimetres) => _workspace.SetGarmentThickness(garmentId, (float)millimetres);
 
     public void SetTopology(string topology)
     {

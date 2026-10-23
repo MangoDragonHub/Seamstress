@@ -71,6 +71,15 @@ public sealed class PieceMesh
     }
 }
 
+/// <summary>A closed triangle surface: two offset copies of a sheet joined by walls along its boundary.</summary>
+public sealed class SurfaceShell
+{
+    public required Vector3[] Positions { get; init; }
+    public required Vector3[] Normals { get; init; }
+    public required Vector2[] Uvs { get; init; }
+    public required int[] Triangles { get; init; }
+}
+
 /// <summary>A pair of mesh vertices joined by a seam.</summary>
 public readonly record struct Stitch(int PieceA, int VertexA, int PieceB, int VertexB);
 
@@ -469,6 +478,91 @@ public static class Mesher
             return result;
         }
         return Arrange(piece, mesh);
+    }
+
+    /// <summary>
+    /// Extrudes a triangle surface by <paramref name="thickness"/> metres (half to each side) and closes it with walls
+    /// along every boundary edge, so the garment renders as a solid shell rather than an infinitely thin sheet.
+    /// </summary>
+    public static SurfaceShell BuildShell(Vector3[] positions, Vector3[] normals, Vector2[] uvs, int[] triangles, float thickness)
+    {
+        int count = positions.Length;
+        float half = MathF.Max(thickness, 0.0001f) * 0.5f;
+
+        // Edges that belong to exactly one triangle are the boundary; remember the third corner so the wall normal
+        // can point away from the cloth.
+        var edges = new Dictionary<long, (int Count, int Opposite)>();
+        void AddEdge(int a, int b, int c)
+        {
+            long key = a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a;
+            edges[key] = edges.TryGetValue(key, out var edge) ? (edge.Count + 1, edge.Opposite) : (1, c);
+        }
+        for (int t = 0; t < triangles.Length; t += 3)
+        {
+            int a = triangles[t], b = triangles[t + 1], c = triangles[t + 2];
+            AddEdge(a, b, c);
+            AddEdge(b, c, a);
+            AddEdge(c, a, b);
+        }
+        var boundary = edges.Where(e => e.Value.Count == 1).Select(e => (Edge: e.Key, Opposite: e.Value.Opposite)).ToList();
+
+        int wallStart = count * 2;
+        var shellPositions = new Vector3[wallStart + boundary.Count * 4];
+        var shellNormals = new Vector3[shellPositions.Length];
+        var shellUvs = new Vector2[shellPositions.Length];
+        var shellTriangles = new List<int>(triangles.Length * 2 + boundary.Count * 6);
+        for (int i = 0; i < count; i++)
+        {
+            shellPositions[i] = positions[i] + normals[i] * half;
+            shellNormals[i] = normals[i];
+            shellUvs[i] = uvs[i];
+            shellPositions[count + i] = positions[i] - normals[i] * half;
+            shellNormals[count + i] = -normals[i];
+            shellUvs[count + i] = uvs[i];
+        }
+        for (int t = 0; t < triangles.Length; t += 3)
+        {
+            int a = triangles[t], b = triangles[t + 1], c = triangles[t + 2];
+            shellTriangles.Add(a);
+            shellTriangles.Add(b);
+            shellTriangles.Add(c);
+            shellTriangles.Add(count + a);
+            shellTriangles.Add(count + c);
+            shellTriangles.Add(count + b);
+        }
+
+        for (int w = 0; w < boundary.Count; w++)
+        {
+            int a = (int)(boundary[w].Edge >> 32);
+            int b = (int)(boundary[w].Edge & 0xFFFFFFFF);
+            int c = boundary[w].Opposite;
+            var tangent = positions[b] - positions[a];
+            if (tangent.LengthSquared() < 1e-12f)
+                continue;
+            tangent = Vector3.Normalize(tangent);
+            var face = Vector3.Cross(tangent, positions[c] - positions[a]);
+            var side = face.LengthSquared() > 1e-12f ? Vector3.Normalize(Vector3.Cross(tangent, Vector3.Normalize(face))) : Vector3.UnitY;
+            if (Vector3.Dot(side, (positions[a] + positions[b]) * 0.5f - positions[c]) < 0)
+                side = -side;
+
+            int v = wallStart + w * 4;
+            shellPositions[v] = positions[a] + normals[a] * half;
+            shellPositions[v + 1] = positions[b] + normals[b] * half;
+            shellPositions[v + 2] = positions[a] - normals[a] * half;
+            shellPositions[v + 3] = positions[b] - normals[b] * half;
+            shellNormals[v] = shellNormals[v + 1] = shellNormals[v + 2] = shellNormals[v + 3] = side;
+            shellUvs[v] = shellUvs[v + 2] = uvs[a];
+            shellUvs[v + 1] = shellUvs[v + 3] = uvs[b];
+            shellTriangles.AddRange(new[] { v, v + 2, v + 3, v, v + 3, v + 1 });
+        }
+
+        return new SurfaceShell
+        {
+            Positions = shellPositions,
+            Normals = shellNormals,
+            Uvs = shellUvs,
+            Triangles = shellTriangles.ToArray(),
+        };
     }
 
     public static Vector3[] ComputeNormals(Vector3[] positions, int[] triangles)

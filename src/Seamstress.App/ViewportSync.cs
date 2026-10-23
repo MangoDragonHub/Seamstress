@@ -219,8 +219,14 @@ internal sealed class ViewportSync : IDisposable
                     var pb = garment.FindPiece(mesh.Pieces[stitch.PieceB].PieceId)!;
                     if (Workspace.IsEffectivelyVisible(garment, pa) && Workspace.IsEffectivelyVisible(garment, pb))
                     {
-                        seamLines.Add(a);
-                        seamLines.Add(b);
+                        var na = normals[stitch.PieceA][stitch.VertexA];
+                        var nb = normals[stitch.PieceB][stitch.VertexB];
+                        float ha = garment.EffectiveThicknessMm(pa) * 0.0005f + 0.001f;
+                        float hb = garment.EffectiveThicknessMm(pb) * 0.0005f + 0.001f;
+                        seamLines.Add(a + na * ha);
+                        seamLines.Add(b + nb * hb);
+                        seamLines.Add(a - na * ha);
+                        seamLines.Add(b - nb * hb);
                     }
                 }
             }
@@ -232,12 +238,16 @@ internal sealed class ViewportSync : IDisposable
                 if (!Workspace.IsEffectivelyVisible(garment, piece) || pieceMesh.TriangleCount == 0)
                     continue;
                 seen.Add(piece.Id);
+                float halfThickness = garment.EffectiveThicknessMm(piece) * 0.0005f;
                 if (piece.PinKey == pieceMesh.Key)
                 {
                     foreach (int index in piece.Pins)
                     {
                         if (index >= 0 && index < positions[i].Length)
-                            pins.Add(positions[i][index] + normals[i][index] * 0.0015f);
+                        {
+                            pins.Add(positions[i][index] + normals[i][index] * (halfThickness + 0.0015f));
+                            pins.Add(positions[i][index] - normals[i][index] * (halfThickness + 0.0015f));
+                        }
                     }
                 }
                 if (workspace.PinSelectionKey(piece.Id) == pieceMesh.Key
@@ -246,7 +256,10 @@ internal sealed class ViewportSync : IDisposable
                     foreach (int index in selectedVertices)
                     {
                         if (index >= 0 && index < positions[i].Length)
-                            pinSelection.Add(positions[i][index] + normals[i][index] * 0.0018f);
+                        {
+                            pinSelection.Add(positions[i][index] + normals[i][index] * (halfThickness + 0.0018f));
+                            pinSelection.Add(positions[i][index] - normals[i][index] * (halfThickness + 0.0018f));
+                        }
                     }
                 }
                 if (wireLines != null)
@@ -260,8 +273,9 @@ internal sealed class ViewportSync : IDisposable
                             int a = face[k], b = face[(k + 1) % face.Length];
                             if (!drawn.Add(a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a))
                                 continue;
-                            foreach (float lift in new[] { 0.0008f, -0.0008f })
+                            foreach (float side in new[] { 1f, -1f })
                             {
+                                float lift = side * (halfThickness + 0.0008f);
                                 wireLines.Add(positions[i][a] + normals[i][a] * lift);
                                 wireLines.Add(positions[i][b] + normals[i][b] * lift);
                             }
@@ -282,13 +296,16 @@ internal sealed class ViewportSync : IDisposable
                 hash.Add(layout.UnitsPerCm);
                 hash.Add(layout.Min);
                 hash.Add(piece.FlipNormals);
+                hash.Add(halfThickness);
                 bool usesDrape = piece.Drape != null && piece.DrapeKey == pieceMesh.Key;
                 int signature = hash.ToHashCode();
                 if (entry.Url.Length == 0 || entry.Key != pieceMesh.Key || entry.Hash != signature
                     || !ReferenceEquals(entry.Drape, usesDrape ? piece.Drape : null))
                 {
                     string file = NextFile("p" + piece.Id, entry.Files);
-                    QtMesh.WriteTriangles(file, positions[i], normals[i], layout.Map(piece, pieceMesh), pieceMesh.ShownTriangles(piece.FlipNormals));
+                    var shell = Mesher.BuildShell(positions[i], normals[i], layout.Map(piece, pieceMesh),
+                        pieceMesh.ShownTriangles(piece.FlipNormals), halfThickness * 2f);
+                    QtMesh.WriteTriangles(file, shell.Positions, shell.Normals, shell.Uvs, shell.Triangles);
                     entry.Url = ToUrl(file);
                     entry.Key = pieceMesh.Key;
                     entry.Hash = signature;

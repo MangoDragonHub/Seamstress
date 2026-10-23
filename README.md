@@ -176,8 +176,8 @@ Qt Bridge for C# is still a beta (0.4), so expect to adjust the package version 
 1. **Garment ▸ Add T-Shirt** puts four pieces in the 2D view, already sewn, and arranges them around the avatar.
 2. Press **Simulate** (or Space). The pieces are drawn together along their seams, then gravity takes over.
    Press it again to stop. Ctrl+Z undoes the whole run; **Reset** returns the pieces to their flat arrangement.
-3. Select a piece and change its fabric under **Fabric Physics**, or drag **Particle distance** to change the
-   face count, then simulate again.
+3. Select a piece and change its fabric under **Fabric Physics**, drag **Particle distance** to change the
+   face count, or set one **Garment Thickness** for every piece, then simulate again.
 
 To make your own: draw pieces with **Polygon / Rectangle / Ellipse**, pick **Sew** and click two edges, place
 the pieces around the body with **3D Arrangement** (position, rotation, and *Wrap* for sleeves and legs), then

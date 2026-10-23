@@ -60,6 +60,32 @@ public class MeshTests
         Assert.Equal(21, mesh.Pieces[0].EdgeChains[0].Length);
     }
 
+    [Fact]
+    public void ShellExtrudesBothSidesAndClosesTheBoundary()
+    {
+        var positions = new[]
+        {
+            new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(1, 1, 0), new Vector3(0, 1, 0),
+        };
+        var normals = Enumerable.Repeat(Vector3.UnitZ, 4).ToArray();
+        var uvs = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1) };
+        var triangles = new[] { 0, 1, 2, 0, 2, 3 };
+
+        var shell = Mesher.BuildShell(positions, normals, uvs, triangles, 0.02f);
+
+        Assert.Equal(24, shell.Positions.Length);   // two surfaces plus four wall vertices per boundary edge
+        Assert.Equal(24, shell.Uvs.Length);
+        Assert.Equal(36, shell.Triangles.Length);   // four surface triangles plus eight wall triangles
+        Assert.True(MathF.Abs(shell.Positions[0].Z - 0.01f) < 1e-6f);
+        Assert.True(MathF.Abs(shell.Positions[4].Z + 0.01f) < 1e-6f);
+        Assert.True(MathF.Abs(shell.Normals[4].Z + 1f) < 1e-6f);
+        Assert.All(shell.Triangles, i => Assert.InRange(i, 0, shell.Positions.Length - 1));
+        for (float x = -1; x <= 1; x += 2)
+            Assert.Contains(shell.Normals, n => n.X * x > 0.99f && MathF.Abs(n.Z) < 0.01f);
+        for (float y = -1; y <= 1; y += 2)
+            Assert.Contains(shell.Normals, n => n.Y * y > 0.99f && MathF.Abs(n.Z) < 0.01f);
+    }
+
     [Theory]
     [InlineData("T-Shirt")]
     [InlineData("Tank Top")]
@@ -223,6 +249,7 @@ public class DocumentTests
         doc.Garments[0].Pieces[0].Physics = FabricPhysics.FromPreset("Silk");
         doc.Garments[0].Pieces[0].Uv.Scale = 1.5f;
         doc.Garments[0].Pieces[1].ParticleDistance = 1.25f;
+        doc.Garments[0].Thickness = 12.5f;
         doc.Garments[1].SimulateWithOthers = true;
         doc.Materials[0].Texture = "/tmp/some/fabric.png";
         var mesh = ws.MeshFor(doc.Garments[1]).Pieces[0];
@@ -236,6 +263,8 @@ public class DocumentTests
         Assert.Equal(json, GarmentFile.Serialize(loaded));
         Assert.Equal(2, loaded.Garments.Count);
         Assert.Equal("Silk", loaded.Garments[0].Pieces[0].Physics.Preset);
+        Assert.Equal(12.5f, loaded.Garments[0].Thickness);
+        Assert.Null(loaded.Garments[1].Thickness);
         Assert.Equal(doc.Garments[0].Seams.Count, loaded.Garments[0].Seams.Count);
         Assert.Equal(doc.Garments[0].Groups.Count, loaded.Garments[0].Groups.Count);
         Assert.NotNull(loaded.Garments[0].Pieces[0].Points[2].Curve);
@@ -243,6 +272,44 @@ public class DocumentTests
         Assert.Equal(new[] { 0, 3, 7 }, loaded.Garments[1].Pieces[0].Pins.OrderBy(i => i));
         Assert.Equal(mesh.Key, loaded.Garments[1].Pieces[0].PinKey);
         Assert.Contains("\"at\": [", json);
+    }
+
+    [Fact]
+    public void GarmentThicknessOverridesPieceThickness()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        var garment = ws.Document.Garments[0];
+        var piece = garment.Pieces[0];
+        piece.Physics.Thickness = 4;
+        Assert.Equal(4f, garment.EffectiveThicknessMm(piece));
+        garment.Thickness = 10;
+        Assert.Equal(10f, garment.EffectiveThicknessMm(piece));
+        garment.Thickness = 80;
+        Assert.Equal(50f, garment.EffectiveThicknessMm(piece));
+    }
+
+    [Fact]
+    public void GarmentThicknessCanBeToggledAndUndone()
+    {
+        var ws = new Workspace();
+        ws.AddTemplate("T-Shirt");
+        string id = ws.Document.Garments[0].Id;
+        ws.Document.Garments[0].Pieces[0].Physics.Thickness = 3;
+        ws.Document.Garments[0].Pieces[1].Physics.Thickness = 5;
+
+        ws.SetGarmentThicknessEnabled(id, true);
+        Assert.Equal(4f, ws.Document.FindGarment(id)!.Thickness);
+
+        ws.SetGarmentThickness(id, 12);
+        Assert.Equal(12f, ws.Document.FindGarment(id)!.Thickness);
+        Assert.True(ws.History.Undo());
+        Assert.Equal(4f, ws.Document.FindGarment(id)!.Thickness);
+
+        ws.SetGarmentThicknessEnabled(id, false);
+        Assert.Null(ws.Document.FindGarment(id)!.Thickness);
+        Assert.True(ws.History.Undo());
+        Assert.Equal(4f, ws.Document.FindGarment(id)!.Thickness);
     }
 
     [Fact]

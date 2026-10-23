@@ -1544,6 +1544,37 @@ public sealed class Workspace
         }, "garment-pd:" + garmentId);
     }
 
+    /// <summary>Turns the garment-wide thickness override on (seeded from its pieces) or off.</summary>
+    public void SetGarmentThicknessEnabled(string garmentId, bool enabled)
+    {
+        if (Document.FindGarment(garmentId) is not { } garment || (garment.Thickness != null) == enabled)
+            return;
+        float thickness = garment.Pieces.Count == 0
+            ? 3f
+            : MathF.Round(Math.Clamp(garment.Pieces.Average(p => p.Physics.Thickness), 1f, 50f));
+        History.Execute(Lang.T("Change garment thickness"), doc =>
+        {
+            if (doc.FindGarment(garmentId) is { } changed)
+                changed.Thickness = enabled ? thickness : null;
+        });
+    }
+
+    /// <summary>Sets the garment-wide collision thickness in millimetres.</summary>
+    public void SetGarmentThickness(string garmentId, float millimetres)
+    {
+        if (float.IsNaN(millimetres) || float.IsInfinity(millimetres))
+            return;
+        float thickness = Math.Clamp(millimetres, 1f, 50f);
+        if (Document.FindGarment(garmentId) is not { } garment
+            || garment.Thickness is { } current && MathF.Abs(current - thickness) < 1e-4f)
+            return;
+        History.Execute(Lang.T("Change garment thickness"), doc =>
+        {
+            if (doc.FindGarment(garmentId) is { } changed)
+                changed.Thickness = thickness;
+        }, "garment-thickness:" + garmentId);
+    }
+
     public void SetTopology(string garmentId, MeshTopology topology)
     {
         if (Document.FindGarment(garmentId) is not { } current || current.Topology == topology)

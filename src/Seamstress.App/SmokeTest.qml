@@ -80,6 +80,22 @@ QtObject {
         App.setParticleDistance(1)
         check("more faces at smaller particle distance", selection().garment.faces > faces * 2)
         App.setParticleDistance(2)
+        check("garment thickness starts unset", selection().garment.thickness === null)
+        const garmentId = selection().garment.id
+        App.setGarmentThicknessEnabled(garmentId, true)
+        check("garment thickness enabled", selection().garment.thickness !== null)
+        App.setGarmentThickness(garmentId, 10)
+        check("garment thickness edited", Math.abs(selection().garment.thickness - 10) < 1e-4)
+        const thinSource = JSON.parse(App.viewportModels()).models[0].source
+        App.setGarmentThickness(garmentId, 20)
+        check("thickness extrudes the displayed mesh", JSON.parse(App.viewportModels()).models[0].source !== thinSource)
+        App.setGarmentThickness(garmentId, 10)
+        App.setGarmentThicknessEnabled(garmentId, false)
+        check("garment thickness disabled", selection().garment.thickness === null)
+        App.undo()
+        check("undo restores garment thickness", Math.abs(selection().garment.thickness - 10) < 1e-4)
+        App.redo()
+        check("redo clears garment thickness", selection().garment.thickness === null)
 
         // Topology, and moving a piece with the 3D handles.
         const triangles = selection().garment.faces
