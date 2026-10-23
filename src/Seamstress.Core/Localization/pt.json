@@ -321,7 +321,7 @@
   "Pin vertex": "Fixar vértice",
   "Pin {0} vertices": "Fixar {0} vértices",
   "Pin: click cloth vertices, or drag a box around them  ·  Right-click: Pin menu": "Fixar: clique nos vértices do tecido ou arraste uma caixa ao redor deles  ·  Clique direito: menu Fixar",
-  "Pin: click vertices or drag a box  ·  Shift/Ctrl-click: add or remove  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit": "Fixar: clique nos vértices ou arraste uma caixa  ·  Shift/Ctrl+clique: adicionar ou remover  ·  Clique direito: menu Fixar  ·  Ctrl+arrastar: orbitar",
+  "Pin: click vertices or drag a box  ·  Shift: add to the selection  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit": "Fixar: clique nos vértices ou arraste uma caixa  ·  Shift: adicionar à seleção  ·  Clique direito: menu Fixar  ·  Ctrl+arrastar: orbitar",
   "Pinch": "Puxar",
   "Pinch applied. Ctrl+Z undoes it.": "Puxão aplicado. Ctrl+Z desfaz.",
   "Pinch cloth": "Puxar tecido",

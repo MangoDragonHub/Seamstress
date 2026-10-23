@@ -321,7 +321,7 @@
   "Pin vertex": "Anclar vértice",
   "Pin {0} vertices": "Anclar {0} vértices",
   "Pin: click cloth vertices, or drag a box around them  ·  Right-click: Pin menu": "Anclar: haga clic en los vértices de la tela o arrastre un cuadro a su alrededor  ·  Clic derecho: menú Anclar",
-  "Pin: click vertices or drag a box  ·  Shift/Ctrl-click: add or remove  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit": "Anclar: haga clic en los vértices o arrastre un cuadro  ·  Mayús/Ctrl+clic: añadir o quitar  ·  Clic derecho: menú Anclar  ·  Ctrl+arrastrar: orbitar",
+  "Pin: click vertices or drag a box  ·  Shift: add to the selection  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit": "Anclar: haga clic en los vértices o arrastre un cuadro  ·  Mayús: añadir a la selección  ·  Clic derecho: menú Anclar  ·  Ctrl+arrastrar: orbitar",
   "Pinch": "Pellizcar",
   "Pinch applied. Ctrl+Z undoes it.": "Pellizco aplicado. Ctrl+Z lo deshace.",
   "Pinch cloth": "Pellizcar tela",

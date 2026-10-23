@@ -321,7 +321,7 @@
   "Pin vertex": "頂点をピン留め",
   "Pin {0} vertices": "{0} 個の頂点をピン留め",
   "Pin: click cloth vertices, or drag a box around them  ·  Right-click: Pin menu": "ピン: 布の頂点をクリックするか、頂点の周りをドラッグして選択  ·  右クリック: ピンメニュー",
-  "Pin: click vertices or drag a box  ·  Shift/Ctrl-click: add or remove  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit": "ピン: 頂点をクリックするか範囲をドラッグ  ·  Shift/Ctrl+クリック: 追加または削除  ·  右クリック: ピンメニュー  ·  Ctrl+ドラッグ: 視点を回転",
+  "Pin: click vertices or drag a box  ·  Shift: add to the selection  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit": "ピン: 頂点をクリックするか範囲をドラッグ  ·  Shift: 選択に追加  ·  右クリック: ピンメニュー  ·  Ctrl+ドラッグ: 視点を回転",
   "Pinch": "つまむ",
   "Pinch applied. Ctrl+Z undoes it.": "つまみを適用しました。Ctrl+Z で元に戻せます。",
   "Pinch cloth": "布をつまむ",

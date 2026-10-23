@@ -321,7 +321,7 @@
   "Pin vertex": "固定顶点",
   "Pin {0} vertices": "固定 {0} 个顶点",
   "Pin: click cloth vertices, or drag a box around them  ·  Right-click: Pin menu": "固定：单击布料顶点，或拖动选框将其框住  ·  右键单击：固定菜单",
-  "Pin: click vertices or drag a box  ·  Shift/Ctrl-click: add or remove  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit": "固定：单击顶点或拖动选框  ·  Shift/Ctrl+单击：添加或移除  ·  右键单击：固定菜单  ·  Ctrl+拖动：环绕",
+  "Pin: click vertices or drag a box  ·  Shift: add to the selection  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit": "固定：单击顶点或拖动选框  ·  Shift：添加到选择  ·  右键单击：固定菜单  ·  Ctrl+拖动：环绕",
   "Pinch": "抓取",
   "Pinch applied. Ctrl+Z undoes it.": "已应用抓取。按 Ctrl+Z 撤销。",
   "Pinch cloth": "抓取布料",

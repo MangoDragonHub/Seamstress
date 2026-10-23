@@ -225,12 +225,18 @@ QtObject {
         check("pin brush lists mesh vertices", pinData.length > 0 && pinData.length % 6 === 0)
         App.pinBrush = true
         check("pin brush on", App.pinBrush)
+        check("pin brush turns wireframe on", viewport.wireframe)
         App.pinClick(pinPiece.id, pinData[0], pinData[1], pinData[2], false)
         check("pin click selects the nearest vertex", App.pinSelectionCount === 1)
         App.pinClick(pinPiece.id, pinData[0], pinData[1], pinData[2], true)
         check("shift-click removes it again", App.pinSelectionCount === 0)
-        const boxed = viewport.pinBoxSelect(pinPiece.id, 0, 0, viewport.width, viewport.height)
+        const boxed = viewport.pinBoxSelect(pinPiece.id, -100000, -100000, 100000, 100000)
         check("QML box selection projects vertices", boxed > 0 && boxed <= pinCount && App.pinSelectionCount === boxed)
+        const allBoxed = viewport.pinBoxSelectAll(-100000, -100000, 100000, 100000, false)
+        check("box selection starts outside the garment", allBoxed > 0 && App.pinSelectionCount === allBoxed)
+        App.pinClick(pinPiece.id, pinData[0], pinData[1], pinData[2], false)
+        const added = viewport.pinBoxSelectAll(-100000, -100000, 100000, 100000, true)
+        check("shift-box adds to the earlier selection", added > 0 && App.pinSelectionCount > 1)
         const everyVertex = Array.from({ length: pinCount }, (_, i) => i).join(",")
         App.pinBoxSelect(pinPiece.id, everyVertex, false)
         check("vertices selected with the brush", App.pinSelectionCount === pinCount)
@@ -251,6 +257,7 @@ QtObject {
         pinMenu.close()
         App.pinBrush = false
         check("pin brush off", !App.pinBrush)
+        check("pin brush turns wireframe off", !viewport.wireframe)
 
         // Send to MakeHuman suggests the garment's name and says where the asset would go (nothing is written here).
         check("send dialog suggests the garment name", App.activeGarmentName() !== "")

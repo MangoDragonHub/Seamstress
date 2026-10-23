@@ -321,7 +321,7 @@
   "Pin vertex": "Épingler un sommet",
   "Pin {0} vertices": "Épingler {0} sommets",
   "Pin: click cloth vertices, or drag a box around them  ·  Right-click: Pin menu": "Épingler : cliquez sur les sommets du tissu ou faites glisser un cadre autour d’eux  ·  Clic droit : menu Épingler",
-  "Pin: click vertices or drag a box  ·  Shift/Ctrl-click: add or remove  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit": "Épingler : cliquez sur les sommets ou faites glisser un cadre  ·  Maj/Ctrl+clic : ajouter ou retirer  ·  Clic droit : menu Épingler  ·  Ctrl+glisser : orbiter",
+  "Pin: click vertices or drag a box  ·  Shift: add to the selection  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit": "Épingler : cliquez sur les sommets ou faites glisser un cadre  ·  Maj : ajouter à la sélection  ·  Clic droit : menu Épingler  ·  Ctrl+glisser : orbiter",
   "Pinch": "Pincer",
   "Pinch applied. Ctrl+Z undoes it.": "Pincement appliqué. Ctrl+Z l’annule.",
   "Pinch cloth": "Pincer le tissu",

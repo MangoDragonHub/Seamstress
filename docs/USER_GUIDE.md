@@ -461,12 +461,13 @@ body.
 ### Pinning the cloth
 
 Pins hold vertices still while the rest of the garment simulates, which is handy for keeping a hem, a strap or
-a neckline where you want it. Turn on **Pin** in the 3D view (or **View ▸ 3D: Pin Vertices**), then:
+a neckline where you want it. Turn on **Pin** in the 3D view (or **View ▸ 3D: Pin Vertices**); wireframe
+turns on with it so you can see the vertices, and turns off again when you leave Pin mode. Then:
 
 - **Click** a piece of cloth to select the nearest vertex; the selection is shown in yellow.
-- **Drag a box** across the cloth to select every vertex inside it on the side facing you. A plain click
-  replaces the selection; **Shift-click** or **Ctrl-click** adds a vertex, or removes one that is already
-  selected.
+- **Drag a box** anywhere in the 3D view, including empty space around the garment, to select every visible
+  vertex inside it on the pieces facing you. A plain click or box replaces the selection; hold **Shift** while
+  clicking or dragging a box to add to it (**Ctrl-click** also adds, or removes an already-selected vertex).
 - **Right-click** the cloth to open the Pin menu: **Pin Selected Vertices**, **Unpin Selected Vertices**,
   **Clear Vertex Selection**, and **Unpin All on Selected Garments**. Pinned vertices are marked in orange.
 - **Unpin All** (also in the **Simulation** menu) clears every pin on the selected garments. With nothing
