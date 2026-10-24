@@ -57,6 +57,25 @@ public sealed class AppSettings
     public static string DefaultPath
         => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Seamstress", "settings.json");
 
+    /// <summary>
+    /// The "logs" folder inside the dedicated Seamstress folder: Documents on Windows, the configuration folder on
+    /// Linux (so Flatpak keeps it under ~/.var/app).
+    /// </summary>
+    public static string LogsFolder
+    {
+        get
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                if (string.IsNullOrEmpty(documents))
+                    documents = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                return Path.Combine(documents, "Seamstress", "logs");
+            }
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Seamstress", "logs");
+        }
+    }
+
     // Relaxed escaping keeps keys such as "Ctrl+S" readable in the file.
     private static readonly JsonSerializerOptions Options = new()
     {

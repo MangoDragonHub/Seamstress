@@ -52,6 +52,8 @@ public partial class AppController : INotifyPropertyChanged
     public AppController()
     {
         Lang.Current = Startup.Language ?? _settings.Language;
+        AppLog.Write($"Interface language: {Lang.Current}");
+        AppLog.Write($"Theme: {_settings.Theme}; units: {_settings.Units}");
         _status = Lang.T("Ready");
         _editor = new PatternEditor(_workspace);
         _simulation = new SimulationController(_workspace, () => _avatar);
@@ -212,20 +214,26 @@ public partial class AppController : INotifyPropertyChanged
     public int StartupWidth => Startup.Width;
     public int StartupHeight => Startup.Height;
 
-    /// <summary>Writes a line to standard error; used by the automated UI check.</summary>
-    public void Log(string message) => Console.Error.WriteLine(message);
+    /// <summary>Writes a line to standard error and to this session's log; used by the automated UI check.</summary>
+    public void Log(string message)
+    {
+        Console.Error.WriteLine(message);
+        AppLog.Write(message);
+    }
 
     private void Fail(string action, Exception e)
     {
         LastError = $"{action}\n\n{e.Message}";
         StatusText = action;
         ErrorRevision++;
+        AppLog.Write($"{action}\n{e}");
     }
 
     private void Fail(string message)
     {
         LastError = message;
         ErrorRevision++;
+        AppLog.Write(message);
     }
 
     private void TrySaveSettings()
@@ -237,6 +245,7 @@ public partial class AppController : INotifyPropertyChanged
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             StatusText = Lang.F("Could not save preferences: {0}", e.Message);
+            AppLog.Write($"Could not save preferences: {e.Message}");
         }
     }
 
@@ -932,6 +941,7 @@ public partial class AppController : INotifyPropertyChanged
         }
         var names = _workspace.Document.Garments.Where(g => _simulation.SimulatedGarments.Contains(g.Id)).Select(g => g.Name);
         StatusText = Lang.F("Simulating {0} — press Space to stop.", string.Join(", ", names));
+        AppLog.Write($"Simulating: {string.Join(", ", names)}");
         Notify(nameof(Simulating));
         Notify(nameof(CanUndo));
     }
@@ -945,9 +955,14 @@ public partial class AppController : INotifyPropertyChanged
         SimInfo = "";
         Notify(nameof(Simulating));
         if (error != null)
+        {
             Fail(Lang.T("The simulation stopped because of an error."), new Exception(error));
+        }
         else
+        {
             StatusText = Lang.T("Simulation stopped.");
+            AppLog.Write("Simulation stopped.");
+        }
     }
 
     public void ResetArrangement()
@@ -972,12 +987,14 @@ public partial class AppController : INotifyPropertyChanged
     public bool Open(string fileUrl)
     {
         string path = LocalPath(fileUrl);
+        AppLog.Write($"Opening {path}");
         try
         {
             _workspace.Open(path);
             _settings.AddRecent(path);
             TrySaveSettings();
             StatusText = Lang.F("Opened {0}", Path.GetFileName(path));
+            AppLog.Write($"Opened {path}");
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
@@ -994,6 +1011,7 @@ public partial class AppController : INotifyPropertyChanged
         string path = LocalPath(fileUrl);
         if (!path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             path += GarmentFile.Extension;
+        AppLog.Write($"Saving {path}");
         try
         {
             if (_simulation.IsRunning)
@@ -1002,6 +1020,7 @@ public partial class AppController : INotifyPropertyChanged
             _settings.AddRecent(path);
             TrySaveSettings();
             StatusText = Lang.F("Saved {0}", Path.GetFileName(path));
+            AppLog.Write($"Saved {path}");
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -1036,6 +1055,7 @@ public partial class AppController : INotifyPropertyChanged
     public bool ExportTo(string format, string fileUrl, bool weld, bool activeOnly)
     {
         string path = LocalPath(fileUrl);
+        AppLog.Write($"Exporting {format} to {path} (weld seams: {weld}; active garment only: {activeOnly})");
         try
         {
             var scene = BuildExport(weld, activeOnly);
@@ -1058,6 +1078,7 @@ public partial class AppController : INotifyPropertyChanged
             }
             int faces = scene.Meshes.Sum(m => format == "gltf" ? m.TriangleCount : m.FaceCount);
             StatusText = Lang.F("Exported {0} garment(s), {1:N0} faces to {2}", scene.Meshes.Count, faces, path);
+            AppLog.Write($"Exported {scene.Meshes.Count} garment(s), {faces} faces to {path}");
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
@@ -1105,6 +1126,7 @@ public partial class AppController : INotifyPropertyChanged
             if (!string.IsNullOrWhiteSpace(_settings.MakeHumanCommand) && Startup.AllowLaunch)
                 launched = LaunchMakeHuman() ? " " + Lang.T("MakeHuman is starting.") : "";
             StatusText = Lang.F("Sent “{0}” to MakeHuman ({1:N0} vertices): {2}.", name, result.VertexCount, result.Folder) + launched;
+            AppLog.Write($"Sent “{name}” to MakeHuman ({result.VertexCount} vertices): {result.Folder}");
             LastMakeHumanFolder = result.Folder;
             return true;
         }
@@ -1275,13 +1297,38 @@ public partial class AppController : INotifyPropertyChanged
     /// <summary>Folder the automated check writes its files into.</summary>
     public string StartupFolderUrl => Startup.Screenshot == null ? "" : ViewportSync.ToUrl(Path.GetDirectoryName(Startup.Screenshot)!);
 
+    // ---------------------------------------------------------------- session logs
+
+    /// <summary>The dedicated Seamstress folder logs are written to.</summary>
+    public string LogsFolder => AppLog.Folder;
+
+    /// <summary>Shows the logs folder in the system's file manager.</summary>
+    public void OpenLogsFolder()
+    {
+        try
+        {
+            Directory.CreateDirectory(AppLog.Folder);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AppLog.Folder) { UseShellExecute = true });
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            Fail(Lang.T("Could not open the logs folder."), e);
+        }
+    }
+
     /// <summary>Called when the window closes.</summary>
     public void Shutdown()
     {
+        AppLog.Write("Seamstress closed.");
         _simulation.Dispose();
         _viewport.Dispose();
+        AppLog.Stop();
     }
 
     /// <summary>The viewport rendered its first frame, so the chosen renderer works on this machine.</summary>
-    public void ViewportReady() => Startup.ClearCrashMarker();
+    public void ViewportReady()
+    {
+        AppLog.Write($"Viewport ready ({Startup.RendererDescription}).");
+        Startup.ClearCrashMarker();
+    }
 }

@@ -794,6 +794,7 @@ MakeHuman's body.
 | --- | --- | --- |
 | General | **Interface language** | English, Español, Português (Brasil), Français, 中文（简体） or 日本語. See [Language](#language) below. |
 | General | **Measurements** | *Metric* shows centimetres, metres, millimetres and g/m². *Imperial* shows inches, oz/yd² and feet and inches for the avatar height, and the grids change to 4 in squares with a stronger line every foot. Only the interface changes: garment files and exports are the same either way. |
+| General | **Session Logs** | Show where logs are written and open the folder. A log is kept for every session. See [Logs](#logs) below. |
 | Themes | **Preset** | The colour scheme of the whole interface: *Default* (the dark grey Seamstress has always used), *Light*, *High Contrast Dark* or *High Contrast Light*. See [Themes](#themes) below. |
 | Themes | **Save Theme… / Load Theme…** | Save the current colours to a file, or load a theme file. A loaded theme is remembered as *Custom*. |
 | Viewport | **Renderer** | *Automatic* uses the GPU and falls back to CPU rendering when no GPU driver is found or the GPU failed to start last time. *GPU* and *CPU* force one or the other. Takes effect on the next start. |
@@ -811,6 +812,23 @@ MakeHuman's body.
 Everything except the theme waits for **Save**; **Cancel** leaves it all as it was (a previewed theme is
 switched back too). The renderer in use is shown in the bottom-right corner of the 3D view. You can also
 force it for one run by starting Seamstress with `--cpu` or `--gpu`.
+
+### Logs
+
+Seamstress keeps a plain-text log of every session to help diagnose problems; there is no setting to turn it
+off. *Preferences ▸ General ▸ Session Logs* shows the log folder and opens it.
+
+Every launch writes a new plain-text file named after the date and time, such as
+`seamstress-2026-10-23_14-30-05.txt`, into the `logs` folder inside Seamstress's own folder:
+
+- Windows: `Documents\Seamstress\logs`
+- Linux: `~/.config/Seamstress/logs` (or `$XDG_CONFIG_HOME/Seamstress/logs`)
+- Flatpak: `~/.var/app/io.github.mangodragonhub.Seamstress/config/Seamstress/logs`
+
+The log records the version, operating system, renderer choice, files opened, and errors with their stack
+traces. It stays on your computer and is not sent anywhere. If Seamstress does not start, or behaves strangely,
+the newest log is the first thing to look at, and attaching it to a bug report helps a great deal. **Open Logs
+Folder** in Preferences shows the files.
 
 ### Themes
 
@@ -952,7 +970,9 @@ drag that part of the cloth to where it should sit.
 **A texture shows as missing.** The image file was moved. Choose it again with **…** in the Material section.
 
 **The 3D view is blank or the application will not start.** Start it with `--cpu` to use CPU rendering, or
-choose *CPU* under **Preferences ▸ Viewport ▸ Renderer**.
+choose *CPU* under **Preferences ▸ Viewport ▸ Renderer**. If that does not help, open the newest file in the
+[logs folder](#logs): it records the startup details and any error, and is the best thing to attach to a bug
+report.
 
 ---
 

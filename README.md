@@ -225,6 +225,21 @@ The 3D view uses Qt Quick 3D on the GPU. It switches to CPU software rendering w
 when the GPU renderer failed to start on the previous launch, or when asked to (`--cpu`, or
 *Preferences ▸ Viewport ▸ Renderer*). `--gpu` forces the GPU. The active renderer is shown in the corner of the 3D view.
 
+## Logs
+
+Seamstress keeps a plain-text log of every session to make startup and other problems easier to diagnose.
+Each launch creates a new file named after the date and time (for example
+`seamstress-2026-10-23_14-30-05.txt`) in the `logs` folder of the dedicated Seamstress folder:
+
+- Windows: `Documents\Seamstress\logs`
+- Linux: `~/.config/Seamstress/logs` (or `$XDG_CONFIG_HOME/Seamstress/logs`)
+- Flatpak: `~/.var/app/io.github.mangodragonhub.Seamstress/config/Seamstress/logs`
+
+The log records the version, operating system, renderer choice, files opened, and errors with their stack traces,
+so attaching the newest one to a bug report usually shows what went wrong. Logs stay on the computer; nothing is
+sent anywhere. If the application cannot start at all, the log written during that launch is the place to look
+first.
+
 ## Project file format
 
 Plain JSON, lengths in centimetres for patterns and metres for 3D placement:
