@@ -50,21 +50,9 @@ postage, for at least three years after the package was distributed.
 
 Third-party components inside Qt Quick 3D
 -----------------------------------------
-Qt Quick 3D contains the components below. Their full licence texts are in the Qt source
-distribution linked above.
-
-    Blue Noise Texture                         CC0-1.0
-    Godot Engine: Fog                          MIT
-    Godot Engine: ProceduralSky                MIT
-    Intel Embree 3.13.3                        Apache-2.0
-    Java Native Interface for C++ 1.0.0        MIT
-    JsonCpp 1.9.6                              MIT
-    Open Asset Import Library (assimp) 6.0.5   BSD-3-Clause
-    OpenXR SDK 1.1.61                          Apache-2.0
-    Tiny OpenEXR 1.0.13                        BSD-3-Clause
-    closestPointOnTriangle                     Apache-2.0
-    meshoptimizer 1.2                          MIT
-    xatlas                                     MIT
+Qt Quick 3D contains third-party code under permissive licences: MIT, BSD-3-Clause and Apache-2.0,
+plus one CC0-1.0 texture. The copyright lines those licences ask to be reproduced, and their licence
+texts, are in LICENSES/THIRD-PARTY-Qt-Quick-3D.txt and the files beside it.
 
 Qt itself contains further third-party code (PCRE2, HarfBuzz, FreeType, libpng, zlib, SQLite and
 others), whose notices and licence texts are part of the Qt source distribution linked above.
