@@ -65,7 +65,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Seamstress-windows
-          path: dist/Seamstress-win-x64.zip
+          path: dist/Seamstress-*-win-x64.zip
           if-no-files-found: error
 
   # Cross-compiled for Windows on ARM with Qt's ARM64 build for MSVC and Visual Studio's ARM64 compiler.
@@ -82,5 +82,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Seamstress-windows-arm64
-          path: dist/Seamstress-win-arm64.zip
+          path: dist/Seamstress-*-win-arm64.zip
           if-no-files-found: error

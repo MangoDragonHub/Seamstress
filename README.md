@@ -137,7 +137,9 @@ explanation -- the app would otherwise start and never show a window.
 
 If Visual Studio's C++ tools are installed the bridge uses them; if not, the script switches to the bridge's
 prebuilt launcher.
-`.\build.ps1 package` produces `dist\Seamstress-win-x64.zip`; the unzipped app needs the .NET 8 runtime installed.
+`.\build.ps1 package` produces `dist\Seamstress-<version>-win-x64.zip`; the unzipped app needs the .NET 8 runtime installed.
+The zip is assembled in a scratch folder and only then moved into place, so a package folder is never left half
+written; `README.txt`, `NOTICE` and `LICENSES/` travel with it.
 If that runtime is missing, the launcher says so and offers the download instead of closing silently (a
 `-NoCompiler` build uses the bridge's prebuilt launcher, which cannot carry that check).
 The Visual C++ runtime rides along in the package, so the VC++ Redistributable does not have to be installed.
@@ -158,10 +160,10 @@ add `-InstallQt` to download it into `~\Qt` (or pass `-Qt <prefix>`):
 .\build.ps1 package -Arch arm64 -InstallQt    # on an x64 PC
 ```
 
-Both produce `dist\Seamstress-win-arm64.zip`, which needs the ARM64 .NET 8 runtime on the target. Cross-building
+Both produce `dist\Seamstress-<version>-win-arm64.zip`, which needs the ARM64 .NET 8 runtime on the target. Cross-building
 on an x64 PC uses Qt's *MSVC 2022 ARM64 (cross-compiled)* build together with the x64 MSVC 2022 Qt of the same
 version for its tools, and Visual Studio's *MSVC ARM64 build tools* component if Visual Studio is installed
-(without it the bridge's prebuilt ARM64 launcher is used). The x64 `Seamstress-win-x64.zip` also runs on Windows
+(without it the bridge's prebuilt ARM64 launcher is used). The x64 `Seamstress-<version>-win-x64.zip` also runs on Windows
 11 on ARM, through its x64 emulation.
 
 > The Windows path, ARM64 included, has not been run yet: it was written against the bridge's Windows packages

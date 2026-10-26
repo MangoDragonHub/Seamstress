@@ -299,7 +299,11 @@ stage() {
     CONFIG="Release"; BIN="src/Seamstress.App/bin/Release/net8.0"
     [ "$CROSS" = 1 ] && BIN="$BIN/linux-$ARCH"
     build
-    say "Assembling a self-contained application in ${STAGE#$ROOT/}"
+    local final="$STAGE"
+    # Assembled in a scratch folder and swapped into place at the end, so a package is never seen half written:
+    # starting a program while its files are being replaced makes Qt abort (0xc0000409 on Windows).
+    local STAGE="$final.staging"
+    say "Assembling a self-contained application in ${final#$ROOT/}"
     rm -rf "$STAGE"
     mkdir -p "$STAGE"
     cp -a "$BIN"/. "$STAGE"/
@@ -360,14 +364,17 @@ stage() {
     install -m644 src/Seamstress.App/icons/seamstress.svg "$STAGE/$APP_ID.svg"
     # The licences of what the package contains: MIT for Seamstress, LGPLv3 for Qt and the Qt Bridge, GPLv3 for
     # Qt Quick 3D, which the 3D viewport makes part of the whole (see NOTICE).
-    cp -a LICENSE NOTICE LICENSES "$STAGE"/
+    cp -a LICENSE NOTICE LICENSES packaging/README.txt "$STAGE"/
     # The Qt version is the bridge's on Windows and another one here, so each package names its own.
     local qt_version="" lib
     for lib in "$STAGE"/lib/libQt6Core.so.6.*; do
         if [ -f "$lib" ] && [ ! -L "$lib" ]; then qt_version="${lib##*.so.}"; fi
     done
     if [ -n "$qt_version" ]; then printf '\nBuilt with Qt %s.\n' "$qt_version" >> "$STAGE/NOTICE"; fi
-    echo "    $(du -sh "$STAGE" | cut -f1) in $(find "$STAGE" -type f | wc -l) files"
+    # Everything is assembled: swap the finished folder into place.
+    rm -rf "$final"
+    mv "$STAGE" "$final"
+    echo "    $(du -sh "$final" | cut -f1) in $(find "$final" -type f | wc -l) files"
 }
 
 tar_stage() {

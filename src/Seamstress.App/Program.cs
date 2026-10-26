@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Qt.Quick;
 using Seamstress.Core;
@@ -109,22 +110,9 @@ public static class Program
             AppLog.Write($"No window after {StartupTimeoutSeconds} seconds: the interface did not load. The most "
                 + "likely cause is a Qt QML module missing from this installation (the 3D viewport needs Qt Quick 3D).");
             AppLog.Stop();
-            if (automated)
-            {
-                Console.Error.WriteLine("error: the interface did not appear; the QML errors are above");
-            }
-            else
-            {
-                string text = $"The Seamstress window did not appear within {StartupTimeoutSeconds} seconds.\n\n"
-                    + "The interface could not be loaded. The most likely cause is a missing Qt Quick 3D module "
-                    + "(the 3D viewport needs it) or a graphics driver that did not start.\n\n"
-                    + $"The log has the details:\n{log}";
-                // A console message is invisible in a windowed app, so say it on screen.
-                if (OperatingSystem.IsWindows())
-                    MessageBoxW(IntPtr.Zero, text, "Seamstress", 0x00000010 /* MB_ICONERROR */);
-                else
-                    Console.Error.WriteLine("error: " + text);
-            }
+            ReportStartupFailure($"The Seamstress window did not appear within {StartupTimeoutSeconds} seconds.\n\n"
+                + "The interface could not be loaded. The most likely cause is a missing Qt Quick 3D module "
+                + "(the 3D viewport needs it) or a graphics driver that did not start.", automated, log);
             Environment.Exit(1);
         })
         {
@@ -132,6 +120,75 @@ public static class Program
             Name = "startup watchdog",
         };
         watchdog.Start();
+    }
+
+    /// <summary>
+    /// Says why a launch failed. A windowed program has no console, so the text goes into a message box (Windows)
+    /// or to standard error, where automated runs read it.
+    /// </summary>
+    private static void ReportStartupFailure(string text, bool automated, string log)
+    {
+        if (automated)
+        {
+            Console.Error.WriteLine("error: " + text.Replace("\n\n", " ").Replace('\n', ' '));
+            return;
+        }
+        string full = text + $"\n\nThe log has the details:\n{log}";
+        if (OperatingSystem.IsWindows())
+            MessageBoxW(IntPtr.Zero, full, "Seamstress", 0x00000010 /* MB_ICONERROR */);
+        else
+            Console.Error.WriteLine("error: " + full);
+    }
+
+    /// <summary>
+    /// What is wrong with the files next to the program, or null when they are all there. An incomplete package, or
+    /// one whose Qt libraries come from different versions, does not fail with a message: Qt aborts inside the QML
+    /// engine, before there is a window to report anything.
+    /// </summary>
+    private static string? DeploymentProblem()
+    {
+        string root = AppContext.BaseDirectory;
+        if (OperatingSystem.IsWindows())
+        {
+            foreach (string file in new[] { "Qt6Core.dll", "Qt6Quick.dll", "Qt6Quick3D.dll" })
+                if (!File.Exists(Path.Combine(root, file)))
+                    return $"{file} is missing";
+
+            // Two Qt versions next to each other is the other way a deployment goes wrong, and it aborts as well.
+            string? expected = QtVersionOf(Path.Combine(root, "Qt6Core.dll"));
+            if (expected != null)
+            {
+                foreach (string dll in Directory.EnumerateFiles(root, "Qt6*.dll"))
+                {
+                    string? actual = QtVersionOf(dll);
+                    if (actual != null && actual != expected)
+                        return $"{Path.GetFileName(dll)} is Qt {actual} but Qt6Core.dll is Qt {expected}";
+                }
+            }
+        }
+        else if (!File.Exists(Path.Combine(root, "lib", "libQt6Core.so.6")))
+        {
+            return "the Qt libraries are missing (lib/libQt6Core.so.6)";
+        }
+
+        if (!File.Exists(Path.Combine(root, "qml", "QtQuick3D", "qmldir")))
+            return "the Qt Quick 3D QML module is missing (qml/QtQuick3D)";
+        if (!File.Exists(Path.Combine(root, "Application", "Main.qml")))
+            return "the application's QML files are missing (Application/Main.qml)";
+        return null;
+    }
+
+    private static string? QtVersionOf(string path)
+    {
+        try
+        {
+            var info = FileVersionInfo.GetVersionInfo(path);
+            return $"{info.FileMajorPart}.{info.FileMinorPart}.{info.FileBuildPart}";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private static bool GpuLooksUsable()
@@ -286,6 +343,20 @@ public static class Program
         SetNativeEnvironment("QT_QUICK_CONTROLS_STYLE", "Fusion");
         // Qt's file dialogs need this to list local files when they run inside QML.
         SetNativeEnvironment("QML_XHR_ALLOW_FILE_READ", "1");
+
+        // Refuse an installation that cannot work before Qt is asked to load it: in that case Qt aborts, and there
+        // is no window left to say why.
+        string? broken = DeploymentProblem();
+        if (broken != null)
+        {
+            string log = AppLog.FilePath ?? "(this run keeps no log file)";
+            AppLog.Write($"This installation is incomplete: {broken}");
+            AppLog.Stop();
+            ReportStartupFailure($"Seamstress cannot start from this folder:\n{broken}\n\n"
+                + "Extract the whole archive again into a new folder (do not start the program from inside it) "
+                + "and try again.", automated, log);
+            Environment.Exit(1);
+        }
 
         AppController.Startup = options;
         Qt.Application.DisplayName = "Seamstress";

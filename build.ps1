@@ -112,7 +112,6 @@ if ($cross -and $Qt -eq $env:QtDir -and -not $PSBoundParameters.ContainsKey('Qt'
 $bin = "src\Seamstress.App\bin\$Configuration\net8.0"
 if ($cross) { $bin = "$bin\win-$Arch" }
 $dist = Join-Path $PSScriptRoot 'dist'
-$stage = Join-Path $dist "Seamstress-win-$Arch"
 $tools = Join-Path $PSScriptRoot '.tools'
 
 # ---------------------------------------------------------------------------------------------- Qt
@@ -461,22 +460,48 @@ switch ($Command) {
         $bin = 'src\Seamstress.App\bin\Release\net8.0'
         if ($cross) { $bin = "$bin\win-$Arch" }
         Invoke-Build
+        # The version in the executable names the package, so a download says which build it is.
+        $version = (Get-Item "$bin\Seamstress.exe").VersionInfo.FileVersion
+        if (-not $version) { Fail "Cannot read the version of $bin\Seamstress.exe" }
+        $name = "Seamstress-$version-win-$Arch"
+        $stage = Join-Path $dist $name
+        # Assembled in a scratch folder and swapped into place at the end, so that the package folder is never seen
+        # half written. Starting a program while its files are being replaced makes Qt abort (0xc0000409).
+        $work = Join-Path $dist ".packaging-$Arch"
+        $staging = Join-Path $work $name
         Say "Assembling $stage"
-        if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-        New-Item $stage -ItemType Directory -Force | Out-Null
+        if (Test-Path $work) { Remove-Item $work -Recurse -Force }
+        New-Item $staging -ItemType Directory -Force | Out-Null
         # The build output already contains Qt (deployed by the bridge); debug symbols are left out, and so are
         # cross-compiled builds, which land inside the regular output folder.
-        Copy-Item "$bin\*" $stage -Recurse -Exclude '*.pdb', 'win-x64', 'win-arm64'
+        Copy-Item "$bin\*" $staging -Recurse -Exclude '*.pdb', 'win-x64', 'win-arm64'
         # The licences of what the package contains: MIT for Seamstress, LGPLv3 for Qt and the Qt Bridge, GPLv3 for
         # Qt Quick 3D, which the 3D viewport makes part of the whole (see NOTICE).
-        Copy-Item LICENSE, NOTICE -Destination $stage -Force
-        Copy-Item LICENSES -Destination $stage -Recurse -Force
+        Copy-Item LICENSE, NOTICE -Destination $staging -Force
+        Copy-Item LICENSES -Destination $staging -Recurse -Force
+        Copy-Item (Join-Path $PSScriptRoot 'packaging\README.txt') -Destination $staging -Force
         # The Qt version is the bridge's on Windows and another one on Linux, so each package names its own.
         $qtVersion = ([Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $bin 'Qt6Core.dll')).FileVersion -split '\.')[0..2] -join '.'
-        Add-Content (Join-Path $stage 'NOTICE') "`nBuilt with Qt $qtVersion."
+        Add-Content (Join-Path $staging 'NOTICE') "`nBuilt with Qt $qtVersion."
+        # Nothing is published unless the result really can start: the program checks the same things at launch.
+        foreach ($required in 'Seamstress.exe', 'Qt6Core.dll', 'Qt6Quick3D.dll', 'qml\QtQuick3D\qmldir',
+            'Application\Main.qml', 'NOTICE', 'README.txt', 'LICENSES\GPL-3.0-only.txt') {
+            if (-not (Test-Path (Join-Path $staging $required))) { Fail "The package would be incomplete: $required is missing" }
+        }
         $zip = "$stage.zip"
-        if (Test-Path $zip) { Remove-Item $zip -Force }
-        Compress-Archive -Path $stage -DestinationPath $zip
+        $tmpZip = Join-Path $work "$name.zip"
+        Compress-Archive -Path $staging -DestinationPath $tmpZip
+        # Publish only now, and only if the old package can be replaced: a running copy holds its files.
+        try {
+            if (Test-Path $stage) { Remove-Item $stage -Recurse -Force -ErrorAction Stop }
+            if (Test-Path $zip) { Remove-Item $zip -Force -ErrorAction Stop }
+        }
+        catch {
+            Fail "Cannot replace $stage or its zip; close Seamstress if it is running from them."
+        }
+        Move-Item $tmpZip $zip
+        Move-Item $staging $stage
+        Remove-Item $work -Recurse -Force
         Say "Created $zip"
         Write-Host "    Unzip anywhere and run Seamstress.exe. It needs the .NET 8 runtime (or newer) for $Arch installed:"
         Write-Host '    https://dotnet.microsoft.com/download/dotnet/8.0'
