@@ -127,6 +127,59 @@ public class SimulationTests : IClassFixture<AvatarFixture>
     }
 
     [Fact]
+    public void PinnedVerticesStayPutWhileTheRestOfTheClothMoves()
+    {
+        var (ws, sim) = Setup("Skirt");
+        var garment = ws.Document.Garments[0];
+        var piece = garment.Pieces[0];
+        var mesh = ws.MeshFor(garment).Find(piece.Id)!;
+        var before = Mesher.CurrentPositions(piece, mesh);
+        int[] pinned = { 0, mesh.VertexCount / 2, mesh.VertexCount - 1 };
+        piece.Pins = pinned.ToHashSet();
+        piece.PinKey = mesh.Key;
+
+        Assert.Null(sim.Start(false));
+        Run(sim, 120);
+        sim.Stop();
+
+        var drapedGarment = ws.Document.Garments[0];
+        var drapedMesh = ws.MeshFor(drapedGarment).Find(piece.Id)!;
+        var after = Mesher.CurrentPositions(drapedGarment.FindPiece(piece.Id)!, drapedMesh);
+        foreach (int index in pinned)
+            Assert.True(Vector3.Distance(before[index], after[index]) < 1e-6f, $"pinned vertex {index} moved");
+        float largest = after.Select((p, i) => Vector3.Distance(before[i], p)).Max();
+        Assert.True(largest > 0.01f, "the unpinned cloth should still fall");
+    }
+
+    [Fact]
+    public void PinsAddedAfterSimulationHoldWhenItRunsAgain()
+    {
+        var (ws, sim) = Setup("Skirt");
+        Assert.Null(sim.Start(false));
+        Run(sim, 180);
+        sim.Stop();
+
+        var garment = ws.Document.Garments[0];
+        var piece = garment.Pieces[0];
+        var mesh = ws.MeshFor(garment).Find(piece.Id)!;
+        var draped = Mesher.CurrentPositions(piece, mesh);
+        int index = Array.IndexOf(draped, draped.OrderBy(p => p.Y).First());
+        var pinnedPosition = draped[index];
+        piece.Pins.Add(index);
+        piece.PinKey = mesh.Key;
+
+        Assert.Null(sim.Start(false));
+        Run(sim, 120);
+        sim.Stop();
+
+        var rerunGarment = ws.Document.Garments[0];
+        var rerunMesh = ws.MeshFor(rerunGarment).Find(piece.Id)!;
+        var after = Mesher.CurrentPositions(rerunGarment.FindPiece(piece.Id)!, rerunMesh);
+        Assert.True(Vector3.Distance(pinnedPosition, after[index]) < 1e-6f, "a pin added after a run should hold");
+        Assert.True(after.Select((p, i) => Vector3.Distance(draped[i], p)).Max() > 0.005f, "the rest should settle again");
+    }
+
+    [Fact]
     public void ACutOutSewnIntoItsHoleDrapesWithTheGarment()
     {
         var (ws, sim) = Setup("Skirt");

@@ -17,9 +17,10 @@ Marvelous Designer.
   body; **View ▸ 2D: Show Avatar** hides it.
 - **3D view** – shows the sewn pieces on an avatar. Orbit, pan, zoom, click to select, and drag the arrows and
   rings on a selected piece to move and rotate it. **Pinch** lets you drag the cloth itself, during or after
-  simulation, to tug bunched-up areas into place. **Ortho** switches to an orthographic camera. **View ▸ 3D:
-  Normal Direction** colours the front and back of every face, and **Invert Normals** (Properties) turns a
-  piece that faces the wrong way.
+  simulation, to tug bunched-up areas into place. **Pin** freezes chosen vertices so the rest of the cloth
+  settles around them; **Unpin All** (Simulation menu) releases them again. **Ortho** switches to an
+  orthographic camera. **View ▸ 3D: Normal Direction** colours the front and back of every face, and **Invert
+  Normals** (Properties) turns a piece that faces the wrong way.
 - **Measuring** – click an edge to read its length, or use the **Ruler** to measure between any two points
   in the pattern or on the cloth and avatar in 3D.
 - **Keyboard** – every shortcut can be changed in Preferences, and right-clicking either view opens the Edit
@@ -178,8 +179,8 @@ Qt Bridge for C# is still a beta (0.4), so expect to adjust the package version 
 1. **Garment ▸ Add T-Shirt** puts four pieces in the 2D view, already sewn, and arranges them around the avatar.
 2. Press **Simulate** (or Space). The pieces are drawn together along their seams, then gravity takes over.
    Press it again to stop. Ctrl+Z undoes the whole run; **Reset** returns the pieces to their flat arrangement.
-3. Select a piece and change its fabric under **Fabric Physics**, or drag **Particle distance** to change the
-   face count, then simulate again.
+3. Select a piece and change its fabric under **Fabric Physics**, drag **Particle distance** to change the
+   face count, or set one **Garment Thickness** for every piece, then simulate again.
 
 To make your own: draw pieces with **Polygon / Rectangle / Ellipse**, pick **Sew** and click two edges, place
 the pieces around the body with **3D Arrangement** (position, rotation, and *Wrap* for sleeves and legs), then
@@ -226,6 +227,21 @@ The built-in mannequin has the base mesh's proportions, so the bundled templates
 The 3D view uses Qt Quick 3D on the GPU. It switches to CPU software rendering when no GPU driver is found,
 when the GPU renderer failed to start on the previous launch, or when asked to (`--cpu`, or
 *Preferences ▸ Viewport ▸ Renderer*). `--gpu` forces the GPU. The active renderer is shown in the corner of the 3D view.
+
+## Logs
+
+Seamstress keeps a plain-text log of every session to make startup and other problems easier to diagnose.
+Each launch creates a new file named after the date and time (for example
+`seamstress-2026-10-23_14-30-05.txt`) in the `logs` folder of the dedicated Seamstress folder:
+
+- Windows: `Documents\Seamstress\logs`
+- Linux: `~/.config/Seamstress/logs` (or `$XDG_CONFIG_HOME/Seamstress/logs`)
+- Flatpak: `~/.var/app/io.github.mangodragonhub.Seamstress/config/Seamstress/logs`
+
+The log records the version, operating system, renderer choice, files opened, and errors with their stack traces,
+so attaching the newest one to a bug report usually shows what went wrong. Logs stay on the computer; nothing is
+sent anywhere. If the application cannot start at all, the log written during that launch is the place to look
+first.
 
 ## Project file format
 

@@ -77,6 +77,12 @@ public sealed class Garment
     /// <summary>Target edge length of the simulation mesh in centimetres. Smaller means more faces.</summary>
     public float ParticleDistance { get; set; } = 2.0f;
 
+    /// <summary>
+    /// Garment-wide collision thickness in millimetres, or null to use each piece's <see cref="FabricPhysics.Thickness"/>.
+    /// The Properties panel edits this in centimetres.
+    /// </summary>
+    public float? Thickness { get; set; }
+
     /// <summary>Whether the garment is meshed with triangles or mostly with quads.</summary>
     public MeshTopology Topology { get; set; } = MeshTopology.Triangles;
 
@@ -98,6 +104,7 @@ public sealed class Garment
         Expanded = Expanded,
         SimulateWithOthers = SimulateWithOthers,
         ParticleDistance = ParticleDistance,
+        Thickness = Thickness,
         Topology = Topology,
         Groups = Groups.Select(g => g.Clone()).ToList(),
         Pieces = Pieces.Select(p => p.Clone()).ToList(),
@@ -110,6 +117,10 @@ public sealed class Garment
 
     public float EffectiveParticleDistance(PatternPiece piece)
         => Math.Clamp(piece.ParticleDistance ?? ParticleDistance, 0.3f, 20f);
+
+    /// <summary>Collision thickness used by the solver for one of this garment's pieces, in millimetres.</summary>
+    public float EffectiveThicknessMm(PatternPiece piece)
+        => Math.Clamp(Thickness ?? piece.Physics.Thickness, 0.1f, 50f);
 
     /// <summary>Every group and piece id in layers-panel order; only the order among siblings is meaningful.</summary>
     public List<string> OrderedLayerIds()
@@ -264,6 +275,15 @@ public sealed class PatternPiece
     /// <summary>Fingerprint of the mesh topology the drape belongs to.</summary>
     public string? DrapeKey { get; set; }
 
+    /// <summary>
+    /// Simulation vertices held in place. A pinned vertex is not moved by the cloth solver until it is unpinned.
+    /// The indices are only meaningful for the mesh identified by <see cref="PinKey"/>.
+    /// </summary>
+    public HashSet<int> Pins { get; set; } = new();
+
+    /// <summary>Fingerprint of the mesh topology the pins belong to.</summary>
+    public string? PinKey { get; set; }
+
     public PatternPiece Clone() => new()
     {
         Id = Id,
@@ -281,6 +301,8 @@ public sealed class PatternPiece
         FlipNormals = FlipNormals,
         Drape = Drape, // drape arrays are replaced, never mutated in place, so sharing is safe
         DrapeKey = DrapeKey,
+        Pins = new HashSet<int>(Pins),
+        PinKey = PinKey,
     };
 
     /// <summary>Points of the outline and of every hole.</summary>
@@ -349,6 +371,12 @@ public sealed class PatternPiece
     {
         Drape = null;
         DrapeKey = null;
+    }
+
+    public void ClearPins()
+    {
+        Pins.Clear();
+        PinKey = null;
     }
 }
 

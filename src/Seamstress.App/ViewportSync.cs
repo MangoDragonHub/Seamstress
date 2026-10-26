@@ -42,6 +42,12 @@ internal sealed class ViewportSync : IDisposable
 
     private readonly Queue<string> _wireFiles = new();
     private string _wireUrl = "";
+    private readonly Queue<string> _pinFiles = new();
+    private string _pinUrl = "";
+    private int _pinHash;
+    private readonly Queue<string> _pinSelectionFiles = new();
+    private string _pinSelectionUrl = "";
+    private int _pinSelectionHash;
 
     public ViewportSync()
     {
@@ -173,6 +179,8 @@ internal sealed class ViewportSync : IDisposable
         var seen = new HashSet<string>();
         var seamLines = new List<Vector3>();
         var wireLines = ShowWire ? new List<Vector3>() : null;
+        var pins = new List<Vector3>();
+        var pinSelection = new List<Vector3>();
 
         foreach (var garment in doc.Garments)
         {
@@ -211,8 +219,14 @@ internal sealed class ViewportSync : IDisposable
                     var pb = garment.FindPiece(mesh.Pieces[stitch.PieceB].PieceId)!;
                     if (Workspace.IsEffectivelyVisible(garment, pa) && Workspace.IsEffectivelyVisible(garment, pb))
                     {
-                        seamLines.Add(a);
-                        seamLines.Add(b);
+                        var na = normals[stitch.PieceA][stitch.VertexA];
+                        var nb = normals[stitch.PieceB][stitch.VertexB];
+                        float ha = garment.EffectiveThicknessMm(pa) * 0.0005f + 0.001f;
+                        float hb = garment.EffectiveThicknessMm(pb) * 0.0005f + 0.001f;
+                        seamLines.Add(a + na * ha);
+                        seamLines.Add(b + nb * hb);
+                        seamLines.Add(a - na * ha);
+                        seamLines.Add(b - nb * hb);
                     }
                 }
             }
@@ -224,6 +238,30 @@ internal sealed class ViewportSync : IDisposable
                 if (!Workspace.IsEffectivelyVisible(garment, piece) || pieceMesh.TriangleCount == 0)
                     continue;
                 seen.Add(piece.Id);
+                float halfThickness = garment.EffectiveThicknessMm(piece) * 0.0005f;
+                if (piece.PinKey == pieceMesh.Key)
+                {
+                    foreach (int index in piece.Pins)
+                    {
+                        if (index >= 0 && index < positions[i].Length)
+                        {
+                            pins.Add(positions[i][index] + normals[i][index] * (halfThickness + 0.0015f));
+                            pins.Add(positions[i][index] - normals[i][index] * (halfThickness + 0.0015f));
+                        }
+                    }
+                }
+                if (workspace.PinSelectionKey(piece.Id) == pieceMesh.Key
+                    && workspace.PinSelection.TryGetValue(piece.Id, out var selectedVertices))
+                {
+                    foreach (int index in selectedVertices)
+                    {
+                        if (index >= 0 && index < positions[i].Length)
+                        {
+                            pinSelection.Add(positions[i][index] + normals[i][index] * (halfThickness + 0.0018f));
+                            pinSelection.Add(positions[i][index] - normals[i][index] * (halfThickness + 0.0018f));
+                        }
+                    }
+                }
                 if (wireLines != null)
                 {
                     // Face outlines, lifted a hair off the surface on both sides so they are not hidden by it.
@@ -235,8 +273,9 @@ internal sealed class ViewportSync : IDisposable
                             int a = face[k], b = face[(k + 1) % face.Length];
                             if (!drawn.Add(a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a))
                                 continue;
-                            foreach (float lift in new[] { 0.0008f, -0.0008f })
+                            foreach (float side in new[] { 1f, -1f })
                             {
+                                float lift = side * (halfThickness + 0.0008f);
                                 wireLines.Add(positions[i][a] + normals[i][a] * lift);
                                 wireLines.Add(positions[i][b] + normals[i][b] * lift);
                             }
@@ -257,13 +296,16 @@ internal sealed class ViewportSync : IDisposable
                 hash.Add(layout.UnitsPerCm);
                 hash.Add(layout.Min);
                 hash.Add(piece.FlipNormals);
+                hash.Add(halfThickness);
                 bool usesDrape = piece.Drape != null && piece.DrapeKey == pieceMesh.Key;
                 int signature = hash.ToHashCode();
                 if (entry.Url.Length == 0 || entry.Key != pieceMesh.Key || entry.Hash != signature
                     || !ReferenceEquals(entry.Drape, usesDrape ? piece.Drape : null))
                 {
                     string file = NextFile("p" + piece.Id, entry.Files);
-                    QtMesh.WriteTriangles(file, positions[i], normals[i], layout.Map(piece, pieceMesh), pieceMesh.ShownTriangles(piece.FlipNormals));
+                    var shell = Mesher.BuildShell(positions[i], normals[i], layout.Map(piece, pieceMesh),
+                        pieceMesh.ShownTriangles(piece.FlipNormals), halfThickness * 2f);
+                    QtMesh.WriteTriangles(file, shell.Positions, shell.Normals, shell.Uvs, shell.Triangles);
                     entry.Url = ToUrl(file);
                     entry.Key = pieceMesh.Key;
                     entry.Hash = signature;
@@ -321,13 +363,55 @@ internal sealed class ViewportSync : IDisposable
             _wireUrl = ToUrl(file);
         }
 
+        WriteMarkers("pins", pins, _pinFiles, ref _pinHash, ref _pinUrl);
+        WriteMarkers("pin_selection", pinSelection, _pinSelectionFiles, ref _pinSelectionHash, ref _pinSelectionUrl);
+
         sb.Append("],\"seams\":\"").Append(_seamUrl).Append('"');
         sb.Append(",\"wire\":\"").Append(_wireUrl).Append('"');
+        sb.Append(",\"pins\":\"").Append(_pinUrl).Append('"');
+        sb.Append(",\"pinSelection\":\"").Append(_pinSelectionUrl).Append('"');
         if (workspace.SelectionCentre() is { } centre)
             sb.Append(inv, $",\"gizmo\":[{centre.X:0.#####},{centre.Y:0.#####},{centre.Z:0.#####}]");
         sb.Append(",\"avatar\":\"").Append(AvatarUrl(avatar)).Append('"');
         sb.Append('}');
         return sb.ToString();
+    }
+
+    /// <summary>Small octahedra at the given points; the file is only rewritten when the points move.</summary>
+    private void WriteMarkers(string prefix, List<Vector3> centres, Queue<string> history, ref int lastHash, ref string url)
+    {
+        int hash = 17;
+        foreach (var centre in centres)
+            hash = hash * 31 + centre.GetHashCode();
+        if (centres.Count == 0)
+        {
+            url = "";
+            lastHash = hash;
+            return;
+        }
+        if (hash == lastHash && url.Length != 0)
+            return;
+
+        const float radius = 0.0042f;
+        var directions = new[]
+        {
+            Vector3.UnitY, Vector3.UnitX, Vector3.UnitZ, -Vector3.UnitX, -Vector3.UnitZ, -Vector3.UnitY,
+        };
+        var positions = new Vector3[centres.Count * 6];
+        var triangles = new int[centres.Count * 24];
+        for (int i = 0; i < centres.Count; i++)
+        {
+            int vertex = i * 6;
+            for (int k = 0; k < 6; k++)
+                positions[vertex + k] = centres[i] + directions[k] * radius;
+            int triangle = i * 24;
+            foreach (int corner in new[] { 0, 2, 1, 0, 4, 2, 0, 3, 4, 0, 1, 3, 5, 1, 2, 5, 2, 4, 5, 4, 3, 5, 3, 1 })
+                triangles[triangle++] = vertex + corner;
+        }
+        string file = NextFile(prefix, history);
+        QtMesh.WriteTriangles(file, positions, Mesher.ComputeNormals(positions, triangles), null, triangles);
+        url = ToUrl(file);
+        lastHash = hash;
     }
 
     public void Dispose()

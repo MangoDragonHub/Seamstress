@@ -177,7 +177,7 @@ ApplicationWindow {
         "tool.ellipse": () => App.tool = "Ellipse",
         "tool.ruler": () => App.tool = "Ruler",
         "tool.confirm": () => App.confirmTool(),
-        "tool.cancel": () => { viewport.clearRuler(); App.cancelTool() },
+        "tool.cancel": () => { viewport.clearRuler(); if (App.pinBrush) App.pinBrush = false; else App.cancelTool() },
         "handles.full": () => App.gizmoMode = "Full",
         "handles.move": () => App.gizmoMode = "Move",
         "handles.rotate": () => App.gizmoMode = "Rotate",
@@ -195,6 +195,7 @@ ApplicationWindow {
         "edit.invertNormals": () => App.invertNormals(),
         "edit.cutHole": () => App.cutHole(),
         "view.pinch": () => viewport.pinchMode = !viewport.pinchMode,
+        "view.pinBrush": () => App.pinBrush = !App.pinBrush,
         "view.handles": () => viewport.showGizmo = !viewport.showGizmo,
         "view.avatar": () => viewport.showAvatar = !viewport.showAvatar,
         "sim.toggle": () => App.toggleSimulation(),
@@ -312,6 +313,8 @@ ApplicationWindow {
                 }
                 MenuSeparator {}
                 KeyMenuItem { text: tr("Reset Arrangement"); command: "sim.reset"; onTriggered: App.resetArrangement() }
+                MenuSeparator {}
+                MenuItem { text: tr("Unpin All on Selected Garments"); onTriggered: App.unpinAll() }
             }
             Menu {
                 title: tr("&Avatar")
@@ -337,6 +340,7 @@ ApplicationWindow {
                 KeyMenuItem { text: tr("3D: Wireframe (Topology)"); command: "view.wireframe"; checkable: true; checked: viewport.wireframe; onTriggered: viewport.wireframe = checked }
                 KeyMenuItem { text: tr("3D: Normal Direction"); command: "view.normals"; checkable: true; checked: viewport.showNormals; onTriggered: viewport.showNormals = checked }
                 KeyMenuItem { text: tr("3D: Pinch Cloth"); command: "view.pinch"; checkable: true; checked: viewport.pinchMode; onTriggered: viewport.pinchMode = checked }
+                KeyMenuItem { text: tr("3D: Pin Vertices"); command: "view.pinBrush"; checkable: true; checked: App.pinBrush; onTriggered: App.pinBrush = checked }
                 KeyMenuItem { text: tr("3D: Show Handles"); command: "view.handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
                 Menu {
                     title: tr("Handles")
@@ -469,6 +473,7 @@ ApplicationWindow {
                 Viewport3D {
                     id: viewport
                     onContextMenuRequested: contextMenu.popup()
+                    onPinMenuRequested: pinMenu.popup()
                     SplitView.preferredWidth: 520
                     SplitView.minimumWidth: 200
                 }
@@ -727,5 +732,6 @@ ApplicationWindow {
 
     PreferencesDialog { id: preferences }
     EditMenu { id: contextMenu }
+    PinMenu { id: pinMenu }
     BodyShapeDialog { id: bodyShape }
 }

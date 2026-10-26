@@ -90,6 +90,8 @@ public static class GarmentFile
                 w.WriteBoolean("visible", g.Visible);
                 w.WriteBoolean("simulateWithOthers", g.SimulateWithOthers);
                 w.WriteNumber("particleDistance", g.ParticleDistance);
+                if (g.Thickness is { } thickness)
+                    w.WriteNumber("thickness", thickness);
                 w.WriteString("topology", g.Topology == MeshTopology.Quads ? "quads" : "triangles");
 
                 w.WriteStartArray("groups");
@@ -208,6 +210,15 @@ public static class GarmentFile
             w.WriteRawValue(sb.ToString());
             w.WriteEndObject();
         }
+        if (p.Pins.Count > 0 && p.PinKey != null)
+        {
+            // Vertices held in place during simulation, for the mesh they were chosen on.
+            w.WriteStartObject("pins");
+            w.WriteString("mesh", p.PinKey);
+            w.WritePropertyName("vertices");
+            w.WriteRawValue("[" + string.Join(", ", p.Pins.OrderBy(i => i)) + "]");
+            w.WriteEndObject();
+        }
         w.WriteEndObject();
     }
 
@@ -277,6 +288,8 @@ public static class GarmentFile
             garment.Visible = Bool(g, "visible", true);
             garment.SimulateWithOthers = Bool(g, "simulateWithOthers", false);
             garment.ParticleDistance = Math.Clamp(Num(g, "particleDistance", garment.ParticleDistance), 0.3f, 20f);
+            if (g.TryGetProperty("thickness", out var thickness) && thickness.ValueKind == JsonValueKind.Number)
+                garment.Thickness = Math.Clamp(thickness.GetSingle(), 1f, 50f);
             garment.Topology = string.Equals(Str(g, "topology"), "quads", StringComparison.OrdinalIgnoreCase)
                 ? MeshTopology.Quads : MeshTopology.Triangles;
             foreach (var gr in Items(g, "groups"))
@@ -399,6 +412,17 @@ public static class GarmentFile
                 piece.Drape = values;
                 piece.DrapeKey = Str(drape, "mesh");
             }
+        }
+        if (p.TryGetProperty("pins", out var pins) && pins.ValueKind == JsonValueKind.Object
+            && pins.TryGetProperty("vertices", out var vertices) && vertices.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var vertex in vertices.EnumerateArray())
+            {
+                if (vertex.ValueKind == JsonValueKind.Number && vertex.TryGetInt32(out int index) && index >= 0)
+                    piece.Pins.Add(index);
+            }
+            if (piece.Pins.Count > 0)
+                piece.PinKey = Str(pins, "mesh");
         }
         return piece;
     }

@@ -229,6 +229,36 @@ Pane {
                 }
             }
 
+            // ---- Garment thickness ---------------------------------------------------
+            Section {
+                title: tr("Garment Thickness")
+                visible: !!root.sel.garment
+                CheckBox {
+                    Layout.fillWidth: true
+                    text: tr("Enable Thickness? (Apply per Garment)")
+                    checked: root.sel.garment ? root.sel.garment.thickness !== null : false
+                    onToggled: App.setGarmentThicknessEnabled(root.sel.garment.id, checked)
+                }
+                SliderRow {
+                    visible: root.sel.garment ? root.sel.garment.thickness !== null : false
+                    label: tr("Thickness")
+                    from: root.imperial ? 0.04 : 0.1; to: root.imperial ? 1.97 : 5
+                    stepSize: root.imperial ? 0.01 : 0.1; decimals: root.imperial ? 2 : 1
+                    suffix: " " + root.lengthName
+                    value: (root.sel.garment && root.sel.garment.thickness !== null ? root.sel.garment.thickness : 3)
+                           / 10 / root.cmUnit
+                    onEdited: (v) => App.setGarmentThickness(root.sel.garment.id, v * root.cmUnit * 10)
+                }
+                Label {
+                    visible: root.sel.garment ? root.sel.garment.thickness !== null : false
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.55
+                    font.pixelSize: 11
+                    text: tr("Applies to every piece in this garment and overrides the thickness set in Fabric Physics.")
+                }
+            }
+
             // ---- Seam ----------------------------------------------------------------
             Section {
                 title: tr("Seam")

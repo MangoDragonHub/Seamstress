@@ -165,6 +165,38 @@ AppDialog {
                         }
                     }
                 }
+                GroupBox {
+                    title: tr("Session Logs")
+                    Layout.fillWidth: true
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 8
+                        Note {
+                            text: tr("A log is kept for every session to help diagnose problems. Logs stay on this computer and are not sent anywhere.")
+                        }
+                        Note {
+                            text: tr("A new plain text file with the date and time in its name is written to this folder at every launch:")
+                        }
+                        RowLayout {
+                            spacing: 8
+                            Label { text: tr("Logs folder"); opacity: 0.75 }
+                            Label {
+                                id: logsFolder
+                                Layout.fillWidth: true
+                                text: App.logsFolder
+                                opacity: 0.75
+                                elide: Text.ElideMiddle
+                                ToolTip.visible: folderHover.hovered
+                                ToolTip.text: text
+                                HoverHandler { id: folderHover }
+                            }
+                            Button {
+                                text: tr("Open Logs Folder")
+                                onClicked: App.openLogsFolder()
+                            }
+                        }
+                    }
+                }
                 Item { Layout.fillHeight: true }
             }
 

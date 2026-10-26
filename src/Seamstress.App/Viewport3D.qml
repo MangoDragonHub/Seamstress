@@ -21,12 +21,15 @@ Item {
     // Distance of the scale boxes from the handle centre, in handle units (an arrow is 1 long).
     readonly property real scaleReach: App.gizmoMode === "Full" ? 1.2 : 0.85
     property bool pinchMode: false
+    onPinchModeChanged: if (pinchMode && App.pinBrush) App.pinBrush = false
     property bool showAvatar: true
     property bool showThreads: true
     // Normal direction: each face's front (the side its normal points to) blue, its back red.
     property bool showNormals: false
     property string avatarSource: ""
     property string threadSource: ""
+    property string pinSource: ""
+    property string pinSelectionSource: ""
 
     property real yaw: 25
     property real pitch: -8
@@ -40,8 +43,9 @@ Item {
     readonly property real magnification: Math.max(1, view.height) / Math.max(1e-6, 2 * distance * Math.tan(fieldOfView * Math.PI / 360))
     readonly property var activeCamera: orthographic ? orthoCamera : camera
 
-    // Right-click without dragging: the Edit menu.
+    // Right-click without dragging: the Edit menu, or the Pin menu while the pin brush is on.
     signal contextMenuRequested()
+    signal pinMenuRequested()
 
     // Ruler (the Ruler tool): two points on the cloth or the avatar, in metres. With only the first end placed,
     // the second follows the pointer until the next click.
@@ -64,6 +68,8 @@ Item {
         avatarSource = data.avatar
         threadSource = data.seams
         wireSource = data.wire
+        pinSource = data.pins
+        pinSelectionSource = data.pinSelection
         hasGizmo = data.gizmo !== undefined
         if (hasGizmo)
             gizmoOrigin = Qt.vector3d(data.gizmo[0], data.gizmo[1], data.gizmo[2])
@@ -87,6 +93,52 @@ Item {
             if (!found)
                 pieceModel.append(row)
         }
+    }
+
+    // Vertices of one piece inside a screen rectangle, seen from the front only.
+    function pinBoxVertices(pieceId, x0, y0, x1, y1) {
+        if (pieceId === "")
+            return []
+        const data = JSON.parse(App.pinVertices(pieceId))
+        const minX = Math.min(x0, x1), maxX = Math.max(x0, x1)
+        const minY = Math.min(y0, y1), maxY = Math.max(y0, y1)
+        const facing = root.activeCamera.forward
+        const picked = []
+        for (let i = 0; i + 5 < data.length; i += 6) {
+            const normal = Qt.vector3d(data[i + 3], data[i + 4], data[i + 5])
+            if (normal.dotProduct(facing) >= 0)
+                continue
+            const point = view.mapFrom3DScene(Qt.vector3d(data[i], data[i + 1], data[i + 2]))
+            if (point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY)
+                picked.push(i / 6)
+        }
+        return picked
+    }
+
+    // Box selection covers every visible piece, so it can start on empty space; Shift keeps the old selection.
+    function pinBoxSelectAll(x0, y0, x1, y1, additive) {
+        if (!App.pinBrush)
+            return 0
+        if (!additive)
+            App.clearPinSelection()
+        let total = 0
+        const models = JSON.parse(App.viewportModels()).models
+        for (const model of models) {
+            const picked = pinBoxVertices(model.id, x0, y0, x1, y1)
+            if (picked.length === 0)
+                continue
+            App.pinBoxSelect(model.id, picked.join(","), true)
+            total += picked.length
+        }
+        return total
+    }
+
+    function pinBoxSelect(pieceId, x0, y0, x1, y1) {
+        if (!App.pinBrush)
+            return 0
+        const picked = pinBoxVertices(pieceId, x0, y0, x1, y1)
+        App.pinBoxSelect(pieceId, picked.join(","), false)
+        return picked.length
     }
 
     function setView(newYaw, newPitch) {
@@ -113,6 +165,15 @@ Item {
     Connections {
         target: App
         function onViewportRevisionChanged() { Qt.callLater(root.refresh) }
+        function onPinBrushChanged() {
+            if (App.pinBrush) {
+                root.pinchMode = false
+                root.clearRuler()
+                root.wireframe = true
+            } else {
+                root.wireframe = false
+            }
+        }
     }
 
     View3D {
@@ -239,6 +300,26 @@ Item {
             source: root.threadSource
             materials: PrincipledMaterial { baseColor: "#ff5a5f"; lighting: PrincipledMaterial.NoLighting }
         }
+
+        // Pinned vertices stay where they are; the brush selection is a brighter, temporary highlight.
+        Model {
+            visible: root.pinSource !== ""
+            source: root.pinSource
+            materials: PrincipledMaterial {
+                baseColor: "#ff8a1f"
+                lighting: PrincipledMaterial.NoLighting
+                cullMode: Material.NoCulling
+            }
+        }
+        Model {
+            visible: root.pinSelectionSource !== ""
+            source: root.pinSelectionSource
+            materials: PrincipledMaterial {
+                baseColor: "#ffe14d"
+                lighting: PrincipledMaterial.NoLighting
+                cullMode: Material.NoCulling
+            }
+        }
     }
 
     // Move/rotate handles for the selected pieces, drawn in their own layer so the garment never hides them.
@@ -246,7 +327,7 @@ Item {
         id: gizmoView
         anchors.fill: parent
         camera: root.orthographic ? gizmoOrtho : gizmoCamera
-        visible: root.hasGizmo && root.showGizmo && !App.simulating && !root.pinchMode && !root.measuring
+        visible: root.hasGizmo && root.showGizmo && !App.simulating && !root.pinchMode && !root.measuring && !App.pinBrush
         environment: SceneEnvironment { backgroundMode: SceneEnvironment.Transparent; antialiasingMode: SceneEnvironment.MSAA }
 
         Node {
@@ -327,6 +408,19 @@ Item {
         }
     }
 
+    // The box dragged with the pin brush, over the scene.
+    Rectangle {
+        id: pinBox
+        visible: mouse.pinDragging && mouse.mode === 6
+        x: Math.min(mouse.pressX, mouse.lastX)
+        y: Math.min(mouse.pressY, mouse.lastY)
+        width: Math.abs(mouse.lastX - mouse.pressX)
+        height: Math.abs(mouse.lastY - mouse.pressY)
+        color: Qt.rgba(1, 0.88, 0.3, 0.10)
+        border.color: "#ffe14d"
+        border.width: 1
+    }
+
     MouseArea {
         id: mouse
         anchors.fill: parent
@@ -334,11 +428,15 @@ Item {
         property real lastX: 0
         property real lastY: 0
         property real travelled: 0
-        property int mode: 0   // 1 orbit, 2 pan, 3 dragging a handle, 4 pinching cloth, 5 placing a ruler end
+        property int mode: 0   // 1 orbit, 2 pan, 3 dragging a handle, 4 pinching cloth, 5 placing a ruler end, 6 pin box
         hoverEnabled: root.rulerOpen
         property vector3d pinchStart: Qt.vector3d(0, 0, 0)
         property real pinchScale: 0
-        cursorShape: mode === 4 ? Qt.ClosedHandCursor : (root.pinchMode ? Qt.OpenHandCursor : Qt.ArrowCursor)
+        property bool pinDragging: false
+        property bool pinAdditive: false
+        cursorShape: mode === 4 ? Qt.ClosedHandCursor
+            : App.pinBrush ? Qt.CrossCursor
+            : root.pinchMode ? Qt.OpenHandCursor : Qt.ArrowCursor
         property string activePart: ""
         property real pressX: 0
         property real pressY: 0
@@ -413,6 +511,13 @@ Item {
                 mode = 1
                 return
             }
+            if (e.button === Qt.LeftButton && App.pinBrush && !(e.modifiers & Qt.ControlModifier)) {
+                // Pin brush: drag a box from anywhere, or click a vertex. Shift keeps the earlier selection.
+                pinAdditive = (e.modifiers & Qt.ShiftModifier) !== 0
+                pinDragging = true
+                mode = 6
+                return
+            }
             if (e.button === Qt.LeftButton && root.pinchMode && !(e.modifiers & Qt.ShiftModifier)) {
                 // Pinch: take hold of the cloth under the cursor. Ctrl-drag anywhere still rotates the camera.
                 const hit = view.pick(e.x, e.y)
@@ -479,6 +584,19 @@ Item {
             if (mode === 3) {
                 App.gizmoEnd()
                 activePart = ""
+            } else if (mode === 6) {
+                pinDragging = false
+                const add = pinAdditive
+                // Net movement, not the path length, so a shaky click still counts as a click.
+                if (Math.abs(e.x - pressX) + Math.abs(e.y - pressY) < 4) {
+                    const hit = view.pick(e.x, e.y)
+                    if (hit.objectHit && hit.objectHit.pid)
+                        App.pinClick(hit.objectHit.pid, hit.scenePosition.x, hit.scenePosition.y, hit.scenePosition.z, add)
+                    else if (!add)
+                        App.clearPinSelection()
+                } else {
+                    root.pinBoxSelectAll(pressX, pressY, e.x, e.y, add)
+                }
             } else if (mode === 4) {
                 App.pinchEnd()
             } else if (mode === 5) {
@@ -487,8 +605,21 @@ Item {
                     root.rulerOpen = false
             } else if (travelled < 4 && e.button === Qt.RightButton) {
                 const hit = view.pick(e.x, e.y)
-                App.contextSelectIn3D(hit.objectHit && hit.objectHit.pid ? hit.objectHit.pid : "")
-                root.contextMenuRequested()
+                if (App.pinBrush) {
+                    App.activate3D(hit.objectHit && hit.objectHit.pid ? hit.objectHit.pid : "")
+                    root.pinMenuRequested()
+                } else {
+                    App.contextSelectIn3D(hit.objectHit && hit.objectHit.pid ? hit.objectHit.pid : "")
+                    root.contextMenuRequested()
+                }
+            } else if (travelled < 4 && e.button === Qt.LeftButton && App.pinBrush) {
+                // Shift/Ctrl-click, or a click that missed the cloth: add a vertex or clear the brush selection.
+                const hit = view.pick(e.x, e.y)
+                const add = (e.modifiers & Qt.ControlModifier) !== 0 || (e.modifiers & Qt.ShiftModifier) !== 0
+                if (hit.objectHit && hit.objectHit.pid)
+                    App.pinClick(hit.objectHit.pid, hit.scenePosition.x, hit.scenePosition.y, hit.scenePosition.z, add)
+                else if (!add)
+                    App.clearPinSelection()
             } else if (travelled < 4 && e.button === Qt.LeftButton && root.measuring) {
                 root.clearRuler()      // a click on empty space
             } else if (travelled < 4 && e.button === Qt.LeftButton) {
@@ -502,6 +633,9 @@ Item {
         onCanceled: {
             if (mode === 3) App.gizmoEnd()
             if (mode === 4) App.pinchEnd()
+            if (mode === 6)
+                pinDragging = false
+            pinAdditive = false
             activePart = ""
             mode = 0
         }
@@ -569,9 +703,26 @@ Item {
             text: tr("Pinch")
             checkable: true
             checked: root.pinchMode
-            onToggled: root.pinchMode = checked
+            onToggled: {
+                root.pinchMode = checked
+                if (checked)
+                    App.pinBrush = false
+            }
             ToolTip.visible: hovered
             ToolTip.text: tr("Drag the cloth itself to tug it into place, during or after simulation")
+        }
+        ViewButton {
+            text: tr("Pin")
+            checkable: true
+            checked: App.pinBrush
+            onToggled: {
+                App.pinBrush = checked
+                if (checked)
+                    root.pinchMode = false
+            }
+            ToolTip.visible: hovered
+            readonly property string key: { App.keysRevision; return App.keyText("view.pinBrush") }
+            ToolTip.text: tr("Click cloth vertices, or drag a box, to pin them in place during simulation") + (key !== "" ? " (" + key + ")" : "")
         }
         ViewButton {
             text: tr("Gizmo")
@@ -594,7 +745,8 @@ Item {
         elide: Text.ElideRight
         opacity: 0.55
         font.pixelSize: 11
-        text: root.measuring ? tr("Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Ctrl-drag: orbit")
+        text: App.pinBrush ? tr("Pin: click vertices or drag a box  ·  Shift: add to the selection  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit")
+            : root.measuring ? tr("Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Ctrl-drag: orbit")
             : root.pinchMode ? tr("Pinch: drag the cloth to pull it  ·  Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom")
                             : tr("Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap")
     }

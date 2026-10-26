@@ -159,7 +159,7 @@ maps what you already know to where it lives here.
   it with the Edit Points tool; each part is then its own edge.
 - **Units.** Patterns are in centimetres; 3D positions are in metres. To work in inches instead, switch
   **Measurements** to Imperial in [Preferences](#preferences).
-- **Not available yet:** internal lines and darts, pins, seam allowance, linked symmetric patterns, trims
+- **Not available yet:** internal lines and darts, seam allowance, linked symmetric patterns, trims
   (buttons, zippers), pressure and wind, animation, and avatar posing or measurement editing.
 
 ---
@@ -458,6 +458,28 @@ body.
 - Only garments that are being simulated can be pinched. If another garment is the active one and a simulation
   is already running, stop it first or tick **All garments**.
 
+### Pinning the cloth
+
+Pins hold vertices still while the rest of the garment simulates, which is handy for keeping a hem, a strap or
+a neckline where you want it. Turn on **Pin** in the 3D view (or **View ▸ 3D: Pin Vertices**); wireframe
+turns on with it so you can see the vertices, and turns off again when you leave Pin mode. Then:
+
+- **Click** a piece of cloth to select the nearest vertex; the selection is shown in yellow.
+- **Drag a box** anywhere in the 3D view, including empty space around the garment, to select every visible
+  vertex inside it on the pieces facing you. A plain click or box replaces the selection; hold **Shift** while
+  clicking or dragging a box to add to it (**Ctrl-click** also adds, or removes an already-selected vertex).
+- **Right-click** the cloth to open the Pin menu: **Pin Selected Vertices**, **Unpin Selected Vertices**,
+  **Clear Vertex Selection**, and **Unpin All on Selected Garments**. Pinned vertices are marked in orange.
+- **Unpin All** (also in the **Simulation** menu) clears every pin on the selected garments. With nothing
+  selected it uses the garment you last clicked in the 3D view.
+
+Pins are applied when the solver starts, so they freeze the cloth from the beginning of the next run. To pin
+after a simulation, let it stop (or stop it), select vertices on the draped cloth, pin them, and simulate
+again: the pinned vertices stay where they are while the rest settles. Each pin or unpin is one undo step.
+
+Pins are saved with the project. Changing a piece's shape or the garment's particle distance rebuilds its
+mesh, which makes the old vertex numbers meaningless, so those edits remove the piece's pins.
+
 ---
 
 ## Simulation
@@ -568,7 +590,7 @@ apply immediately; dragging a slider counts as a single undo step.
 | **Bend** | Resistance to folding. Low values give many small wrinkles; high values give stiff, smooth cloth. |
 | **Damping** | How quickly motion dies out. |
 | **Friction** | Grip against the avatar and other cloth. |
-| **Thickness** | Collision thickness in millimetres: how far the cloth sits off the body and other layers. |
+| **Thickness** | Collision thickness in millimetres: how far the cloth sits off the body and other layers. The 3D view shows the fabric as a solid shell. A garment-wide thickness overrides it. |
 
 With several pieces selected, a change applies to all of them.
 
@@ -582,6 +604,11 @@ With several pieces selected, a change applies to all of them.
   wrinkles and slower simulation. The face and vertex counts update as you drag.
 - **Faces** chooses **Triangles** (even, near-equilateral) or **Quads** (a grid along the fabric grain).
 - **Piece override** gives the selected piece its own particle distance; 0 means "use the garment's".
+
+**Garment Thickness** — tick **Use one thickness for the whole garment** to give every piece in the active
+garment the same collision thickness. The slider is in centimetres. This overrides the per-piece **Thickness**
+under Fabric Physics for that garment only, so a shirt can be 1 cm and a skirt 2 cm. The 3D view extrudes the
+surface into a closed shell at that thickness; the slider updates it immediately.
 
 ![Quad topology with the Wire overlay on](images/topology-quads.png)
 
@@ -767,6 +794,7 @@ MakeHuman's body.
 | --- | --- | --- |
 | General | **Interface language** | English, Español, Português (Brasil), Français, 中文（简体） or 日本語. See [Language](#language) below. |
 | General | **Measurements** | *Metric* shows centimetres, metres, millimetres and g/m². *Imperial* shows inches, oz/yd² and feet and inches for the avatar height, and the grids change to 4 in squares with a stronger line every foot. Only the interface changes: garment files and exports are the same either way. |
+| General | **Session Logs** | Show where logs are written and open the folder. A log is kept for every session. See [Logs](#logs) below. |
 | Themes | **Preset** | The colour scheme of the whole interface: *Default* (the dark grey Seamstress has always used), *Light*, *High Contrast Dark* or *High Contrast Light*. See [Themes](#themes) below. |
 | Themes | **Save Theme… / Load Theme…** | Save the current colours to a file, or load a theme file. A loaded theme is remembered as *Custom*. |
 | Viewport | **Renderer** | *Automatic* uses the GPU and falls back to CPU rendering when no GPU driver is found or the GPU failed to start last time. *GPU* and *CPU* force one or the other. Takes effect on the next start. |
@@ -784,6 +812,23 @@ MakeHuman's body.
 Everything except the theme waits for **Save**; **Cancel** leaves it all as it was (a previewed theme is
 switched back too). The renderer in use is shown in the bottom-right corner of the 3D view. You can also
 force it for one run by starting Seamstress with `--cpu` or `--gpu`.
+
+### Logs
+
+Seamstress keeps a plain-text log of every session to help diagnose problems; there is no setting to turn it
+off. *Preferences ▸ General ▸ Session Logs* shows the log folder and opens it.
+
+Every launch writes a new plain-text file named after the date and time, such as
+`seamstress-2026-10-23_14-30-05.txt`, into the `logs` folder inside Seamstress's own folder:
+
+- Windows: `Documents\Seamstress\logs`
+- Linux: `~/.config/Seamstress/logs` (or `$XDG_CONFIG_HOME/Seamstress/logs`)
+- Flatpak: `~/.var/app/io.github.mangodragonhub.Seamstress/config/Seamstress/logs`
+
+The log records the version, operating system, renderer choice, files opened, and errors with their stack
+traces. It stays on your computer and is not sent anywhere. If Seamstress does not start, or behaves strangely,
+the newest log is the first thing to look at, and attaching it to a bug report helps a great deal. **Open Logs
+Folder** in Preferences shows the files.
 
 ### Themes
 
@@ -925,7 +970,9 @@ drag that part of the cloth to where it should sit.
 **A texture shows as missing.** The image file was moved. Choose it again with **…** in the Material section.
 
 **The 3D view is blank or the application will not start.** Start it with `--cpu` to use CPU rendering, or
-choose *CPU* under **Preferences ▸ Viewport ▸ Renderer**.
+choose *CPU* under **Preferences ▸ Viewport ▸ Renderer**. If that does not help, open the newest file in the
+[logs folder](#logs): it records the startup details and any error, and is the best thing to attach to a bug
+report.
 
 ---
 

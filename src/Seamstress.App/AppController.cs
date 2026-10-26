@@ -7,6 +7,7 @@ using System.Text.Json;
 using Qt.Quick;
 using Seamstress.Core;
 using Seamstress.Core.Editing;
+using Seamstress.Core.Geometry;
 using Seamstress.Core.IO;
 using Seamstress.Core.Model;
 using Seamstress.Core.Simulation;
@@ -42,6 +43,7 @@ public partial class AppController : INotifyPropertyChanged
     private string _simInfo = "";
     private string _lastError = "";
     private bool _simulateAll;
+    private bool _pinBrush;
     private bool _refreshQueued;
     private bool _startWhenAvatarReady;
 
@@ -50,6 +52,8 @@ public partial class AppController : INotifyPropertyChanged
     public AppController()
     {
         Lang.Current = Startup.Language ?? _settings.Language;
+        AppLog.Write($"Interface language: {Lang.Current}");
+        AppLog.Write($"Theme: {_settings.Theme}; units: {_settings.Units}");
         _status = Lang.T("Ready");
         _editor = new PatternEditor(_workspace);
         _simulation = new SimulationController(_workspace, () => _avatar);
@@ -87,6 +91,7 @@ public partial class AppController : INotifyPropertyChanged
             Notify(nameof(Simulating));
             Notify(nameof(HasFile));
             Notify(nameof(AvatarType));
+            Notify(nameof(PinSelectionCount));
             EnsureAvatar();
         }
         finally
@@ -161,6 +166,26 @@ public partial class AppController : INotifyPropertyChanged
         set { if (_simulateAll != value) { _simulateAll = value; Notify(); } }
     }
 
+    /// <summary>The 3D pin brush: clicks and drags choose cloth vertices instead of pieces.</summary>
+    public bool PinBrush
+    {
+        get => _pinBrush;
+        set
+        {
+            if (_pinBrush == value)
+                return;
+            _pinBrush = value;
+            if (!value)
+                _workspace.ClearPinSelection();
+            Notify();
+            StatusText = value
+                ? Lang.T("Pin: click cloth vertices, or drag a box around them  ·  Right-click: Pin menu")
+                : _editor.Hint;
+        }
+    }
+
+    public int PinSelectionCount => _workspace.PinSelectionCount;
+
     public string CheckerTexture => _viewport.CheckerUrl;
     public string GizmoArrow => _viewport.ArrowUrl;
     public string GizmoRing => _viewport.RingUrl;
@@ -189,20 +214,26 @@ public partial class AppController : INotifyPropertyChanged
     public int StartupWidth => Startup.Width;
     public int StartupHeight => Startup.Height;
 
-    /// <summary>Writes a line to standard error; used by the automated UI check.</summary>
-    public void Log(string message) => Console.Error.WriteLine(message);
+    /// <summary>Writes a line to standard error and to this session's log; used by the automated UI check.</summary>
+    public void Log(string message)
+    {
+        Console.Error.WriteLine(message);
+        AppLog.Write(message);
+    }
 
     private void Fail(string action, Exception e)
     {
         LastError = $"{action}\n\n{e.Message}";
         StatusText = action;
         ErrorRevision++;
+        AppLog.Write($"{action}\n{e}");
     }
 
     private void Fail(string message)
     {
         LastError = message;
         ErrorRevision++;
+        AppLog.Write(message);
     }
 
     private void TrySaveSettings()
@@ -214,6 +245,7 @@ public partial class AppController : INotifyPropertyChanged
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             StatusText = Lang.F("Could not save preferences: {0}", e.Message);
+            AppLog.Write($"Could not save preferences: {e.Message}");
         }
     }
 
@@ -391,6 +423,129 @@ public partial class AppController : INotifyPropertyChanged
             _workspace.ClearSelection();
         else
             _workspace.SelectPiece(pieceId, additive);
+    }
+
+    /// <summary>Makes the garment under the pointer the one Simulate acts on, without clearing a brush selection.</summary>
+    public void Activate3D(string pieceId)
+    {
+        if (_workspace.Document.GarmentOfPiece(pieceId) is { } garment)
+            _workspace.SetActiveGarment(garment.Id);
+    }
+
+    // ---------------------------------------------------------------- pinning
+
+    /// <summary>Brush click: selects the cloth vertex nearest to the point picked in the 3D view.</summary>
+    public void PinClick(string pieceId, double x, double y, double z, bool additive)
+    {
+        if (!_pinBrush)
+            return;
+        var garment = _workspace.Document.GarmentOfPiece(pieceId);
+        if (garment == null)
+            return;
+        var piece = garment.FindPiece(pieceId);
+        var mesh = _workspace.MeshFor(garment).Find(pieceId);
+        if (piece == null || mesh == null)
+            return;
+        var positions = Mesher.CurrentPositions(piece, mesh);
+        var point = new Vector3((float)x, (float)y, (float)z);
+        int nearest = -1;
+        float best = float.MaxValue;
+        for (int i = 0; i < positions.Length; i++)
+        {
+            float distance = Vector3.DistanceSquared(positions[i], point);
+            if (distance < best)
+            {
+                best = distance;
+                nearest = i;
+            }
+        }
+        if (nearest < 0)
+        {
+            if (!additive)
+                _workspace.ClearPinSelection();
+            return;
+        }
+        _workspace.SetActiveGarment(garment.Id);
+        if (additive)
+            _workspace.TogglePinVertex(pieceId, nearest);
+        else
+            _workspace.SelectPinVertices(pieceId, new[] { nearest }, false);
+    }
+
+    /// <summary>The vertices of one piece as [x,y,z,nx,ny,nz,...], for the brush's box selection.</summary>
+    public string PinVertices(string pieceId)
+    {
+        var garment = _workspace.Document.GarmentOfPiece(pieceId);
+        if (garment == null)
+            return "[]";
+        var piece = garment.FindPiece(pieceId);
+        var mesh = _workspace.MeshFor(garment).Find(pieceId);
+        if (piece == null || mesh == null)
+            return "[]";
+        var positions = Mesher.CurrentPositions(piece, mesh);
+        var normals = Mesher.ComputeNormals(positions, mesh.ShownTriangles(piece.FlipNormals));
+        var sb = new StringBuilder(positions.Length * 64);
+        sb.Append('[');
+        for (int i = 0; i < positions.Length; i++)
+        {
+            if (i > 0)
+                sb.Append(',');
+            var p = positions[i];
+            var n = normals[i];
+            sb.Append(p.X.ToString("0.#####", CultureInfo.InvariantCulture)).Append(',')
+              .Append(p.Y.ToString("0.#####", CultureInfo.InvariantCulture)).Append(',')
+              .Append(p.Z.ToString("0.#####", CultureInfo.InvariantCulture)).Append(',')
+              .Append(n.X.ToString("0.#####", CultureInfo.InvariantCulture)).Append(',')
+              .Append(n.Y.ToString("0.#####", CultureInfo.InvariantCulture)).Append(',')
+              .Append(n.Z.ToString("0.#####", CultureInfo.InvariantCulture));
+        }
+        return sb.Append(']').ToString();
+    }
+
+    public void PinBoxSelect(string pieceId, string indices, bool additive)
+    {
+        if (!_pinBrush)
+            return;
+        var garment = _workspace.Document.GarmentOfPiece(pieceId);
+        var mesh = garment == null ? null : _workspace.MeshFor(garment).Find(pieceId);
+        if (garment == null || mesh == null)
+            return;
+        var vertices = new List<int>();
+        foreach (string part in indices.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out int index)
+                && index >= 0 && index < mesh.VertexCount)
+                vertices.Add(index);
+        }
+        _workspace.SetActiveGarment(garment.Id);
+        _workspace.SelectPinVertices(pieceId, vertices, additive);
+    }
+
+    public void ClearPinSelection() => _workspace.ClearPinSelection();
+
+    public void PinSelectedVertices()
+    {
+        int count = _workspace.PinSelectedVertices();
+        StatusText = count == 0 ? Lang.T("No vertices selected")
+            : count == 1 ? Lang.T("Pinned 1 vertex")
+            : Lang.F("Pinned {0} vertices", count);
+    }
+
+    public void UnpinSelectedVertices()
+    {
+        bool hadSelection = PinSelectionCount > 0;
+        int count = _workspace.UnpinSelectedVertices();
+        StatusText = count == 0 ? (hadSelection ? Lang.T("No pins to remove") : Lang.T("No vertices selected"))
+            : count == 1 ? Lang.T("Unpinned 1 vertex")
+            : Lang.F("Unpinned {0} vertices", count);
+    }
+
+    public void UnpinAll()
+    {
+        int count = _workspace.UnpinAll();
+        StatusText = count == 0 ? Lang.T("No pins to remove")
+            : count == 1 ? Lang.T("Unpinned 1 vertex")
+            : Lang.F("Unpinned {0} vertices", count);
     }
 
     // Move/rotate handles in the 3D view. Offsets and angles are totals since the drag began.
@@ -737,6 +892,8 @@ public partial class AppController : INotifyPropertyChanged
     }
 
     public void SetSimulateWithOthers(string garmentId, bool value) => _workspace.SetSimulateWithOthers(garmentId, value);
+    public void SetGarmentThicknessEnabled(string garmentId, bool enabled) => _workspace.SetGarmentThicknessEnabled(garmentId, enabled);
+    public void SetGarmentThickness(string garmentId, double millimetres) => _workspace.SetGarmentThickness(garmentId, (float)millimetres);
 
     public void SetTopology(string topology)
     {
@@ -784,6 +941,7 @@ public partial class AppController : INotifyPropertyChanged
         }
         var names = _workspace.Document.Garments.Where(g => _simulation.SimulatedGarments.Contains(g.Id)).Select(g => g.Name);
         StatusText = Lang.F("Simulating {0} — press Space to stop.", string.Join(", ", names));
+        AppLog.Write($"Simulating: {string.Join(", ", names)}");
         Notify(nameof(Simulating));
         Notify(nameof(CanUndo));
     }
@@ -797,9 +955,14 @@ public partial class AppController : INotifyPropertyChanged
         SimInfo = "";
         Notify(nameof(Simulating));
         if (error != null)
+        {
             Fail(Lang.T("The simulation stopped because of an error."), new Exception(error));
+        }
         else
+        {
             StatusText = Lang.T("Simulation stopped.");
+            AppLog.Write("Simulation stopped.");
+        }
     }
 
     public void ResetArrangement()
@@ -824,12 +987,14 @@ public partial class AppController : INotifyPropertyChanged
     public bool Open(string fileUrl)
     {
         string path = LocalPath(fileUrl);
+        AppLog.Write($"Opening {path}");
         try
         {
             _workspace.Open(path);
             _settings.AddRecent(path);
             TrySaveSettings();
             StatusText = Lang.F("Opened {0}", Path.GetFileName(path));
+            AppLog.Write($"Opened {path}");
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
@@ -846,6 +1011,7 @@ public partial class AppController : INotifyPropertyChanged
         string path = LocalPath(fileUrl);
         if (!path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             path += GarmentFile.Extension;
+        AppLog.Write($"Saving {path}");
         try
         {
             if (_simulation.IsRunning)
@@ -854,6 +1020,7 @@ public partial class AppController : INotifyPropertyChanged
             _settings.AddRecent(path);
             TrySaveSettings();
             StatusText = Lang.F("Saved {0}", Path.GetFileName(path));
+            AppLog.Write($"Saved {path}");
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -888,6 +1055,7 @@ public partial class AppController : INotifyPropertyChanged
     public bool ExportTo(string format, string fileUrl, bool weld, bool activeOnly)
     {
         string path = LocalPath(fileUrl);
+        AppLog.Write($"Exporting {format} to {path} (weld seams: {weld}; active garment only: {activeOnly})");
         try
         {
             var scene = BuildExport(weld, activeOnly);
@@ -910,6 +1078,7 @@ public partial class AppController : INotifyPropertyChanged
             }
             int faces = scene.Meshes.Sum(m => format == "gltf" ? m.TriangleCount : m.FaceCount);
             StatusText = Lang.F("Exported {0} garment(s), {1:N0} faces to {2}", scene.Meshes.Count, faces, path);
+            AppLog.Write($"Exported {scene.Meshes.Count} garment(s), {faces} faces to {path}");
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
@@ -957,6 +1126,7 @@ public partial class AppController : INotifyPropertyChanged
             if (!string.IsNullOrWhiteSpace(_settings.MakeHumanCommand) && Startup.AllowLaunch)
                 launched = LaunchMakeHuman() ? " " + Lang.T("MakeHuman is starting.") : "";
             StatusText = Lang.F("Sent “{0}” to MakeHuman ({1:N0} vertices): {2}.", name, result.VertexCount, result.Folder) + launched;
+            AppLog.Write($"Sent “{name}” to MakeHuman ({result.VertexCount} vertices): {result.Folder}");
             LastMakeHumanFolder = result.Folder;
             return true;
         }
@@ -1127,13 +1297,38 @@ public partial class AppController : INotifyPropertyChanged
     /// <summary>Folder the automated check writes its files into.</summary>
     public string StartupFolderUrl => Startup.Screenshot == null ? "" : ViewportSync.ToUrl(Path.GetDirectoryName(Startup.Screenshot)!);
 
+    // ---------------------------------------------------------------- session logs
+
+    /// <summary>The dedicated Seamstress folder logs are written to.</summary>
+    public string LogsFolder => AppLog.Folder;
+
+    /// <summary>Shows the logs folder in the system's file manager.</summary>
+    public void OpenLogsFolder()
+    {
+        try
+        {
+            Directory.CreateDirectory(AppLog.Folder);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AppLog.Folder) { UseShellExecute = true });
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            Fail(Lang.T("Could not open the logs folder."), e);
+        }
+    }
+
     /// <summary>Called when the window closes.</summary>
     public void Shutdown()
     {
+        AppLog.Write("Seamstress closed.");
         _simulation.Dispose();
         _viewport.Dispose();
+        AppLog.Stop();
     }
 
     /// <summary>The viewport rendered its first frame, so the chosen renderer works on this machine.</summary>
-    public void ViewportReady() => Startup.ClearCrashMarker();
+    public void ViewportReady()
+    {
+        AppLog.Write($"Viewport ready ({Startup.RendererDescription}).");
+        Startup.ClearCrashMarker();
+    }
 }

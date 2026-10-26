@@ -77,6 +77,7 @@ public static class Program
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
             Console.Error.WriteLine($"Could not set {name}: {e.Message}");
+            AppLog.Write($"Could not set {name}: {e.Message}");
         }
     }
 
@@ -93,6 +94,19 @@ public static class Program
         {
             return true;
         }
+    }
+
+    private static string Version => typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+
+    /// <summary>Writes the machine and startup details that make a launch log useful for a bug report.</summary>
+    private static void LogStartup(string[] args)
+    {
+        AppLog.Write($"Seamstress {Version} starting");
+        AppLog.Write($"OS: {RuntimeInformation.OSDescription} ({RuntimeInformation.ProcessArchitecture})");
+        AppLog.Write($"Runtime: .NET {Environment.Version}");
+        AppLog.Write($"Arguments: {(args.Length == 0 ? "(none)" : string.Join(" ", args))}");
+        AppLog.Write($"Settings: {AppSettings.DefaultPath}");
+        AppLog.Write($"Log: {AppLog.FilePath ?? "(not written for this automated run)"}");
     }
 
     public static void Main(string[] args)
@@ -151,8 +165,29 @@ public static class Program
         if (options.Smoke)
             options.Language ??= Lang.English;
 
+        var settings = AppSettings.Load();
+        bool automated = options.Smoke || options.Screenshot != null;
+        // The log starts before Qt so that failures while the window is created are recorded too. Automated runs
+        // report on standard error and do not leave session logs behind.
+        if (!automated)
+            AppLog.Start(AppSettings.LogsFolder);
+        LogStartup(args);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => AppLog.Write("Unhandled exception:\n" + e.ExceptionObject);
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            AppLog.Write("Unobserved task exception:\n" + e.Exception);
+            e.SetObserved();
+        };
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => AppLog.Stop();
+
         // Decide between the GPU renderer and the CPU fallback before Qt creates its rendering context.
-        string preference = forced ?? AppSettings.Load().Renderer;
+        string preference = forced ?? settings.Renderer;
+        bool gpuUsable = GpuLooksUsable();
+        bool previousGpuFailure = StartupOptions.PreviousGpuStartFailed;
+        AppLog.Write($"Renderer preference: {preference}");
+        AppLog.Write($"Previous GPU start failed: {previousGpuFailure}");
+        if (OperatingSystem.IsLinux())
+            AppLog.Write($"GPU driver found: {gpuUsable}");
         bool software;
         if (preference == "cpu")
         {
@@ -164,31 +199,36 @@ public static class Program
             software = false;
             options.RendererDescription = Lang.N("GPU");
         }
-        else if (!GpuLooksUsable())
+        else if (!gpuUsable)
         {
             software = true;
             options.RendererDescription = Lang.N("CPU (no GPU driver found)");
         }
-        else if (StartupOptions.PreviousGpuStartFailed)
+        else if (previousGpuFailure)
         {
             software = true;
             options.RendererDescription = Lang.N("CPU (the GPU renderer failed to start last time)");
             options.ClearCrashMarker();
+            AppLog.Write("The previous GPU start did not finish; falling back to the CPU renderer.");
         }
         else
         {
             software = false;
             options.RendererDescription = Lang.N("GPU");
         }
+        AppLog.Write($"Renderer: {options.RendererDescription}");
+        AppLog.Write($"Language: {options.Language ?? settings.Language}");
 
         if (software)
         {
             SetNativeEnvironment("QSG_RHI_PREFER_SOFTWARE_RENDERER", "1");
             SetNativeEnvironment("LIBGL_ALWAYS_SOFTWARE", "1");
+            AppLog.Write("Software rendering variables set.");
         }
         else if (options.Screenshot == null)
         {
             StartupOptions.WriteCrashMarker();
+            AppLog.Write("GPU startup marker written.");
         }
         SetNativeEnvironment("QT_QUICK_CONTROLS_STYLE", "Fusion");
         // Qt's file dialogs need this to list local files when they run inside QML.
