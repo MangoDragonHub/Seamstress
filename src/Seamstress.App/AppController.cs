@@ -1325,9 +1325,16 @@ public partial class AppController : INotifyPropertyChanged
         AppLog.Stop();
     }
 
+    /// <summary>
+    /// Set once the viewport rendered its first frame. The launcher watches it, because the Qt bridge reports
+    /// nothing when the interface fails to load: no window appears and the process would wait for ever.
+    /// </summary>
+    internal static volatile bool InterfaceDrawn;
+
     /// <summary>The viewport rendered its first frame, so the chosen renderer works on this machine.</summary>
     public void ViewportReady()
     {
+        InterfaceDrawn = true;
         AppLog.Write($"Viewport ready ({Startup.RendererDescription}).");
         Startup.ClearCrashMarker();
     }

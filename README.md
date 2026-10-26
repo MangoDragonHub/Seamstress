@@ -127,11 +127,16 @@ Install the [.NET SDK 9.0.200 or newer](https://dotnet.microsoft.com/download) (
 then in PowerShell:
 
 ```powershell
-.\build.ps1 run
+.\build.ps1 -InstallQt run
 ```
 
-On 64-bit Windows the bridge package ships its own Qt, so nothing else is needed. If Visual Studio's C++ tools
-are installed the bridge uses them; if not, the script switches to the bridge's prebuilt launcher.
+The 3D viewport is built with Qt Quick 3D, which the minimal Qt runtime in the bridge's Windows package does not
+contain. `-InstallQt` downloads a full Qt 6 of the version the bridge uses into `~\Qt` (about 2.7 GB, once); if
+you already have one, pass `-Qt C:\Qt\6.12.0\msvc2022_64` instead. Without either, the build stops with an
+explanation -- the app would otherwise start and never show a window.
+
+If Visual Studio's C++ tools are installed the bridge uses them; if not, the script switches to the bridge's
+prebuilt launcher.
 `.\build.ps1 package` produces `dist\Seamstress-win-x64.zip`; the unzipped app needs the .NET 8 runtime installed.
 If PowerShell refuses to run the script, start it with `powershell -ExecutionPolicy Bypass -File build.ps1`.
 `-AllX64` and `-AllArm64` are the build-and-package-for-one-processor shortcuts; on Windows the zip is the only

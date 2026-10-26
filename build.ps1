@@ -11,8 +11,9 @@
     .\build.ps1 -AllArm64       the same for ARM64
     .\build.ps1 clean           remove build output
 
-    On 64-bit Windows the Qt bridge package brings its own copy of Qt, so only the .NET SDK is required.
-    Pass -Qt <dir> to build against another Qt 6 installation.
+    The 3D viewport is built with Qt Quick 3D, which the minimal Qt runtime in the bridge's Windows package does
+    not contain, so a full Qt 6 of the same version is needed: -Qt <dir> points at one, -InstallQt downloads it
+    into ~\Qt. Without either the build stops with an explanation, instead of making an app that shows no window.
 
     ARM64 (Windows on ARM: Snapdragon laptops, Surface Pro X...) needs a Qt for ARM64, which the bridge does not
     bring. -InstallQt downloads it into ~\Qt; -Qt or C:\Qt\<version>\msvc2022_arm64 are used otherwise.
@@ -29,14 +30,16 @@
     Release (default) or Debug.
 
 .PARAMETER Qt
-    Qt 6 prefix to build against, for example C:\Qt\6.11.3\msvc2022_64 or C:\Qt\6.11.3\msvc2022_arm64.
+    Qt 6 prefix to build against, for example C:\Qt\6.11.3\msvc2022_64 or C:\Qt\6.11.3\msvc2022_arm64. On 64-bit
+    Windows it must be the version the bridge package was built with and include Qt Quick 3D.
 
 .PARAMETER HostQt
     When cross-compiling to ARM64, the x64 Qt of the same version whose tools the build runs. By default the
     msvc2022_64 folder next to the ARM64 Qt.
 
 .PARAMETER InstallQt
-    Download Qt into ~\Qt with aqtinstall if the Qt needed for -Arch is not found.
+    Download the Qt needed into ~\Qt with aqtinstall when it is not found: a full desktop Qt on 64-bit Windows,
+    or the ARM64 Qt when building for ARM64.
 
 .PARAMETER AllX64
     Build (Release) and package everything for x64 in one run: the same as "package", the zip being the only
@@ -134,9 +137,9 @@ function Invoke-Aqt([string[]]$arguments) {
     if ($LASTEXITCODE -ne 0) { Fail 'downloading Qt failed' }
 }
 
-function Install-Qt($aqtHost, $aqtArch) {
-    Say "Installing Qt $QtVersion ($aqtArch) into ~\Qt with aqtinstall"
-    Invoke-Aqt (@('install-qt', $aqtHost, 'desktop', $QtVersion, $aqtArch, '-O', (Join-Path $HOME 'Qt'), '-m') + $QtModules)
+function Install-Qt($aqtHost, $aqtArch, $version) {
+    Say "Installing Qt $version ($aqtArch) into ~\Qt with aqtinstall"
+    Invoke-Aqt (@('install-qt', $aqtHost, 'desktop', $version, $aqtArch, '-O', (Join-Path $HOME 'Qt'), '-m') + $QtModules)
 }
 
 # Newest <root>\<version>\<subdir> under C:\Qt (Qt online installer) and ~\Qt (aqtinstall) that passes the test.
@@ -150,6 +153,84 @@ function Find-Qt($subdir, [scriptblock]$accept) {
     return $null
 }
 
+# The bridge package for this PC. On Windows it carries the Qt it deploys: a minimal Qt Quick runtime that runs
+# QML but has none of the modules a full Qt has, Qt Quick 3D among them.
+function Find-BridgePackage {
+    $root = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+    Get-ChildItem (Join-Path $root 'qtgroup.qt.bridge.csharp.win-*') -Directory -ErrorAction SilentlyContinue |
+        ForEach-Object { Get-ChildItem $_.FullName -Directory -ErrorAction SilentlyContinue } |
+        Sort-Object { try { [version]($_.Name -replace '-.*$', '') } catch { [version]'0.0' } } -Descending |
+        Where-Object { Test-Path (Join-Path $_.FullName 'tools\qt\bin\windeployqt.exe') } |
+        Select-Object -First 1
+}
+
+# The bridge's prebuilt host is built against one Qt version, and Qt is only binary compatible within a version,
+# so the full Qt that replaces the bundled one has to have exactly that version.
+function Get-BridgeQtVersion {
+    $package = Find-BridgePackage
+    if (-not $package) {
+        # The package only reaches the NuGet cache with the restore, and -InstallQt runs before the build.
+        & dotnet restore 'src\Seamstress.App\Seamstress.App.csproj' --nologo -v:quiet | Out-Null
+        $package = Find-BridgePackage
+    }
+    if (-not $package) { return $null }
+    $core = Join-Path $package.FullName 'tools\qt\bin\Qt6Core.dll'
+    if (-not (Test-Path $core)) { return $null }
+    $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($core).FileVersion
+    if ($version -match '^\d+\.\d+\.\d+') { return $Matches[0] }
+    return $null
+}
+
+# 64-bit Windows: the bridge's Qt has no Qt Quick 3D, so -InstallQt fetches a full Qt of the bridge's version,
+# or reuses one of that version that is already installed.
+function Resolve-DesktopQt {
+    $version = Get-BridgeQtVersion
+    if (-not $version) {
+        Fail 'Cannot tell which Qt version the bridge package uses; install Qt yourself and pass -Qt <dir>.'
+    }
+    foreach ($root in @('C:\Qt', (Join-Path $HOME 'Qt'))) {
+        $dir = Join-Path $root "$version\msvc2022_64"
+        if ((Test-QtPrefix $dir) -and (Test-Path (Join-Path $dir 'qml\QtQuick3D'))) {
+            Say "Using the Qt $version at $dir"
+            $script:Qt = $dir
+            return
+        }
+    }
+    Install-Qt 'windows' 'win64_msvc2022_64' $version
+    $dir = Join-Path $HOME "Qt\$version\msvc2022_64"
+    if (-not (Test-QtPrefix $dir) -or -not (Test-Path (Join-Path $dir 'qml\QtQuick3D'))) {
+        Fail "The Qt downloaded to '$dir' has no Qt Quick 3D; pass -Qt <dir> with a full Qt $version."
+    }
+    $script:Qt = $dir
+}
+
+# windeployqt leaves Qt DLLs that are already next to the app alone, so changing the Qt (from the bridge's bundled
+# one to -Qt, or between two -Qt prefixes) would mix two runtimes. Start over when the deployed Qt is not this one.
+function Reset-IfQtChanged {
+    if (-not $Qt -or $cross) { return }
+    $deployed = Join-Path $bin 'Qt6Core.dll'
+    $wanted = Join-Path $Qt 'bin\Qt6Core.dll'
+    if (-not (Test-Path $deployed) -or -not (Test-Path $wanted)) { return }
+    if ((Get-FileHash $deployed).Hash -eq (Get-FileHash $wanted).Hash) { return }
+    Say "The app was deployed with another Qt; removing $bin to deploy this one"
+    Remove-Item $bin -Recurse -Force
+    Remove-Item "src\Seamstress.App\obj\$Configuration" -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Qt Quick 3D is not part of the minimal Qt runtime in the bridge's Windows package, but the 3D viewport imports
+# it, and a missing QML module fails no build step: the app would start and never show a window.
+function Assert-QtQuick3D {
+    if (Test-Path (Join-Path $bin 'qml\QtQuick3D')) { return }
+    Fail (@"
+the Qt deployed with the app has no Qt Quick 3D, which the 3D viewport needs.
+The Qt in the bridge's Windows package is a minimal Qt Quick runtime and does not include it.
+Use a full Qt of the same version, or let the script download one:
+
+    .\build.ps1 -InstallQt $Command
+
+"@)
+}
+
 function Resolve-ArmQt {
     if ($Qt) {
         if (-not (Test-QtPrefix $Qt)) { Fail "'$Qt' is not a Qt 6 prefix (expected lib\cmake\Qt6\Qt6Config.cmake inside it)" }
@@ -159,10 +240,10 @@ function Resolve-ArmQt {
         if (-not $Qt -and $InstallQt) {
             if ($cross) {
                 # The x64 Qt first, with the same modules: the cross-compiled Qt runs its tools.
-                if (-not (Test-QtPrefix (Join-Path $HOME "Qt\$QtVersion\msvc2022_64"))) { Install-Qt 'windows' 'win64_msvc2022_64' }
-                Install-Qt 'windows' 'win64_msvc2022_arm64_cross_compiled'
+                if (-not (Test-QtPrefix (Join-Path $HOME "Qt\$QtVersion\msvc2022_64"))) { Install-Qt 'windows' 'win64_msvc2022_64' $QtVersion }
+                Install-Qt 'windows' 'win64_msvc2022_arm64_cross_compiled' $QtVersion
             }
-            else { Install-Qt 'windows_arm64' 'win64_msvc2022_arm64' }
+            else { Install-Qt 'windows_arm64' 'win64_msvc2022_arm64' $QtVersion }
             $script:Qt = Join-Path $HOME "Qt\$QtVersion\msvc2022_arm64"
         }
         if (-not (Test-QtPrefix $Qt)) {
@@ -208,12 +289,7 @@ function Test-MsvcRuntime {
 function Show-DeployError {
     # A successful deployment leaves Qt's DLLs next to the app; without them the deployment is what failed.
     if (Test-Path (Join-Path $bin 'Qt6Core.dll')) { return }
-    $root = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
-    $package = Get-ChildItem (Join-Path $root 'qtgroup.qt.bridge.csharp.win-*') -Directory -ErrorAction SilentlyContinue |
-        ForEach-Object { Get-ChildItem $_.FullName -Directory -ErrorAction SilentlyContinue } |
-        Sort-Object { try { [version]($_.Name -replace '-.*$', '') } catch { [version]'0.0' } } -Descending |
-        Where-Object { Test-Path (Join-Path $_.FullName 'tools\qt\bin\windeployqt.exe') } |
-        Select-Object -First 1
+    $package = Find-BridgePackage
     if (-not $package) { return }
     $exe = Join-Path $bin 'Seamstress.exe'
     if (-not (Test-Path $exe)) { return }
@@ -280,6 +356,7 @@ function Invoke-Build {
         $targets = @(Get-BuildTarget)
         $options = @('-c', $Configuration, '--nologo', '-v:minimal')
         if ($Arch -eq 'arm64') { Resolve-ArmQt }
+        elseif ($InstallQt -and -not $Qt) { Resolve-DesktopQt }
         if ($Qt) {
             if (-not (Test-QtPrefix $Qt)) { Fail "'$Qt' is not a Qt 6 prefix (expected lib\cmake\Qt6\Qt6Config.cmake inside it)" }
             $options += "-p:QtDir=$Qt"
@@ -290,6 +367,7 @@ function Invoke-Build {
         $options += '-p:QtExportAs=metadata'
     }
     Say "Building Seamstress ($Configuration, $Arch)"
+    Reset-IfQtChanged
     foreach ($target in $targets) {
         & dotnet build $target @options
         if ($LASTEXITCODE -ne 0) {
@@ -299,6 +377,7 @@ function Invoke-Build {
     }
     if (-not (Test-Path "$bin\Seamstress.exe")) { Fail "the build finished but $bin\Seamstress.exe is missing" }
     if ($cross) { Invoke-CrossDeploy }
+    Assert-QtQuick3D
 }
 
 if ($cross -and $Command -in @('test', 'run')) {

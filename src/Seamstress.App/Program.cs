@@ -81,6 +81,59 @@ public static class Program
         }
     }
 
+    /// <summary>How long the interface has to draw its first frame before the launch counts as failed.</summary>
+    private const int StartupTimeoutSeconds = 60;
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int MessageBoxW(IntPtr parent, string text, string caption, uint type);
+
+    /// <summary>
+    /// Closes a launch that never gets a window. The Qt bridge gives no result for a failed QML load: the engine
+    /// writes the reason to the console, which a windowed app does not have, then waits as if all were well. The
+    /// first frame is the only sign that the interface really came up, so without this the process would stay in
+    /// the task manager with nothing on screen.
+    /// </summary>
+    private static void WatchStartup(bool automated)
+    {
+        var watchdog = new Thread(() =>
+        {
+            for (int quarter = 0; quarter < StartupTimeoutSeconds * 4; quarter++)
+            {
+                if (AppController.InterfaceDrawn)
+                    return;
+                Thread.Sleep(250);
+            }
+            if (AppController.InterfaceDrawn)
+                return;
+            string log = AppLog.FilePath ?? "(this run keeps no log file)";
+            AppLog.Write($"No window after {StartupTimeoutSeconds} seconds: the interface did not load. The most "
+                + "likely cause is a Qt QML module missing from this installation (the 3D viewport needs Qt Quick 3D).");
+            AppLog.Stop();
+            if (automated)
+            {
+                Console.Error.WriteLine("error: the interface did not appear; the QML errors are above");
+            }
+            else
+            {
+                string text = $"The Seamstress window did not appear within {StartupTimeoutSeconds} seconds.\n\n"
+                    + "The interface could not be loaded. The most likely cause is a missing Qt Quick 3D module "
+                    + "(the 3D viewport needs it) or a graphics driver that did not start.\n\n"
+                    + $"The log has the details:\n{log}";
+                // A console message is invisible in a windowed app, so say it on screen.
+                if (OperatingSystem.IsWindows())
+                    MessageBoxW(IntPtr.Zero, text, "Seamstress", 0x00000010 /* MB_ICONERROR */);
+                else
+                    Console.Error.WriteLine("error: " + text);
+            }
+            Environment.Exit(1);
+        })
+        {
+            IsBackground = true,
+            Name = "startup watchdog",
+        };
+        watchdog.Start();
+    }
+
     private static bool GpuLooksUsable()
     {
         if (!OperatingSystem.IsLinux())
@@ -237,6 +290,8 @@ public static class Program
         AppController.Startup = options;
         Qt.Application.DisplayName = "Seamstress";
         Qt.Application.SetWindowIcon("qrc:/assemblies/Seamstress/icons/seamstress.svg");
+        // Started before the QML load, which reports nothing when the interface cannot be built.
+        WatchStartup(automated);
         Qml.LoadFromRootModule("Main");
         Qml.WaitForExit();
     }
