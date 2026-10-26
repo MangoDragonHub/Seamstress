@@ -40,6 +40,8 @@ ApplicationWindow {
     property var afterDiscard: null      // what to do once unsaved changes were dealt with
     property bool closing: false
     property string pendingExport: ""
+    // Where Help sends readers for the manual; the guide lives in the repository's docs folder.
+    readonly property string userGuideUrl: "https://github.com/MangoDragonHub/Seamstress/blob/main/docs/USER_GUIDE.md"
     // A text box has the keyboard: Enter and Escape belong to it rather than to the tool shortcuts.
     readonly property bool typing: activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined
     // Interface texts in the language chosen in Preferences; reading the revision redoes the binding when it changes.
@@ -354,6 +356,8 @@ ApplicationWindow {
             }
             Menu {
                 title: tr("&Help")
+                MenuItem { text: tr("Documentation"); onTriggered: Qt.openUrlExternally(window.userGuideUrl) }
+                MenuSeparator {}
                 MenuItem { text: tr("About Seamstress"); onTriggered: aboutDialog.open() }
             }
         }
