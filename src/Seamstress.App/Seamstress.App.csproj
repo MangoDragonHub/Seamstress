@@ -66,8 +66,8 @@
       <_SeamstressHostLast>$(ProjectDir)$(IntermediateOutputPath)seamstress-host-main.cpp</_SeamstressHostLast>
       <_SeamstressHostSource>$([System.IO.File]::ReadAllText('$(_SeamstressHostMain)'))</_SeamstressHostSource>
       <_SeamstressHostLimit>constexpr int maxTries = 10000;</_SeamstressHostLimit>
-      <!-- Inserted in front of QT_DOTNET_HOST, whose line is repeated at the end so that this value ends in a plain
-           statement rather than in a newline the property system may trim. -->
+      <!-- Inserted in front of main, which both the older template (QT_DOTNET_HOST) and the newer one
+           (nativeHostAssemblyName) have, so that the definition is present whichever the bridge generates. -->
       <_SeamstressHostMissingDotNet>#ifdef Q_OS_WINDOWS
 #include &lt;QDesktopServices&gt;
 #include &lt;QUrl&gt;
@@ -81,9 +81,7 @@ static void SeamstressMissingDotNet()
 }
 #else
 static void SeamstressMissingDotNet() {}
-#endif
-
-QT_DOTNET_HOST(appName);</_SeamstressHostMissingDotNet>
+#endif</_SeamstressHostMissingDotNet>
       <!-- The check for the failed host is two lines in the generated file; the 8 spaces on the second line are part
            of what is matched, so both values continue at column 0. -->
       <_SeamstressHostExitCheck>if (dotNetExited)
@@ -101,8 +99,10 @@ QT_DOTNET_HOST(appName);</_SeamstressHostMissingDotNet>
         >$(_SeamstressHostSource.Replace('dotNetResult = dotNetHost.runApp();', 'dotNetResult = dotNetHost.isLoaded() ? dotNetHost.runApp() : -4;'))</_SeamstressHostSource>
       <_SeamstressHostSource Condition="$(_SeamstressHostSource.Contains('$(_SeamstressHostExitCheck)'))"
         >$(_SeamstressHostSource.Replace('$(_SeamstressHostExitCheck)', '$(_SeamstressHostExitCheckFixed)'))</_SeamstressHostSource>
-      <_SeamstressHostSource Condition="$(_SeamstressHostSource.Contains('QT_DOTNET_HOST(appName);')) and !$(_SeamstressHostSource.Contains('static void SeamstressMissingDotNet()'))"
-        >$(_SeamstressHostSource.Replace('QT_DOTNET_HOST(appName);', '$(_SeamstressHostMissingDotNet)'))</_SeamstressHostSource>
+      <_SeamstressHostSource Condition="$(_SeamstressHostSource.Contains('int main')) and !$(_SeamstressHostSource.Contains('static void SeamstressMissingDotNet()'))"
+        >$(_SeamstressHostSource.Replace('int main', '$(_SeamstressHostMissingDotNet)
+
+int main'))</_SeamstressHostSource>
     </PropertyGroup>
     <Warning Condition="!$(_SeamstressHostSource.Contains('maxTries = 300000;'))"
       Text="Seamstress: the bridge's generated host changed; its .NET start-up timeout was not raised." />
