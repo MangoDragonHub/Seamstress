@@ -358,7 +358,15 @@ stage() {
     install -m755 packaging/linux/seamstress.sh "$STAGE/seamstress.sh"
     install -m644 packaging/linux/"$APP_ID".desktop packaging/linux/"$APP_ID".metainfo.xml "$STAGE"/
     install -m644 src/Seamstress.App/icons/seamstress.svg "$STAGE/$APP_ID.svg"
-    cp LICENSE "$STAGE"/ 2>/dev/null || true
+    # The licences of what the package contains: MIT for Seamstress, LGPLv3 for Qt and the Qt Bridge, GPLv3 for
+    # Qt Quick 3D, which the 3D viewport makes part of the whole (see NOTICE).
+    cp -a LICENSE NOTICE LICENSES "$STAGE"/
+    # The Qt version is the bridge's on Windows and another one here, so each package names its own.
+    local qt_version="" lib
+    for lib in "$STAGE"/lib/libQt6Core.so.6.*; do
+        if [ -f "$lib" ] && [ ! -L "$lib" ]; then qt_version="${lib##*.so.}"; fi
+    done
+    if [ -n "$qt_version" ]; then printf '\nBuilt with Qt %s.\n' "$qt_version" >> "$STAGE/NOTICE"; fi
     echo "    $(du -sh "$STAGE" | cut -f1) in $(find "$STAGE" -type f | wc -l) files"
 }
 

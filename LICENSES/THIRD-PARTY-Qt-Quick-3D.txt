@@ -1,0 +1,46 @@
+Third-party components inside Qt Quick 3D
+=========================================
+
+Qt Quick 3D contains the components below. Their licence texts are in this folder: MIT.txt,
+BSD-3-Clause.txt and Apache-2.0.txt. The version of Qt in a package is named at the end of NOTICE;
+the component versions are the ones that release of Qt ships.
+
+Blue Noise Texture
+    CC0-1.0 - public domain dedication, no attribution required
+
+Godot Engine: Fog
+    MIT - Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.
+          Copyright (c) 2014-2022 Godot Engine contributors
+
+Godot Engine: ProceduralSky
+    MIT - Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.
+          Copyright (c) 2014-2022 Godot Engine contributors
+
+Intel Embree
+    Apache-2.0 - Copyright 2009-2021 Intel Corporation
+
+Java Native Interface for C++
+    MIT - Copyright (c) 2016 Mitchell Dowd
+
+JsonCpp
+    MIT - Copyright (c) 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+
+Open Asset Import Library (assimp)
+    BSD-3-Clause - Copyright (c) 2006-2026, assimp team
+
+OpenXR SDK
+    Apache-2.0 - Copyright (c) 2017-2025, The Khronos Group Inc.
+                 Copyright (c) 2017-2019, Valve Corporation
+                 Copyright (c) 2017-2019, LunarG, Inc.
+
+Tiny OpenEXR
+    BSD-3-Clause - Copyright (c) 2014 - 2021, Syoyo Fujita and many contributors.
+
+closestPointOnTriangle
+    Apache-2.0 - Copyright 2009-2021 Intel Corporation
+
+meshoptimizer
+    MIT - Copyright (c) 2016-2026 Arseny Kapoulkine
+
+xatlas
+    MIT - Copyright (c) 2018-2020 Jonathan Young

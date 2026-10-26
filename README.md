@@ -127,11 +127,16 @@ Install the [.NET SDK 9.0.200 or newer](https://dotnet.microsoft.com/download) (
 then in PowerShell:
 
 ```powershell
-.\build.ps1 run
+.\build.ps1 -InstallQt run
 ```
 
-On 64-bit Windows the bridge package ships its own Qt, so nothing else is needed. If Visual Studio's C++ tools
-are installed the bridge uses them; if not, the script switches to the bridge's prebuilt launcher.
+The 3D viewport is built with Qt Quick 3D, which the minimal Qt runtime in the bridge's Windows package does not
+contain. `-InstallQt` downloads a full Qt 6 of the version the bridge uses into `~\Qt` (about 2.7 GB, once); if
+you already have one, pass `-Qt C:\Qt\6.12.0\msvc2022_64` instead. Without either, the build stops with an
+explanation -- the app would otherwise start and never show a window.
+
+If Visual Studio's C++ tools are installed the bridge uses them; if not, the script switches to the bridge's
+prebuilt launcher.
 `.\build.ps1 package` produces `dist\Seamstress-win-x64.zip`; the unzipped app needs the .NET 8 runtime installed.
 If that runtime is missing, the launcher says so and offers the download instead of closing silently (a
 `-NoCompiler` build uses the bridge's prebuilt launcher, which cannot carry that check).
@@ -304,3 +309,17 @@ missing one, has one the source no longer uses, or changes a placeholder. To add
   written to MakeHuman's folder.
 - The translations have not yet been checked by native speakers. The file dialogs and colour picker come from Qt
   and the desktop, so they follow the system language rather than the one chosen in Preferences.
+
+## Licensing
+
+The Seamstress source code is released under the [MIT licence](LICENSE). A packaged Seamstress is a **GPL-3.0
+work**, because the 3D viewport is built with Qt Quick 3D and Qt offers that module under the GPL-3.0 only; the
+rest of Qt and Qt Bridge for C# are LGPL-3.0. Every package therefore ships the licence texts in `LICENSES/` and
+the notices in [NOTICE](NOTICE), including the links to the corresponding source of Seamstress, Qt and Qt Bridge
+for C#.
+
+Charging for a ready-made package is allowed and changes nothing for the people who receive it: the GPL gives
+them the source and the right to pass the package on. Distributing the program under other terms, or inside a
+closed-source product, needs a [commercial Qt licence](https://www.qt.io/licensing/) or a build without Qt Quick
+3D.
+
