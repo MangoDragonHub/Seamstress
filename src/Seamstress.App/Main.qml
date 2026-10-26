@@ -727,6 +727,13 @@ ApplicationWindow {
                 text: tr("A 3D garment creation tool: draw pattern pieces, sew them, and drape them on an avatar.") + "\n\n"
                       + tr("Built with C# and Qt Quick (Qt Bridge for C#).") + "\n" + tr("3D viewport: %1").arg(App.renderer)
             }
+            Label {
+                Layout.maximumWidth: 460
+                wrapMode: Text.WordWrap
+                font.pixelSize: 11
+                opacity: 0.7
+                text: tr("Source code: MIT licence. This build includes Qt Quick 3D under the GPL-3.0, so the package as a whole is GPL-3.0; the licence texts and notices are in LICENSES/ and NOTICE.")
+            }
         }
     }
 

@@ -306,3 +306,17 @@ missing one, has one the source no longer uses, or changes a placeholder. To add
   written to MakeHuman's folder.
 - The translations have not yet been checked by native speakers. The file dialogs and colour picker come from Qt
   and the desktop, so they follow the system language rather than the one chosen in Preferences.
+
+## Licensing
+
+The Seamstress source code is released under the [MIT licence](LICENSE). A packaged Seamstress is a **GPL-3.0
+work**, because the 3D viewport is built with Qt Quick 3D and Qt offers that module under the GPL-3.0 only; the
+rest of Qt and Qt Bridge for C# are LGPL-3.0. Every package therefore ships the licence texts in `LICENSES/` and
+the notices in [NOTICE](NOTICE), including the links to the corresponding source of Seamstress, Qt and Qt Bridge
+for C#.
+
+Charging for a ready-made package is allowed and changes nothing for the people who receive it: the GPL gives
+them the source and the right to pass the package on. Distributing the program under other terms, or inside a
+closed-source product, needs a [commercial Qt licence](https://www.qt.io/licensing/) or a build without Qt Quick
+3D.
+

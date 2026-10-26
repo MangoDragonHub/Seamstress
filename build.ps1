@@ -407,6 +407,13 @@ switch ($Command) {
         # The build output already contains Qt (deployed by the bridge); debug symbols are left out, and so are
         # cross-compiled builds, which land inside the regular output folder.
         Copy-Item "$bin\*" $stage -Recurse -Exclude '*.pdb', 'win-x64', 'win-arm64'
+        # The licences of what the package contains: MIT for Seamstress, LGPLv3 for Qt and the Qt Bridge, GPLv3 for
+        # Qt Quick 3D, which the 3D viewport makes part of the whole (see NOTICE).
+        Copy-Item LICENSE, NOTICE -Destination $stage -Force
+        Copy-Item LICENSES -Destination $stage -Recurse -Force
+        # The Qt version is the bridge's on Windows and another one on Linux, so each package names its own.
+        $qtVersion = ([Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $bin 'Qt6Core.dll')).FileVersion -split '\.')[0..2] -join '.'
+        Add-Content (Join-Path $stage 'NOTICE') "`nBuilt with Qt $qtVersion."
         $zip = "$stage.zip"
         if (Test-Path $zip) { Remove-Item $zip -Force }
         Compress-Archive -Path $stage -DestinationPath $zip

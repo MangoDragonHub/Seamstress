@@ -1,0 +1,70 @@
+Seamstress - licences and notices
+=================================
+
+Seamstress is open source under the MIT licence (see LICENSE). A package also contains the libraries
+below, which the program links against; they are not part of the Seamstress source code.
+
+Qt 6 - https://www.qt.io/
+    LGPL-3.0-only, or a Qt commercial licence (LICENSES/LGPL-3.0-only.txt):
+        Qt Core, Qt Gui, Qt Network, Qt OpenGL, Qt Svg
+        Qt Qml, Qt Quick, Qt Quick Controls 2, Qt Quick Dialogs, Qt Quick Layouts, Qt Quick Shapes,
+        Qt Quick Effects, Qt Quick Templates, Qt Labs Folder List Model, Qt Shader Tools
+    GPL-3.0-only, or a Qt commercial licence (LICENSES/GPL-3.0-only.txt):
+        Qt Quick 3D, with its runtime renderer, utilities and helpers - the 3D viewport is built on it
+
+Qt Bridge for C# 0.4 - https://github.com/qt/qtbridge-csharp
+    LGPL-3.0-only, or a Qt commercial licence (LICENSES/LGPL-3.0-only.txt)
+
+Microsoft .NET 8 runtime - https://dotnet.microsoft.com/ (Linux packages only)
+    MIT licence - https://github.com/dotnet/runtime/blob/main/LICENSE.TXT
+
+Qt is used unmodified. Its libraries are loaded from files next to the program and can be replaced
+with other builds of the same version.
+
+The whole package is under the GPL-3.0
+--------------------------------------
+Qt Quick 3D is licensed under the GPL-3.0 only, so a package that contains it is a GPL-3.0 work as a
+whole: you may use, copy, modify and redistribute the package under the GPL-3.0 in
+LICENSES/GPL-3.0-only.txt. The Seamstress source code itself stays under the MIT licence, and the MIT
+rights apply to it alongside the GPL.
+
+Charging money for a ready-made package is allowed by these licences and does not change what the
+people who receive the package may do with it.
+
+Corresponding source
+--------------------
+The GPL and the LGPL give everyone who receives this package the right to its source code:
+
+    Seamstress:  https://github.com/MangoDragonHub/Seamstress
+                 A package is built from the tag or commit named on the page it was downloaded from.
+    Qt:          https://download.qt.io/archive/qt/<version>/<version>/submodules/
+                 <version> is named at the end of this file.
+    Qt Bridge:   https://github.com/qt/qtbridge-csharp
+
+The Seamstress repository holds everything needed to rebuild the program: the build scripts, the
+project files and the Qt version they expect.
+
+If you would rather have the source on a physical medium, ask through the project's issue tracker or
+the contact address on the download page. We will send it for no more than the cost of the medium and
+postage, for at least three years after the package was distributed.
+
+Third-party components inside Qt Quick 3D
+-----------------------------------------
+Qt Quick 3D contains the components below. Their full licence texts are in the Qt source
+distribution linked above.
+
+    Blue Noise Texture                         CC0-1.0
+    Godot Engine: Fog                          MIT
+    Godot Engine: ProceduralSky                MIT
+    Intel Embree 3.13.3                        Apache-2.0
+    Java Native Interface for C++ 1.0.0        MIT
+    JsonCpp 1.9.6                              MIT
+    Open Asset Import Library (assimp) 6.0.5   BSD-3-Clause
+    OpenXR SDK 1.1.61                          Apache-2.0
+    Tiny OpenEXR 1.0.13                        BSD-3-Clause
+    closestPointOnTriangle                     Apache-2.0
+    meshoptimizer 1.2                          MIT
+    xatlas                                     MIT
+
+Qt itself contains further third-party code (PCRE2, HarfBuzz, FreeType, libpng, zlib, SQLite and
+others), whose notices and licence texts are part of the Qt source distribution linked above.
