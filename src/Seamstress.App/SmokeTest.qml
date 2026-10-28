@@ -280,6 +280,13 @@ QtObject {
         const info = JSON.parse(App.makeHumanAssetInfo("Summer Skirt/v2"))
         check("send dialog names the asset folder", info.folder === "" || /summer_skirt_v2$/.test(info.folder))
         check("licences offered", App.makeHumanLicenses().split("|").indexOf("CC-BY") >= 0 && App.settingMakeHumanLicense !== "")
+        // It lists every garment with its z_depth (50 unless changed), and a change is saved with the garment.
+        const mhGarments = JSON.parse(App.makeHumanGarmentsJson())
+        check("send dialog lists the garments", mhGarments.length > 0 && mhGarments.every(g => g.id !== "" && g.zDepth === 50))
+        App.setMakeHumanZDepth(mhGarments[0].id, 65)
+        check("z_depth is changed per garment", JSON.parse(App.makeHumanGarmentsJson())[0].zDepth === 65)
+        App.undo()
+        check("z_depth change undoes", JSON.parse(App.makeHumanGarmentsJson())[0].zDepth === 50)
 
         // Languages offered in Preferences, and the texts of the one in use.
         const languages = JSON.parse(App.languagesJson())

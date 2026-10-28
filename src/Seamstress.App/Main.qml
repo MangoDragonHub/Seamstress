@@ -603,9 +603,44 @@ ApplicationWindow {
         standardButtons: Dialog.Ok | Dialog.Cancel
         // Where the asset goes and whether that replaces one already there, for the name being typed.
         property var target: ({ folder: "", exists: false })
+        // Every garment ({id, name, zDepth, visible, active}) and the ids of those ticked for sending.
+        property var garments: []
+        property var ticked: []
+        // z_depth by garment id, kept apart from the list so editing one does not rebuild the rows.
+        property var depths: ({})
+        // The name last suggested; while the field still shows it, ticking garments updates it.
+        property string suggested: ""
+        readonly property var sending: garments.filter(g => ticked.indexOf(g.id) >= 0)
+        readonly property int zDepth: sending.reduce((z, g) => Math.max(z, depths[g.id]), 0)
+        onSendingChanged: if (standardButton(Dialog.Ok)) standardButton(Dialog.Ok).enabled = sending.length > 0 || !App.makeHumanLinked
         function check() { target = JSON.parse(App.makeHumanAssetInfo(assetName.text)) }
+        function suggest() {
+            const name = sending.length === 1 ? sending[0].name : sending.length > 1 ? App.documentName() : App.activeGarmentName()
+            if (assetName.text === suggested)
+                assetName.text = name
+            suggested = name
+        }
+        function tick(id, on) {
+            ticked = on ? ticked.concat([id]) : ticked.filter(t => t !== id)
+            suggest()
+        }
+        function setZDepth(id, value) {
+            App.setMakeHumanZDepth(id, value)
+            const d = Object.assign({}, depths)
+            d[id] = value
+            depths = d
+        }
         onAboutToShow: {
-            assetName.text = App.activeGarmentName()
+            garments = JSON.parse(App.makeHumanGarmentsJson())
+            const d = {}
+            for (const g of garments)
+                d[g.id] = g.zDepth
+            depths = d
+            // Everything shown is sent by default; hidden garments are listed unticked.
+            ticked = garments.filter(g => g.visible).map(g => g.id)
+            assetName.text = ""
+            suggested = ""
+            suggest()
             check()
             if (App.makeHumanLinked)
                 assetName.forceActiveFocus()
@@ -632,6 +667,45 @@ ApplicationWindow {
                     placeholderText: tr("the name MakeHuman lists it under")
                     onTextChanged: makeHumanDialog.check()
                     onAccepted: makeHumanDialog.accept()
+                }
+                Label { text: tr("Garments"); Layout.alignment: Qt.AlignTop; Layout.topMargin: 6 }
+                ColumnLayout {
+                    Layout.preferredWidth: 340
+                    spacing: 2
+                    RowLayout {
+                        Label { text: tr("Send"); opacity: 0.65; font.pixelSize: 11; Layout.fillWidth: true }
+                        Label { text: tr("z_depth"); opacity: 0.65; font.pixelSize: 11; Layout.preferredWidth: 110; horizontalAlignment: Text.AlignHCenter }
+                    }
+                    Repeater {
+                        model: makeHumanDialog.garments
+                        RowLayout {
+                            required property var modelData
+                            CheckBox {
+                                Layout.fillWidth: true
+                                text: modelData.name + (modelData.visible ? "" : " " + tr("(hidden)"))
+                                checked: makeHumanDialog.ticked.indexOf(modelData.id) >= 0
+                                onToggled: makeHumanDialog.tick(modelData.id, checked)
+                            }
+                            SpinBox {
+                                Layout.preferredWidth: 110
+                                from: 0
+                                to: App.maxMakeHumanZDepth
+                                editable: true
+                                value: modelData.zDepth
+                                onValueModified: makeHumanDialog.setZDepth(modelData.id, value)
+                                ToolTip.visible: hovered
+                                ToolTip.text: tr("The layer MakeHuman draws this garment in; higher is further out. 50 is the default.")
+                            }
+                        }
+                    }
+                    Label {
+                        visible: makeHumanDialog.sending.length > 1
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        opacity: 0.75
+                        font.pixelSize: 11
+                        text: tr("The ticked garments are sent as one asset with z_depth %1, the highest of theirs.").arg(makeHumanDialog.zDepth)
+                    }
                 }
                 Label { text: tr("Saved in"); opacity: 0.75 }
                 Label {
@@ -661,7 +735,7 @@ ApplicationWindow {
                 wrapMode: Text.WordWrap
                 opacity: 0.65
                 font.pixelSize: 11
-                text: tr("The garment is fitted to the MakeHuman base mesh, so it follows the character when you change body shape. In MakeHuman it appears under Geometries ▸ Clothes. Author and license are set in Preferences ▸ MakeHuman.")
+                text: tr("The garments are fitted to the MakeHuman base mesh, so they follow the character when you change body shape. In MakeHuman the asset appears under Geometries ▸ Clothes. Author and license are set in Preferences ▸ MakeHuman.")
             }
             Label {
                 visible: App.makeHumanLinked && App.avatarType !== "MakeHuman"
@@ -675,7 +749,7 @@ ApplicationWindow {
                 Button { visible: App.makeHumanLinked; text: tr("Change Author or License…"); flat: true; onClicked: { makeHumanDialog.close(); preferences.openPage("MakeHuman") } }
             }
         }
-        onAccepted: if (App.makeHumanLinked) App.sendToMakeHuman(assetName.text)
+        onAccepted: if (App.makeHumanLinked) App.sendToMakeHuman(assetName.text, ticked.join("|"))
     }
 
     AppDialog {

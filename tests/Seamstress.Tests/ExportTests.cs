@@ -295,5 +295,39 @@ public class ExportTests : IDisposable
         Assert.True(File.Exists(Path.Combine(named.Folder, "summer_skirt_v2.mhmat")));
         // A different name is a different asset: it gets its own id, so MakeHuman lists both.
         Assert.NotEqual(lines.First(l => l.StartsWith("uuid ")), head.First(l => l.StartsWith("uuid ")));
+        Assert.Contains("z_depth 50", header);
+
+        // Several garments sent together become one asset holding all of them, at the z_depth it is given.
+        var scene = Scene();
+        var outfit = MakeHumanExporter.Export(scene.Meshes, avatar.MakeHuman!, clothes, "tester", null, "Outfit", 70);
+        var outfitHead = File.ReadLines(outfit.MhcloPath).TakeWhile(l => l != "verts 0").ToList();
+        Assert.Contains("z_depth 70", outfitHead);
+        Assert.Contains("name Outfit", outfitHead);
+        int single0 = MakeHumanExporter.Export(scene.Meshes[0], avatar.MakeHuman!, clothes, assetName: "Only0").VertexCount;
+        Assert.Equal(single0 + result.VertexCount, outfit.VertexCount);
+        int outfitFaces = File.ReadLines(Path.ChangeExtension(outfit.MhcloPath, ".obj")).Count(l => l.StartsWith("f "));
+        Assert.Equal(scene.Meshes.Sum(m => m.TriangleCount), outfitFaces);
+        // Out-of-range depths are clamped.
+        var deep = MakeHumanExporter.Export(mesh, avatar.MakeHuman!, clothes, assetName: "Deep", zDepth: 999);
+        Assert.Contains($"z_depth {Garment.MaxMakeHumanZDepth}", File.ReadLines(deep.MhcloPath));
+    }
+
+    [Fact]
+    public void MakeHumanZDepthIsSavedPerGarmentAndUndoable()
+    {
+        var garment = _ws.Document.Garments[1];
+        Assert.Equal(Garment.DefaultMakeHumanZDepth, garment.MakeHumanZDepth);
+        // The default is left out of the file.
+        Assert.DoesNotContain("makeHumanZDepth", GarmentFile.Serialize(_ws.Document));
+        _ws.SetMakeHumanZDepth(garment.Id, 70);
+        Assert.Equal(70, _ws.Document.Garments[1].MakeHumanZDepth);
+        var reloaded = GarmentFile.Deserialize(GarmentFile.Serialize(_ws.Document));
+        Assert.Equal(70, reloaded.Garments[1].MakeHumanZDepth);
+        Assert.Equal(Garment.DefaultMakeHumanZDepth, reloaded.Garments[0].MakeHumanZDepth);
+        _ws.SetMakeHumanZDepth(garment.Id, 500);
+        Assert.Equal(Garment.MaxMakeHumanZDepth, _ws.Document.Garments[1].MakeHumanZDepth);
+        _ws.History.Undo();
+        _ws.History.Undo();
+        Assert.Equal(Garment.DefaultMakeHumanZDepth, _ws.Document.Garments[1].MakeHumanZDepth);
     }
 }

@@ -1039,12 +1039,14 @@ public partial class AppController : INotifyPropertyChanged
     }
 
     private ExportScene BuildExport(bool weld, bool activeOnly)
+        => BuildExport(weld, activeOnly && _workspace.ActiveGarment is { } active ? new[] { active.Id } : null);
+
+    /// <param name="garmentIds">The garments to export, hidden or not; null exports the visible ones.</param>
+    private ExportScene BuildExport(bool weld, IReadOnlyCollection<string>? garmentIds)
     {
         if (_simulation.IsRunning)
             StopSimulation();
-        var options = new ExportOptions { WeldSeams = weld };
-        if (activeOnly && _workspace.ActiveGarment is { } active)
-            options.GarmentIds = new[] { active.Id };
+        var options = new ExportOptions { WeldSeams = weld, GarmentIds = garmentIds };
         var scene = ExportScene.Build(_workspace.Document, _workspace.MeshFor, options);
         if (scene.Meshes.Count == 0)
             throw new InvalidOperationException(Lang.T("There is nothing to export: no visible garment has any pieces."));
@@ -1098,6 +1100,23 @@ public partial class AppController : INotifyPropertyChanged
     /// <summary>The name the Send to MakeHuman dialog suggests: the active garment's.</summary>
     public string ActiveGarmentName() => _workspace.ActiveGarment?.Name ?? "";
 
+    /// <summary>The name suggested for an asset made of several garments: the project's.</summary>
+    public string DocumentName() => _workspace.Document.Name;
+
+    /// <summary>The garments the Send to MakeHuman dialog lists ({id, name, zDepth, visible, active}), in layers order.</summary>
+    public string MakeHumanGarmentsJson() => JsonSerializer.Serialize(_workspace.Document.Garments.Select(g => new
+    {
+        id = g.Id,
+        name = g.Name,
+        zDepth = g.MakeHumanZDepth,
+        visible = g.Visible,
+        active = g == _workspace.ActiveGarment,
+    }));
+
+    public int MaxMakeHumanZDepth => Garment.MaxMakeHumanZDepth;
+
+    public void SetMakeHumanZDepth(string garmentId, int value) => _workspace.SetMakeHumanZDepth(garmentId, value);
+
     /// <summary>Where an asset of this name would be written, and whether one is there already ({folder, exists}).</summary>
     public string MakeHumanAssetInfo(string assetName)
     {
@@ -1107,26 +1126,32 @@ public partial class AppController : INotifyPropertyChanged
         return JsonSerializer.Serialize(new { folder, exists = Directory.Exists(folder) });
     }
 
-    /// <summary>Writes the active garment into MakeHuman's clothes library, bound to the base mesh.</summary>
+    /// <summary>Writes the chosen garments into MakeHuman's clothes library as one asset, bound to the base mesh.</summary>
     /// <param name="assetName">The name MakeHuman lists it under; empty uses the garment's name.</param>
-    public bool SendToMakeHuman(string assetName)
+    /// <param name="garmentIds">Ids of the garments to send, separated by "|". The asset takes the highest of their
+    /// z_depth values, so it is drawn over anything the outermost of them would be.</param>
+    public bool SendToMakeHuman(string assetName, string garmentIds)
     {
         try
         {
             if (_settings.MakeHumanClothesFolder is not { } clothes || !Directory.Exists(_settings.MakeHumanUserFolder))
                 throw new InvalidOperationException(Lang.T("MakeHuman is not linked yet. Open File ▸ Preferences and choose MakeHuman's user data folder."));
-            if (_workspace.ActiveGarment is not { } garment)
-                throw new InvalidOperationException(Lang.T("Select the garment to send first."));
+            var ids = garmentIds.Split('|', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+            var garments = _workspace.Document.Garments.Where(g => ids.Contains(g.Id)).ToList();
+            if (garments.Count == 0)
+                throw new InvalidOperationException(Lang.T("Tick at least one garment to send."));
             if (_avatar?.MakeHuman is not { } baseMesh)
                 throw new InvalidOperationException(Lang.T("Garments are fitted to MakeHuman's base mesh.\n\nChoose Avatar ▸ MakeHuman Base Mesh, simulate the garment on it, then send it again."));
-            var scene = BuildExport(weld: true, activeOnly: true);
-            string name = string.IsNullOrWhiteSpace(assetName) ? garment.Name : assetName.Trim();
-            var result = MakeHumanExporter.Export(scene.Meshes[0], baseMesh, clothes, _settings.Author, _settings.MakeHumanLicense, name);
+            var scene = BuildExport(weld: true, garments.Select(g => g.Id).ToArray());
+            string name = !string.IsNullOrWhiteSpace(assetName) ? assetName.Trim()
+                : garments.Count == 1 ? garments[0].Name : _workspace.Document.Name;
+            int zDepth = garments.Max(g => g.MakeHumanZDepth);
+            var result = MakeHumanExporter.Export(scene.Meshes, baseMesh, clothes, _settings.Author, _settings.MakeHumanLicense, name, zDepth);
             string launched = "";
             if (!string.IsNullOrWhiteSpace(_settings.MakeHumanCommand) && Startup.AllowLaunch)
                 launched = LaunchMakeHuman() ? " " + Lang.T("MakeHuman is starting.") : "";
             StatusText = Lang.F("Sent “{0}” to MakeHuman ({1:N0} vertices): {2}.", name, result.VertexCount, result.Folder) + launched;
-            AppLog.Write($"Sent “{name}” to MakeHuman ({result.VertexCount} vertices): {result.Folder}");
+            AppLog.Write($"Sent “{name}” to MakeHuman ({string.Join(", ", garments.Select(g => g.Name))}; z_depth {zDepth}; {result.VertexCount} vertices): {result.Folder}");
             LastMakeHumanFolder = result.Folder;
             return true;
         }

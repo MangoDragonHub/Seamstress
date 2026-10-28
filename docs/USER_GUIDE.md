@@ -757,23 +757,59 @@ to the exported file (or embedded, for `.glb`). Hidden garments and pieces are l
 
 ## Send to MakeHuman
 
-Seamstress can write a garment directly into MakeHuman's clothes library, fitted so that it follows the
+Seamstress can write garments directly into MakeHuman's clothes library, fitted so that they follow the
 character when its body shape changes.
 
 1. Link MakeHuman once in [Preferences](#preferences).
 2. Choose **Avatar ▸ MakeHuman Base Mesh**, and optionally set its body with **MakeHuman Body Shape…**.
-3. Build the garment and simulate it on that avatar.
-4. Select the garment and choose **File ▸ Export ▸ Send to MakeHuman**.
-5. Check the **Asset name** (it starts as the garment's name) and press **Send**.
+3. Build the garments and simulate them on that avatar.
+4. Choose **File ▸ Export ▸ Send to MakeHuman**.
+5. Under **Garments**, tick the garments to send and set each one's **z_depth** (see below).
+6. Check the **Asset name** and press **Send**.
 
-![Send to MakeHuman, with the asset name, where it is saved, and its author and license](images/dialog-makehuman.png)
+![Send to MakeHuman, with the garments to send and their z_depth, the asset name, where it is saved, and its author and license](images/dialog-makehuman.png)
+
+### Choosing the garments
+
+The dialog lists every garment in the project. The ones shown in the 3D view start ticked; hidden ones are
+listed as *(hidden)* and start unticked, but can be ticked and sent all the same.
+
+- **One garment ticked:** only that garment is sent. If you have a whole outfit but only changed the
+  trousers, untick the shirt and send the trousers on their own.
+- **Several garments ticked:** they are sent together as **one** asset, which MakeHuman lists and puts on
+  as a single item of clothing.
+
+The asset name starts as the garment's name when one is ticked and the project's name when several are. Ticking
+and unticking updates it until you type a name of your own. **Send** is greyed out while nothing is ticked.
+
+### z_depth
+
+MakeHuman draws clothes in order of their *z_depth*: an item with a higher value is drawn over one with a lower
+value, so it should be the outer layer. Each garment has its own value, from 0 to 100, set in the box next to it.
+New garments start at **50**, MakeHuman's default. A rough guide:
+
+| z_depth | Layer |
+| --- | --- |
+| 10–20 | Underwear, tights |
+| 30–40 | Shirts, trousers, skirts |
+| 50 | Sweaters, dresses |
+| 60–70 | Jackets |
+| 80+ | Coats |
+
+Changing a value is saved with the garment in the project file and can be undone with **Edit ▸ Undo**. When
+several garments are sent as one asset, the asset gets the **highest** of their values, and the dialog shows
+which value that is. To layer garments separately in MakeHuman (a shirt under a jacket, say), send each one as
+its own asset with its own name and z_depth.
+
+### Where the asset goes
 
 The asset name is what MakeHuman lists the garment under. The folder and files are named after it, with
 spaces and other characters that are awkward in file names replaced by `_`, so *Summer Skirt* is written as
 `summer_skirt.mhclo`, `summer_skirt.obj` and `summer_skirt.mhmat` (plus the texture, if any) in
 `<MakeHuman user folder>/data/clothes/summer_skirt/`. The dialog shows that folder as you type, and warns
 when an asset of that name is already there: sending replaces it, while a different name keeps both. In
-MakeHuman the garment appears under **Geometries ▸ Clothes**; restart MakeHuman if it was already running.
+MakeHuman the asset appears under **Geometries ▸ Clothes**; restart MakeHuman if it was already running.
+An asset has one material, so garments sent together all take the first ticked garment's material.
 
 Every asset carries the **author** and **license** set in **Preferences ▸ MakeHuman**, and MakeHuman shows
 them in its clothes library. The files load in MakeHuman 1.2, 1.3 and the current development version, and in

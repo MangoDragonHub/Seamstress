@@ -219,8 +219,10 @@ To make clothes for MakeHuman characters:
 3. **File ▸ Export ▸ Send to MakeHuman** writes `<name>.mhclo`, `.obj` and `.mhmat` into
    `<user data>/data/clothes/<name>/`. Every vertex is bound to the base mesh, so the garment follows the
    character when its body shape changes. It appears in MakeHuman under *Geometries ▸ Clothes* (restart
-   MakeHuman if it is running). A dialog lets you choose the asset name first; the author and license written into
-   the asset are set under *Preferences ▸ MakeHuman*.
+   MakeHuman if it is running). The dialog lists every garment with a tickbox and its *z_depth* (MakeHuman's
+   layering order, 50 by default, saved per garment): tick one to send it alone, or several to send them as one
+   asset, which takes the highest of their z_depth values. The asset name is chosen there too; the author and
+   license written into the asset are set under *Preferences ▸ MakeHuman*.
 
 The built-in mannequin has the base mesh's proportions, so the bundled templates fit both.
 

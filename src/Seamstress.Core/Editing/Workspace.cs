@@ -1591,6 +1591,15 @@ public sealed class Workspace
         });
     }
 
+    public void SetMakeHumanZDepth(string garmentId, int value)
+    {
+        History.Execute(Lang.T("Change MakeHuman layer"), doc =>
+        {
+            if (doc.FindGarment(garmentId) is { } garment)
+                garment.MakeHumanZDepth = Math.Clamp(value, 0, Garment.MaxMakeHumanZDepth);
+        });
+    }
+
     public void SetSimulationValue(string key, float value)
     {
         History.Execute(Lang.T("Change simulation settings"), doc =>

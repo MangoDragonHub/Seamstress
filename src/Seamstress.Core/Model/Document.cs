@@ -86,6 +86,15 @@ public sealed class Garment
     /// <summary>Whether the garment is meshed with triangles or mostly with quads.</summary>
     public MeshTopology Topology { get; set; } = MeshTopology.Triangles;
 
+    /// <summary>
+    /// The "z_depth" written when this garment is sent to MakeHuman: the layer it is drawn in, higher being further
+    /// out (roughly 10-20 for underwear, 50 for a sweater, 70 for a jacket).
+    /// </summary>
+    public int MakeHumanZDepth { get; set; } = DefaultMakeHumanZDepth;
+
+    public const int DefaultMakeHumanZDepth = 50;
+    public const int MaxMakeHumanZDepth = 100;
+
     public List<LayerGroup> Groups { get; set; } = new();
     public List<PatternPiece> Pieces { get; set; } = new();
     public List<Seam> Seams { get; set; } = new();
@@ -106,6 +115,7 @@ public sealed class Garment
         ParticleDistance = ParticleDistance,
         Thickness = Thickness,
         Topology = Topology,
+        MakeHumanZDepth = MakeHumanZDepth,
         Groups = Groups.Select(g => g.Clone()).ToList(),
         Pieces = Pieces.Select(p => p.Clone()).ToList(),
         Seams = Seams.Select(s => s.Clone()).ToList(),
