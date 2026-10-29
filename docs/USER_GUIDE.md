@@ -883,6 +883,16 @@ annotations and the 3D background — and remembers the choice for the next star
   `"#rrggbb"` value per role. **Load Theme…** applies such a file and remembers it as the **Custom**
   theme. The file is plain text, so it is an easy starting point for your own theme: save one, edit the
   colours in any text editor, and load it again. Roles you leave out fall back to the Default colours.
+- Seamstress keeps a **`Themes`** folder next to its `logs` folder, and **Save Theme…** and **Load Theme…**
+  open there. It holds `example-theme.json`, a complete theme that lists every colour role, and a
+  `README.md` saying what each role colours. Copy the example, change the colours, and load it with
+  **Load Theme…**. **Open Themes Folder** on the same page shows it in your file manager.
+  - Windows: `Documents\Seamstress\Themes`
+  - Linux: `~/.config/Seamstress/Themes` (or `$XDG_CONFIG_HOME/Seamstress/Themes`)
+  - Flatpak: `~/.var/app/io.github.mangodragonhub.Seamstress/config/Seamstress/Themes`
+
+  The two files are put there when Seamstress starts if they are missing. Edits to them are kept, and a deleted
+  one comes back at the next start, so save your own themes under other names.
 
 ### Language
 

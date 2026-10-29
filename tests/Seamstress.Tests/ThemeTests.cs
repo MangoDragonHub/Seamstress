@@ -91,4 +91,44 @@ public class ThemeTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void ExampleThemeLoadsAndListsEveryRole()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Themes")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        string json = File.ReadAllText(Path.Combine(dir!.FullName, "Themes", "example-theme.json"));
+        Assert.True(Theme.TryParse(json, out string name, out _, out var problem), problem.ToString());
+        Assert.NotEqual("", name);
+        // The example is the reference for theme authors, so it names every role, and only real ones.
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        var listed = document.RootElement.GetProperty("colors").EnumerateObject().Select(p => p.Name).ToList();
+        Assert.Equal(Theme.Roles.OrderBy(r => r), listed.OrderBy(r => r));
+    }
+
+    [Fact]
+    public void ExamplesAreInstalledWithoutOverwritingEdits()
+    {
+        Assert.Contains("example-theme.json", Theme.ExampleFiles);
+        Assert.Contains("README.md", Theme.ExampleFiles);
+        string folder = Path.Combine(Path.GetTempPath(), "seamstress-themes-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Assert.Equal(2, Theme.InstallExamples(folder).Count);
+            string example = Path.Combine(folder, "example-theme.json");
+            Assert.True(Theme.TryParse(File.ReadAllText(example), out _, out _, out _));
+
+            // A user's edits survive the next start; a deleted file comes back.
+            File.WriteAllText(example, "edited");
+            File.Delete(Path.Combine(folder, "README.md"));
+            Assert.Equal(new[] { Path.Combine(folder, "README.md") }, Theme.InstallExamples(folder));
+            Assert.Equal("edited", File.ReadAllText(example));
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
 }

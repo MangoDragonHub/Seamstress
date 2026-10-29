@@ -178,6 +178,31 @@ public static class Theme
         });
     }
 
+    /// <summary>The files placed in the Themes folder: an example theme naming every role, and notes on the format.</summary>
+    public static IEnumerable<string> ExampleFiles => typeof(Theme).Assembly.GetManifestResourceNames()
+        .Where(n => n.StartsWith("Themes/", StringComparison.Ordinal)).Select(n => n["Themes/".Length..]);
+
+    /// <summary>
+    /// Copies the example files into <paramref name="folder"/>, creating it if needed. A file already there is left
+    /// alone, so edits to it are kept; one that was deleted comes back. Returns the files written.
+    /// </summary>
+    public static List<string> InstallExamples(string folder)
+    {
+        var written = new List<string>();
+        Directory.CreateDirectory(folder);
+        foreach (string file in ExampleFiles)
+        {
+            string path = Path.Combine(folder, file);
+            if (File.Exists(path))
+                continue;
+            using var source = typeof(Theme).Assembly.GetManifestResourceStream("Themes/" + file)!;
+            using (var target = File.Create(path))
+                source.CopyTo(target);
+            written.Add(path);
+        }
+        return written;
+    }
+
     private static readonly System.Text.RegularExpressions.Regex ColorPattern
         = new("^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$", System.Text.RegularExpressions.RegexOptions.Compiled);
 }

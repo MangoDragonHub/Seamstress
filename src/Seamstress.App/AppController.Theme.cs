@@ -16,7 +16,38 @@ public partial class AppController
     private string _customThemeName = "";
 
     /// <summary>Called from the constructor once the settings are loaded.</summary>
-    private void InitTheme() => RestoreFromSettings();
+    private void InitTheme()
+    {
+        RestoreFromSettings();
+        try
+        {
+            foreach (string path in Theme.InstallExamples(ThemesFolder))
+                AppLog.Write($"Wrote {path}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Write($"Could not write the example theme to {ThemesFolder}: {e.Message}");
+        }
+    }
+
+    /// <summary>The Themes folder beside the logs, holding the example theme; theme files are loaded from and saved to it.</summary>
+    public string ThemesFolder => AppSettings.ThemesFolder;
+
+    public string ThemesFolderUrl => ViewportSync.ToUrl(ThemesFolder);
+
+    /// <summary>Shows the Themes folder in the system's file manager.</summary>
+    public void OpenThemesFolder()
+    {
+        try
+        {
+            Directory.CreateDirectory(ThemesFolder);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(ThemesFolder) { UseShellExecute = true });
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            Fail(Lang.T("Could not open the themes folder."), e);
+        }
+    }
 
     /// <summary>The preset the interface shows ("default", "light", "hcdark", "hclight" or "custom").</summary>
     public string ThemeChoice => _themeChoice;

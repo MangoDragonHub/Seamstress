@@ -257,6 +257,26 @@ AppDialog {
                         Note {
                             text: tr("A theme is a small JSON file of colours: load one to use it, or edit a saved file in a text editor and load it again. The chosen theme is remembered the next time Seamstress is opened.")
                         }
+                        Note {
+                            text: tr("The themes folder holds example-theme.json, which lists every colour, and a README describing each one. Copy the example to start your own.")
+                        }
+                        RowLayout {
+                            spacing: 8
+                            Label { text: tr("Themes folder"); opacity: 0.75 }
+                            Label {
+                                Layout.fillWidth: true
+                                text: App.themesFolder
+                                opacity: 0.75
+                                elide: Text.ElideMiddle
+                                ToolTip.visible: themesHover.hovered
+                                ToolTip.text: text
+                                HoverHandler { id: themesHover }
+                            }
+                            Button {
+                                text: tr("Open Themes Folder")
+                                onClicked: App.openThemesFolder()
+                            }
+                        }
                     }
                 }
                 Item { Layout.fillHeight: true }
@@ -622,7 +642,7 @@ AppDialog {
         title: tr("Save Theme")
         fileMode: FileDialog.SaveFile
         nameFilters: [tr("Seamstress themes") + " (*.json)"]
-        currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
+        currentFolder: App.themesFolderUrl
         currentFile: currentFolder + "/" + (App.customThemeName !== "" ? App.fileName(App.customThemeName) : "seamstress-theme") + ".json"
         onAccepted: App.saveThemeFile(selectedFile.toString())
     }
@@ -631,7 +651,7 @@ AppDialog {
         title: tr("Load Theme")
         fileMode: FileDialog.OpenFile
         nameFilters: [tr("Seamstress themes") + " (*.json)"]
-        currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
+        currentFolder: App.themesFolderUrl
         onAccepted: {
             App.loadThemeFile(selectedFile.toString())
             root.themeChoice = App.themeChoice
