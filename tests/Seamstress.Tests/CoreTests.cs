@@ -86,6 +86,33 @@ public class MeshTests
             Assert.Contains(shell.Normals, n => n.Y * y > 0.99f && MathF.Abs(n.Z) < 0.01f);
     }
 
+    [Fact]
+    public void ShellWithoutThicknessIsAFlatSheet()
+    {
+        var positions = new[] { new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(1, 1, 0) };
+        var normals = Enumerable.Repeat(Vector3.UnitZ, 3).ToArray();
+        var uvs = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1) };
+
+        var shell = Mesher.BuildShell(positions, normals, uvs, new[] { 0, 1, 2 }, 0f);
+
+        Assert.Equal(6, shell.Positions.Length);    // front and back, no walls
+        Assert.Equal(6, shell.Triangles.Length);
+        Assert.All(shell.Positions, p => Assert.True(MathF.Abs(p.Z) < 1e-4f));
+    }
+
+    [Fact]
+    public void GarmentIsDrawnThickOnlyWhenThicknessIsEnabled()
+    {
+        var doc = new Document();
+        var garment = Templates.Create("Skirt", doc);
+        var piece = garment.Pieces[0];
+        Assert.Null(garment.Thickness);
+        Assert.Equal(0f, garment.ShownThicknessMm);
+        Assert.Equal(piece.Physics.Thickness, garment.EffectiveThicknessMm(piece)); // collision still uses the fabric
+        garment.Thickness = 6f;
+        Assert.Equal(6f, garment.ShownThicknessMm);
+    }
+
     [Theory]
     [InlineData("T-Shirt")]
     [InlineData("Tank Top")]

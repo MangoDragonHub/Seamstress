@@ -132,6 +132,12 @@ public sealed class Garment
     public float EffectiveThicknessMm(PatternPiece piece)
         => Math.Clamp(Thickness ?? piece.Physics.Thickness, 0.1f, 50f);
 
+    /// <summary>
+    /// How thick the 3D view draws the garment, in millimetres: the garment thickness when it is enabled, otherwise 0,
+    /// so the cloth is shown as a flat sheet rather than extruded by its fabric's collision thickness.
+    /// </summary>
+    public float ShownThicknessMm => Thickness is { } thickness ? Math.Clamp(thickness, 0.1f, 50f) : 0f;
+
     /// <summary>Every group and piece id in layers-panel order; only the order among siblings is meaningful.</summary>
     public List<string> OrderedLayerIds()
     {

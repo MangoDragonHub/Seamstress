@@ -221,8 +221,8 @@ internal sealed class ViewportSync : IDisposable
                     {
                         var na = normals[stitch.PieceA][stitch.VertexA];
                         var nb = normals[stitch.PieceB][stitch.VertexB];
-                        float ha = garment.EffectiveThicknessMm(pa) * 0.0005f + 0.001f;
-                        float hb = garment.EffectiveThicknessMm(pb) * 0.0005f + 0.001f;
+                        float ha = garment.ShownThicknessMm * 0.0005f + 0.001f;
+                        float hb = garment.ShownThicknessMm * 0.0005f + 0.001f;
                         seamLines.Add(a + na * ha);
                         seamLines.Add(b + nb * hb);
                         seamLines.Add(a - na * ha);
@@ -238,7 +238,7 @@ internal sealed class ViewportSync : IDisposable
                 if (!Workspace.IsEffectivelyVisible(garment, piece) || pieceMesh.TriangleCount == 0)
                     continue;
                 seen.Add(piece.Id);
-                float halfThickness = garment.EffectiveThicknessMm(piece) * 0.0005f;
+                float halfThickness = garment.ShownThicknessMm * 0.0005f;
                 if (piece.PinKey == pieceMesh.Key)
                 {
                     foreach (int index in piece.Pins)
