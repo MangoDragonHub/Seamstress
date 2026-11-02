@@ -533,6 +533,70 @@ public class DocumentTests
     }
 
     [Fact]
+    public void ShiftSnapsTransformPointsToTheGrid()
+    {
+        var ws = new Workspace();
+        var editor = new PatternEditor(ws) { GridStep = 10 };
+        editor.Tool = PatternTool.Rectangle;
+        editor.PointerDown(new Vector2(0, 0), 1, false);
+        editor.PointerMove(new Vector2(40, 20), 1);
+        editor.PointerUp(new Vector2(40, 20));
+        Vector2 Corner()
+        {
+            var piece = ws.Document.Garments[0].Pieces[0];
+            return piece.PointAt(0).Position + piece.Origin;
+        }
+
+        // With Shift the dragged point lands on the nearest crossing, in both axes.
+        editor.Tool = PatternTool.TransformPoints;
+        editor.Constrain = true;
+        editor.PointerDown(new Vector2(0, 0), 0.9f, false);
+        editor.PointerMove(new Vector2(3.2f, 7.9f), 0.9f);
+        Assert.True(Vector2.Distance(Corner(), new Vector2(0, 10)) < 1e-3f);
+        editor.PointerMove(new Vector2(16, 11), 0.9f);
+        Assert.True(Vector2.Distance(Corner(), new Vector2(20, 10)) < 1e-3f);
+        editor.Constrain = false;                                  // releasing Shift frees the point again
+        Assert.True(Vector2.Distance(Corner(), new Vector2(16, 11)) < 1e-3f);
+        editor.Constrain = true;                                   // and pressing it mid-drag snaps at once
+        Assert.True(Vector2.Distance(Corner(), new Vector2(20, 10)) < 1e-3f);
+        editor.PointerUp(new Vector2(16, 11));
+        Assert.Equal("Move point", ws.History.UndoName);
+    }
+
+    [Fact]
+    public void ShiftSnapsSelectedPiecesToTheGrid()
+    {
+        var ws = new Workspace();
+        var editor = new PatternEditor(ws) { GridStep = 10 };
+        editor.Tool = PatternTool.Rectangle;
+        editor.PointerDown(new Vector2(0, 0), 1, false);
+        editor.PointerMove(new Vector2(40, 20), 1);
+        editor.PointerUp(new Vector2(40, 20));
+        Vector2 Origin() => ws.Document.Garments[0].Pieces[0].Origin;
+
+        // Dragging a piece with Shift puts its position on the grid.
+        editor.Tool = PatternTool.Select;
+        editor.PointerDown(new Vector2(5, 5), 0.9f, false);
+        editor.Constrain = true;
+        editor.PointerMove(new Vector2(18.2f, 12.9f), 0.9f);
+        Assert.True(Vector2.Distance(Origin(), new Vector2(10, 10)) < 1e-3f);
+        editor.Constrain = false;
+        Assert.True(Vector2.Distance(Origin(), new Vector2(13.2f, 7.9f)) < 1e-3f);
+        editor.Constrain = true;
+        Assert.True(Vector2.Distance(Origin(), new Vector2(10, 10)) < 1e-3f);
+        editor.PointerUp(new Vector2(18.2f, 12.9f));
+
+        // An arrow still keeps to its axis while snapping.
+        editor.Constrain = false;
+        editor.PointerDown(new Vector2(33, 20), 0.9f, false);      // the X arrow beside the middle
+        editor.Constrain = true;
+        editor.PointerMove(new Vector2(38.2f, 24), 0.9f);
+        editor.PointerUp(new Vector2(38.2f, 24));
+        Assert.True(Vector2.Distance(Origin(), new Vector2(20, 10)) < 1e-3f);
+        Assert.Equal("Move piece", ws.History.UndoName);
+    }
+
+    [Fact]
     public void RulerMeasuresAndCatchesOnPoints()
     {
         var ws = new Workspace();

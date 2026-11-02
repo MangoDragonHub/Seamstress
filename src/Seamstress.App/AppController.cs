@@ -343,7 +343,7 @@ public partial class AppController : INotifyPropertyChanged
         return sb.Append(']').ToString();
     }
 
-    /// <summary>Shift is held in the 2D view: the drawing tools keep their proportions (see PatternEditor.Constrain).</summary>
+    /// <summary>Shift is held in the 2D view: the drawing tools keep their proportions and moving points or pieces snaps to the grid (see PatternEditor.Constrain).</summary>
     public bool Constrain
     {
         get => _editor.Constrain;

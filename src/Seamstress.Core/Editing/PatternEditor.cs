@@ -64,6 +64,9 @@ public sealed class PatternEditor
     private readonly List<EdgeRef> _measured = new();
     private readonly List<(string PieceId, int Index)> _points = new();   // selection of the Transform Points tool
     private List<PointStart> _pointStarts = new();
+    private readonly Dictionary<string, Vector2> _pieceStarts = new();
+    private Vector2 _piecesSnapOrigin;
+    private bool _piecesStarted;
     private int _pointsAxis;            // 0 = free (or even scaling), 1 = along X, 2 = along Y
     private float _pointsPixel = 1;     // world units per screen pixel when the drag began
     private GizmoMode _gizmoMode;
@@ -109,7 +112,8 @@ public sealed class PatternEditor
 
     /// <summary>
     /// Shift held while drawing: rectangles become squares, ellipses become circles, and each polygon side snaps
-    /// to 15° steps and to a whole number of <see cref="LengthStep"/>.
+    /// to 15° steps and to a whole number of <see cref="LengthStep"/>. While moving points or pieces it snaps
+    /// them to the grid.
     /// </summary>
     public bool Constrain
     {
@@ -124,6 +128,10 @@ public sealed class PatternEditor
                 BuildShape(_dragLast);
             else if ((_drag is Drag.Point or Drag.Control) && _dragMoved)
                 DragPoint(_dragLast);
+            else if (_drag == Drag.Pieces && _dragMoved)
+                MovePieces(_dragLast);
+            else if (_drag == Drag.PointsMove && _dragMoved)
+                MovePoints(_dragLast);
             else if (_drag == Drag.Ruler && _dragMoved)
                 _rulerEnd = RulerPoint(_dragLast, _rulerTolerance, _rulerStart);
             else if (_tool == PatternTool.Polygon && _draft.Count > 0 && _draftCursor != null)
@@ -137,11 +145,24 @@ public sealed class PatternEditor
     /// <summary>Length in centimetres that constrained polygon sides are rounded to.</summary>
     public float LengthStep { get; set; } = 1f;
 
-    /// <summary>Size in centimetres of the grid squares the 2D view shows; Edit Points snaps to it with Shift.</summary>
+    /// <summary>Size in centimetres of the grid squares the 2D view shows; Shift snaps points and pieces to it.</summary>
     public float GridStep { get; set; } = 1f;
 
     private Vector2 SnapToGrid(Vector2 world)
         => GridStep > 0 ? new Vector2(MathF.Round(world.X / GridStep), MathF.Round(world.Y / GridStep)) * GridStep : world;
+
+    /// <summary>
+    /// Snaps a move so the selection's reference point lands on a grid crossing. An axis the move does not use
+    /// keeps exactly where it was.
+    /// </summary>
+    private Vector2 SnapMove(Vector2 origin, Vector2 offset)
+    {
+        if (GridStep <= 0)
+            return offset;
+        float Axis(float start, float delta)
+            => delta == 0 ? 0 : MathF.Round((start + delta) / GridStep) * GridStep - start;
+        return new Vector2(Axis(origin.X, offset.X), Axis(origin.Y, offset.Y));
+    }
 
     private float _rulerTolerance;
 
@@ -233,9 +254,9 @@ public sealed class PatternEditor
         ? Lang.T("UV layout of the active garment: drag a piece to move it in texture space. The checker shows texel density.")
         : _tool switch
         {
-            PatternTool.Select => Lang.T("Click a piece to select it, drag to move. Use the handles to move, rotate or scale it (Q/W/E/R). Click an edge to see its length. Ctrl+click adds to the selection. Double-click a piece to select all its points."),
+            PatternTool.Select => Lang.T("Click a piece to select it, drag to move. Use the handles to move, rotate or scale it (Q/W/E/R). Click an edge to see its length. Ctrl+click adds to the selection. Double-click a piece to select all its points. Hold Shift to snap to the grid."),
             PatternTool.EditPoints => Lang.T("Drag a point to move it, drag an edge to curve it, double-click an edge to add a point (or inside the piece to select all its points), Delete removes the selected point. Hold Shift to snap to the grid. Click an edge to see its length."),
-            PatternTool.TransformPoints => Lang.T("Click a point to select it, Ctrl+click to add, drag a box around several, or double-click a piece for all of its points. Drag an arrow to move them, the ring to rotate them, a box to scale them (Q/W/E/R choose the handles)."),
+            PatternTool.TransformPoints => Lang.T("Click a point to select it, Ctrl+click to add, drag a box around several, or double-click a piece for all of its points. Drag an arrow to move them, the ring to rotate them, a box to scale them (Q/W/E/R choose the handles). Hold Shift to snap the moved points to the grid."),
             PatternTool.Sew => _pendingEdge == null ? Lang.T("Click the first edge to sew.") : Lang.T("Click the edge to sew it to. Esc cancels."),
             PatternTool.Polygon => _draft.Count == 0 ? Lang.T("Click to place the first corner.") : Lang.T("Click to add corners; click the first corner, double-click or press Enter to finish. Hold Shift to snap the side's angle and length."),
             PatternTool.Rectangle => Lang.T("Drag to draw a rectangular piece. Hold Shift for a square."),
@@ -557,6 +578,50 @@ public sealed class PatternEditor
         Changed?.Invoke();
     }
 
+    /// <summary>Moves the pieces being dragged; Shift snaps the selection's reference point to the grid.</summary>
+    private void MovePieces(Vector2 world)
+    {
+        if (!_piecesStarted)
+        {
+            _piecesStarted = true;
+            _pieceStarts.Clear();
+            foreach (var piece in _workspace.SelectedPieceObjects())
+                _pieceStarts[piece.Id] = piece.Origin;
+            // A single piece lands with its own position on the grid; several with their shared middle.
+            _piecesSnapOrigin = _pieceStarts.Count == 1
+                ? _pieceStarts.Values.First()
+                : PointsCentre() ?? _dragStart;
+        }
+        var offset = world - _dragStart;
+        // Dragged by an arrow, the pieces keep to that arrow's axis.
+        if (_pointsAxis == 1)
+            offset.Y = 0;
+        else if (_pointsAxis == 2)
+            offset.X = 0;
+        if (_constrain)
+            offset = SnapMove(_piecesSnapOrigin, offset);
+        foreach (var piece in _workspace.SelectedPieceObjects())
+        {
+            if (_pieceStarts.TryGetValue(piece.Id, out var start))
+                piece.Origin = start + offset;
+        }
+        _workspace.History.NotifyLiveChange();
+    }
+
+    /// <summary>Moves the points being dragged; Shift snaps the selection's reference point to the grid.</summary>
+    private void MovePoints(Vector2 world)
+    {
+        var offset = world - _dragStart;
+        // Dragged by an arrow, the points keep to that arrow's axis.
+        if (_pointsAxis == 1)
+            offset.Y = 0;
+        else if (_pointsAxis == 2)
+            offset.X = 0;
+        if (_constrain)
+            offset = SnapMove(_pointsPivot, offset);
+        ApplyPoints(p => p + offset);
+    }
+
     // ---------------------------------------------------------------- pointer events
 
     public void PointerDown(Vector2 world, float tolerance, bool additive)
@@ -565,6 +630,7 @@ public sealed class PatternEditor
         _dragMoved = false;
         _drag = Drag.None;
         _onHandle = false;
+        _piecesStarted = false;
 
         if (_uvMode)
         {
@@ -738,14 +804,7 @@ public sealed class PatternEditor
         switch (_drag)
         {
             case Drag.Pieces:
-                // Dragged by an arrow, the pieces keep to that arrow's axis.
-                if (_pointsAxis == 1)
-                    delta.Y = 0;
-                else if (_pointsAxis == 2)
-                    delta.X = 0;
-                foreach (var piece in _workspace.SelectedPieceObjects())
-                    piece.Origin += delta;
-                _workspace.History.NotifyLiveChange();
+                MovePieces(world);
                 return;
             case Drag.Uv:
                 foreach (var piece in _workspace.SelectedPieceObjects())
@@ -771,17 +830,8 @@ public sealed class PatternEditor
                 Changed?.Invoke();
                 return;
             case Drag.PointsMove:
-                {
-                    var offset = world - _dragStart;
-                    // Shift on a free drag keeps to whichever of the two axes the drag mostly follows.
-                    int axis = _pointsAxis != 0 ? _pointsAxis : !_constrain ? 0 : MathF.Abs(offset.X) >= MathF.Abs(offset.Y) ? 1 : 2;
-                    if (axis == 1)
-                        offset.Y = 0;
-                    else if (axis == 2)
-                        offset.X = 0;
-                    ApplyPoints(p => p + offset);
-                    return;
-                }
+                MovePoints(world);
+                return;
             case Drag.PointsRotate:
                 {
                     var from = _dragStart - _pointsPivot;

@@ -41,7 +41,7 @@ Item {
         }
         return gridLevels[gridLevels.length - 1]
     }
-    // Shift in Edit Points snaps to the smallest squares on screen.
+    // Shift snaps points and pieces to the smallest squares on screen.
     Binding { target: App; property: "patternGridStep"; value: root.gridLevel()[0] }
     function lengthText(cm) { return App.imperial ? (cm / 2.54).toFixed(2) + " in" : cm.toFixed(1) + " cm" }
 
@@ -421,7 +421,7 @@ Item {
             root.forceActiveFocus()
             App.constrain = (e.modifiers & Qt.ShiftModifier) !== 0
             if (e.button === Qt.LeftButton && !(e.modifiers & Qt.AltModifier)) {
-                App.pointerDown(root.wx(e.x), root.wy(e.y), root.tolerance(), (e.modifiers & Qt.ControlModifier) !== 0 || (e.modifiers & Qt.ShiftModifier) !== 0)
+                App.pointerDown(root.wx(e.x), root.wy(e.y), root.tolerance(), (e.modifiers & Qt.ControlModifier) !== 0)
             } else {
                 panning = true
                 lastX = e.x; lastY = e.y
@@ -459,7 +459,7 @@ Item {
         }
         onDoubleClicked: (e) => {
             if (e.button === Qt.LeftButton)
-                App.doubleClick(root.wx(e.x), root.wy(e.y), root.tolerance(), (e.modifiers & Qt.ControlModifier) !== 0 || (e.modifiers & Qt.ShiftModifier) !== 0)
+                App.doubleClick(root.wx(e.x), root.wy(e.y), root.tolerance(), (e.modifiers & Qt.ControlModifier) !== 0)
         }
         onWheel: (e) => {
             // Zoom about the cursor so the point under it stays put.

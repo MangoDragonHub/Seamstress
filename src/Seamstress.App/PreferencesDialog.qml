@@ -341,7 +341,7 @@ AppDialog {
                         }
                         Note {
                             Layout.columnSpan: 2
-                            text: tr("The 2D grid sizes itself to the zoom; Shift in Edit Points snaps to its smallest squares.")
+                            text: tr("The 2D grid sizes itself to the zoom; Shift snaps points and pieces to its smallest squares.")
                         }
                     }
                 }

@@ -201,8 +201,8 @@ across. Shift can be pressed or released in the middle of a drag.
 With the **Select** tool, a selected piece shows the same handles as the 3D view (see
 [Choosing which handles are shown](#choosing-which-handles-are-shown)). The arrows move the piece along one
 axis, the ring turns it, and the boxes scale it: red for width, green for height, yellow for both. Hold
-**Shift** while turning for 15° steps and while scaling for steps of a tenth. You can still drag the piece
-itself to move it freely.
+**Shift** while turning for 15° steps and while scaling for steps of a tenth, or while moving to snap the
+piece's position to the grid. You can still drag the piece itself to move it freely.
 
 ### Measuring edges
 
@@ -252,7 +252,8 @@ also show a yellow handle.
 
 With **Shift** held, the point snaps to the nearest crossing of the smallest squares on screen, so the step
 follows the zoom: zoom in for finer steps (down to 1 mm, or 1/8 in in imperial) and out for coarser ones. The
-scale bar in the corner says how big a square is.
+same snapping moves points in **Transform Points** and pieces in **Select**. The scale bar in the corner says
+how big a square is.
 
 ### Arranging pieces in the pattern
 
@@ -269,7 +270,7 @@ the UVs), not the 3D placement. The **Edit** menu also has **Duplicate** (Ctrl+D
 - **Scale:** with two or more points selected, drag a box to scale them about their middle: red for width,
   green for height, yellow for both. **Q / W / E / R** choose which handles are shown.
 
-- **Select:** click a point; **Ctrl+click** (or Shift+click) adds or removes one; drag a box over empty space
+- **Select:** click a point; **Ctrl+click** adds or removes one; drag a box over empty space
   to select every point inside it, across pieces. **Ctrl+A** selects every point of the active garment.
   Click empty space to clear the selection.
 - **Select a whole shape:** double-click inside a piece. This works from the **Select** and **Edit Points**
@@ -278,7 +279,7 @@ the UVs), not the 3D placement. The **Edit** menu also has **Duplicate** (Ctrl+D
   on an edge still adds a point there.)
 - **Move:** handles appear in the middle of the selected points. Drag the red arrow to move them left–right
   only, the green arrow up–down only, or the white square to move them freely. You can also just drag any
-  selected point. Hold **Shift** on a free drag to keep to one axis.
+  selected point. Hold **Shift** to snap the points to the grid (use an arrow to keep to one axis).
 - **Rotate:** with two or more points selected, drag the blue ring to turn them about their middle. Hold
   **Shift** for 15° steps.
 - **Delete** removes the selected points (a piece always keeps at least three). Selecting every point of a
@@ -977,11 +978,14 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | --- | --- | --- |
 | Left button | The current tool | Click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it |
 | Ctrl + drag | — | Orbit around the avatar |
-| Ctrl or Shift + click | Add to the selection | Add to the selection |
+| Ctrl + click | Add to the selection | Add to the selection |
+| Shift + click | — | Add to the selection |
 | Shift while drawing | Square, circle, or a snapped polygon side | — |
 | Shift + drag | — | Pan |
 | Shift + drag a move arrow | — | Snap the piece to the grid along that axis |
 | Shift + drag a point (Edit Points) | Snap the point to the grid | — |
+| Shift + drag a point (Transform Points) | Snap the selected points to the grid | — |
+| Shift + drag a piece (Select) | Snap the piece to the grid | — |
 | Middle or right drag | Pan | Pan |
 | Right-click | Edit menu | Edit menu |
 | Alt + left drag | Pan | — |
