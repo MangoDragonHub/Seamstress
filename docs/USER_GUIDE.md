@@ -98,6 +98,7 @@ The borders between the panels can be dragged to resize them.
 | 2 | **Edit Points** | A | Drag a point to move it. Drag an edge to curve it. Double-click an edge to add a point. |
 | 3 | **Transform Points** | T | Select one point or several, then move or rotate them with handles. Does not bend edges. |
 | 4 | **Sew** | S | Click one edge, then another, to sew them together. |
+| | **Inset Band** | I | Cut a waistband, collar band or facing off pieces along the edges you click, already sewn on (see [Cutting bands from edges](#cutting-bands-from-edges)). |
 | 5 | **Polygon** | P | Click to place corners; click the first corner again, double-click, or press Enter to finish. |
 | 6 | **Rectangle** | B | Drag out a rectangular piece. |
 | 7 | **Ellipse** | O | Drag out an elliptical piece. |
@@ -134,6 +135,7 @@ maps what you already know to where it lives here.
 | Edit Curvature | **Edit Points** tool: drag an edge to bend it |
 | Add Point / Split Line | **Edit Points** tool: double-click an edge |
 | Internal shape ▸ Cut / Convert to Hole | Draw the shape as a piece on top, select both, **Edit ▸ Cut Hole** |
+| Offset as Internal Line, then Cut & Sew (for a waistband or facing) | **Inset Band** tool (**I**): click the edges, set the width, Apply |
 | Segment Sewing | **Sew** tool (**S**): click one edge, then the other |
 | Edit Sewing ▸ reverse a twisted seam | Select the seam, then **Reverse Direction** in Properties |
 | Simulate (Space) | **Simulate** (Space) |
@@ -314,6 +316,42 @@ right-click and choose **Cut Hole** (also in the **Edit** menu).
   brings it back.
 - In the 2D view you see through a hole to the grid and to any piece beneath it, and a click there selects
   what is underneath.
+
+### Cutting bands from edges
+
+A waistband, collar band, neckband or facing has to match the edge it is sewn to exactly. Instead of drawing it
+as a separate piece, cut it off the piece itself: pick **Inset Band** (**I**), click the edges, set the width and
+press **Apply**.
+
+![The waists of a skirt's front and back chosen with Inset Band: each band shaded, its cut line dashed, and the width panel](images/inset-band.png)
+
+1. **Click the edges** the band runs along: the waist of the front, say, and the waist of the back. Edges of
+   several pieces can be chosen at once. Click a chosen edge again to drop it; click empty space to start over.
+2. **Set the width.** Drag inward from a chosen edge, or use the Width box in the panel in the top-right corner of
+   the 2D view: type a number, or drag left or right in the box. Hold **Shift** while dragging an edge for whole
+   centimetres (or quarter inches). Each band is previewed as you go, shaded, with its cut line dashed.
+3. **Apply** (or press **Enter**). **Esc** or **Cancel** drops the choice without cutting anything.
+
+What you get:
+
+- Each piece is cut along the dashed line. What was beyond it becomes a new piece, **"… band"**, of the same fabric.
+  It is left exactly where it was cut, in the pattern and in 3D, so you see the cut; drag it aside in the pattern
+  if you like. A draped piece stays draped, and so does its band.
+- **The band is sewn to the piece** along the cut, so you can simulate straight away.
+- **Seams carry over.** A seam on a chosen edge moves to the band. A seam on an edge the cut runs into (a side
+  seam, say) is split in two, so the band and the piece both stay sewn: cut the front and back waists together and
+  the side seams continue up the waistband. If the edge it is sewn to was not cut at the same place, a point is
+  added to it there.
+- **Edges next to each other make one band**, turning the corner; edges apart make one band each. Choosing every
+  edge of an outline or of a hole gives a ring.
+- **Curved edges work too.** The band's outer edge is the original curve, unchanged, and the cut follows it at the
+  chosen width, so a band cut from a neckline or a curved waist is contoured to fit it. Where the edge next to a
+  band is curved, it is split where the cut meets it and both parts keep its shape.
+- **Ctrl+Z** undoes the whole cut in one step.
+
+The width has to fit. When it does not, the preview turns red, the panel says why and **Apply** is unavailable:
+the cut would cross another edge or a hole, it would run past the end of the edge beside the band, or a curve
+bulges more tightly than the band is wide.
 
 ---
 
@@ -565,6 +603,11 @@ Each garment row also shows its face count.
 
 The panel shows sections for the current selection. Click a section title to fold it. Sliders and number boxes
 apply immediately; dragging a slider counts as a single undo step.
+
+**Number boxes** (here, in Preferences, in Send to MakeHuman and in the Inset Band panel) can be dragged as well as
+typed in: press in the box and drag left or right to change the value, watching the result as you go. Hold
+**Shift** for fine steps or **Ctrl** for coarse ones. A click without dragging selects the number so you can type
+a new one; the arrow keys step it up and down.
 
 ### 3D Arrangement and Fabric Physics
 
@@ -950,6 +993,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | Key | Action |
 | --- | --- |
 | V / A / T / S | Select / Edit Points / Transform Points / Sew |
+| I | Inset Band |
 | Q / W / E / R | Handles: all / move only / rotate only / scale only (both views) |
 | P / B / O | Polygon / Rectangle / Ellipse |
 | M | Ruler |
@@ -959,7 +1003,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | 5 | Orthographic 3D view on or off (number row or keypad) |
 | G | Turn Pinch on or off in the 3D view |
 | Space | Start or stop simulation |
-| Enter | Finish the polygon being drawn |
+| Enter | Finish the polygon being drawn; cut the bands previewed with Inset Band |
 | Esc | Cancel the current tool action |
 | Delete / Backspace | Delete the selected pieces, seam or point |
 | Ctrl+Z | Undo |
@@ -992,6 +1036,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | Scroll | Zoom about the cursor | Zoom |
 | Double-click | Finish a polygon; add a point on an edge (Edit Points); select every point of a piece | — |
 | Drag (Ruler) | Measure; the ends catch on pattern points | Click or drag between two points on the cloth or avatar |
+| Click / drag an edge (Inset Band) | Choose the edge, or drop it again; drag inward to set the band's width | — |
 | Drag on empty space (Transform Points) | Box-select points | — |
 
 ---

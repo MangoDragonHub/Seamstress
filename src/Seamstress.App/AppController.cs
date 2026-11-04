@@ -56,6 +56,8 @@ public partial class AppController : INotifyPropertyChanged
         AppLog.Write($"Theme: {_settings.Theme}; units: {_settings.Units}");
         _status = Lang.T("Ready");
         _editor = new PatternEditor(_workspace);
+        // Bands start a round width in the units shown: 3 cm or 1¼ in.
+        _editor.InsetWidth = Imperial ? 3.175f : PatternEditor.DefaultInsetWidth;
         _simulation = new SimulationController(_workspace, () => _avatar);
         _workspace.History.Changed += OnDocumentChanged;
         _workspace.SelectionChanged += OnDocumentChanged;
@@ -411,7 +413,48 @@ public partial class AppController : INotifyPropertyChanged
         StatusText = _editor.Hint;
     }
 
-    public void ConfirmTool() => _editor.Confirm();
+    public void ConfirmTool()
+    {
+        if (_editor.Tool == PatternTool.InsetBand)
+            ApplyInset();
+        else
+            _editor.Confirm();
+    }
+
+    /// <summary>Width of the bands the Inset Band tool cuts, in centimetres.</summary>
+    public double InsetWidth
+    {
+        get => _editor.InsetWidth;
+        set
+        {
+            _editor.InsetWidth = (float)value;
+            Notify();
+        }
+    }
+
+    /// <summary>Inset Band: cuts the bands previewed in the 2D view off their pieces, or says why it cannot.</summary>
+    public void ApplyInset()
+    {
+        var edges = _editor.InsetEdges;
+        if (edges.Count == 0)
+        {
+            StatusText = Lang.T("Click the edges to cut a band from.");
+            return;
+        }
+        if (_editor.InsetProblem is { } problem)
+        {
+            StatusText = problem;
+            return;
+        }
+        string name = _workspace.Document.FindPiece(edges[0].PieceId)?.Name ?? "";
+        var created = _editor.ApplyInset();
+        StatusText = created.Count switch
+        {
+            0 => _editor.Hint,
+            1 => Lang.F("Cut the band “{0}” from “{1}”; it is sewn to it along the cut.", created[0].Name, name),
+            _ => Lang.F("Cut {0} bands; each is sewn to the piece it was cut from.", created.Count),
+        };
+    }
 
     // ---------------------------------------------------------------- 3D viewport
 

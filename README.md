@@ -83,7 +83,7 @@ Packages, all written to `dist/`:
 - `./build.sh appimage` — `Seamstress-x86_64.AppImage`, a single file to download and run.
 - `./build.sh flatpak` — `Seamstress.flatpak`; install with `flatpak install --user dist/Seamstress.flatpak`.
   Needs `flatpak-builder` and the runtimes
-  `flatpak install flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08`.
+  `flatpak install flathub org.freedesktop.Platform//26.08 org.freedesktop.Sdk//26.08`.
 - `./build.sh --all-x64` (or `--all-arm64`, whose packages are named for the processor) — the three packages
   above for that CPU in one run, all from a single build.
 
@@ -114,7 +114,7 @@ There are two ways to make it:
 The packages are named for the processor: `Seamstress-linux-arm64/` and its `.tar.gz`,
 `Seamstress-aarch64.AppImage` and `Seamstress-aarch64.flatpak`. Cross-building the Flatpak needs no ARM64 runtime
 on the PC; on the board, `flatpak install --user Seamstress-aarch64.flatpak` fetches
-`org.freedesktop.Platform//24.08` from Flathub as usual.
+`org.freedesktop.Platform//26.08` from Flathub as usual.
 
 Seamstress draws with OpenGL, which the Pi's VideoCore GPU and the RK3399's Mali GPU (through Mesa's Panfrost
 driver) provide. If the GPU renderer does not start, Seamstress switches to the CPU renderer on the next launch

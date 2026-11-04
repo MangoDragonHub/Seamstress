@@ -216,6 +216,33 @@ public static class Outline
         return false;
     }
 
+    /// <summary>True when a closed polygon's sides do not cross or touch each other, apart from neighbours meeting at their shared corner.</summary>
+    public static bool IsSimple(IReadOnlyList<Vector2> polygon)
+    {
+        int n = polygon.Count;
+        if (n < 3)
+            return false;
+        for (int i = 0; i < n; i++)
+        {
+            var p = polygon[i];
+            var q = polygon[(i + 1) % n];
+            var lo = Vector2.Min(p, q);
+            var hi = Vector2.Max(p, q);
+            for (int j = i + 2; j < n; j++)
+            {
+                if (i == 0 && j == n - 1)
+                    continue;
+                var r = polygon[j];
+                var s = polygon[(j + 1) % n];
+                if (MathF.Max(r.X, s.X) < lo.X || MathF.Min(r.X, s.X) > hi.X || MathF.Max(r.Y, s.Y) < lo.Y || MathF.Min(r.Y, s.Y) > hi.Y)
+                    continue;
+                if (SegmentsIntersect(p, q, r, s))
+                    return false;
+            }
+        }
+        return true;
+    }
+
     private static bool SegmentsIntersect(Vector2 p, Vector2 q, Vector2 r, Vector2 s)
     {
         static float Cross(Vector2 o, Vector2 a, Vector2 b) => (a.X - o.X) * (b.Y - o.Y) - (a.Y - o.Y) * (b.X - o.X);

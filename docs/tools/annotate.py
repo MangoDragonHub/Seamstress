@@ -15,7 +15,8 @@
 #   --view propsbottom    scroll the properties panel to its end
 #
 # Raw files expected: overview, arranged, editpoints, sew, uv, quads, layered, bottom, pinch_before (a simulated
-# skirt), pinch (the same with --view pinch), avatar2d (a T-Shirt, --view nosel), mh_0, mh_0.5, mh_1,
+# skirt), pinch (the same with --view pinch), avatar2d (a T-Shirt, --view nosel), inset (a Skirt,
+# --view inset,nosel), mh_0, mh_0.5, mh_1,
 # dlg_prefs, dlg_themes (--view prefsthemes), dlg_export, dlg_bodyshape. The pixel positions below assume a
 # 1920x1042 capture.
 import sys
@@ -95,6 +96,8 @@ save(sw, "seams")
 save(load("sew").crop((1590, 72, 1920, 470)), "seam-properties")
 # The faded avatar behind the pieces in the 2D view
 save(load("avatar2d").crop((806, 72, 1587, 1016)), "avatar-2d")
+# Inset Band: the skirt's waistbands previewed, with the width panel
+save(load("inset").crop((806, 72, 1587, 700)), "inset-band")
 
 # 6. Gizmo with callouts
 g = load("overview").crop((330, 290, 760, 640))

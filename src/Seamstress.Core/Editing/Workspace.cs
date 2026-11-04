@@ -1127,6 +1127,246 @@ public sealed class Workspace
     }
 
     /// <summary>
+    /// What Inset Band would do with <paramref name="edges"/> at <paramref name="width"/> centimetres: the plan for
+    /// each piece they belong to, and why it cannot be done (null when it can). Plans that do not work are still
+    /// returned, so their shapes can be drawn.
+    /// </summary>
+    public List<(PatternPiece Piece, Inset.Result Result)> PlanInsetBand(IEnumerable<EdgeRef> edges, float width, out string? problem)
+    {
+        problem = null;
+        var plans = new List<(PatternPiece, Inset.Result)>();
+        foreach (var group in edges.GroupBy(e => e.PieceId))
+        {
+            if (Document.FindPiece(group.Key) is not { } piece)
+                continue;
+            var result = Inset.Plan(piece, group.Select(e => e.Edge).Distinct().ToList(), width, out var why);
+            problem ??= why;
+            if (result != null)
+                plans.Add((piece, result));
+        }
+        if (plans.Count == 0)
+            problem ??= Lang.T("Click the edges to cut a band from.");
+        return plans;
+    }
+
+    /// <summary>
+    /// Cuts a band <paramref name="width"/> centimetres wide off each piece along the chosen edges, as one undo step
+    /// (see <see cref="Inset"/>). Each band becomes a new piece of the same fabric, left where it was cut in the
+    /// pattern and in 3D, and sewn to the piece along the cut. Seams on the chosen edges move to the band; a seam on
+    /// an edge the cut meets is split in two, inserting a point on the edge it is sewn to where that one was not cut
+    /// at the same place, so the band and the piece both stay sewn. Draped pieces stay draped. Returns the bands,
+    /// which become the selection; nothing changes when <see cref="PlanInsetBand"/> finds a problem.
+    /// </summary>
+    public List<PatternPiece> InsetBand(IReadOnlyCollection<EdgeRef> edges, float width)
+    {
+        var created = new List<PatternPiece>();
+        PlanInsetBand(edges, width, out var problem);
+        if (problem != null)
+            return created;
+        var chosen = edges.GroupBy(e => e.PieceId).ToDictionary(g => g.Key, g => g.Select(e => e.Edge).Distinct().ToList());
+        var garmentIds = chosen.Keys.Select(id => Document.GarmentOfPiece(id)!.Id).Distinct().ToList();
+        // The draped shape of every piece of those garments before the cut, to drape what changes the same way.
+        var before = new Dictionary<string, (PieceMesh Mesh, Vector3[] Positions)>();
+        foreach (var garmentId in garmentIds)
+        {
+            var garment = Document.FindGarment(garmentId)!;
+            var mesh = MeshFor(garment);
+            foreach (var piece in garment.Pieces)
+            {
+                if (mesh.Find(piece.Id) is { } pieceMesh && piece.Drape != null && piece.DrapeKey == pieceMesh.Key)
+                    before[piece.Id] = (pieceMesh, Mesher.CurrentPositions(piece, pieceMesh));
+            }
+        }
+
+        History.Execute(Lang.T("Inset band"), doc =>
+        {
+            foreach (var garmentId in garmentIds)
+                CutBands(doc, doc.FindGarment(garmentId)!, chosen, width, before, created);
+        });
+        SelectedPieces.Clear();
+        SelectedPoint = null;
+        SelectedSeamId = null;
+        foreach (var piece in created)
+            SelectedPieces.Add(piece.Id);
+        SelectionChanged?.Invoke();
+        return created;
+    }
+
+    /// <summary>Part of an edge as it was before Inset Band: the edge now starting at <see cref="Start"/>, covering fractions F0 to F1 of the old one.</summary>
+    private sealed record EdgePart(PatternPiece Piece, PatternPoint Start, float F0, float F1);
+
+    private static void CutBands(Document doc, Garment garment, Dictionary<string, List<int>> chosen, float width,
+        Dictionary<string, (PieceMesh Mesh, Vector3[] Positions)> before, List<PatternPiece> created)
+    {
+        // Every edge as it is now, so seams can be followed to wherever their edges go.
+        var parts = new Dictionary<(string, int), List<EdgePart>>();
+        var lengths = new Dictionary<(string, int), float>();
+        foreach (var piece in garment.Pieces)
+        {
+            for (int e = 0; e < piece.EdgeCount; e++)
+            {
+                parts[(piece.Id, e)] = new List<EdgePart> { new(piece, piece.PointAt(e), 0, 1) };
+                lengths[(piece.Id, e)] = Outline.EdgeLength(piece, e);
+            }
+        }
+
+        var source = new Dictionary<string, string>();   // band → the piece it was cut from
+        var cuts = new List<(EdgePart Base, EdgePart Band)>();
+        foreach (var piece in garment.Pieces.ToList())
+        {
+            if (!chosen.TryGetValue(piece.Id, out var pieceEdges) || Inset.Plan(piece, pieceEdges, width, out _) is not { } result)
+                continue;
+            var old = piece.Clone();
+            piece.Points = result.Points;
+            piece.Holes = result.Holes;
+            Place(old, piece);
+            var bands = new List<PatternPiece>();
+            foreach (var shape in result.Bands)
+            {
+                var band = new PatternPiece
+                {
+                    Name = doc.UniqueName(Lang.F("{0} band", old.Name)),
+                    GroupId = piece.GroupId,
+                    Origin = piece.Origin,
+                    Points = shape.Outline,
+                    Holes = shape.Holes,
+                    Physics = piece.Physics.Clone(),
+                    MaterialId = piece.MaterialId,
+                    ParticleDistance = piece.ParticleDistance,
+                    Uv = piece.Uv.Clone(),
+                    FlipNormals = piece.FlipNormals,
+                };
+                Place(old, band);
+                garment.Pieces.Insert(garment.Pieces.IndexOf(piece) + 1 + bands.Count, band);
+                int listed = garment.LayerOrder.IndexOf(piece.Id);
+                if (listed >= 0)
+                    garment.LayerOrder.Insert(listed + 1 + bands.Count, band.Id);
+                bands.Add(band);
+                created.Add(band);
+                source[band.Id] = piece.Id;
+            }
+            PatternPiece Owner(int owner) => owner < 0 ? piece : bands[owner];
+            foreach (var (edge, list) in result.Edges)
+                parts[(piece.Id, edge)] = list.Select(p => new EdgePart(Owner(p.Owner), p.Start, p.F0, p.F1)).ToList();
+            cuts.AddRange(result.Cuts.Select(c => (new EdgePart(piece, c.Base, 0, 1), new EdgePart(bands[c.Band], c.BandStart, 0, 1))));
+        }
+
+        // Seams follow their edges. Where one side of a seam is now in several parts, the other side is split to
+        // match (unless it already was, at nearly the same place) and each pair of parts is sewn.
+        var seams = new List<Seam>();
+        var sewn = new List<(EdgePart A, EdgePart B, bool Reversed, string Id)>();
+        foreach (var seam in garment.Seams)
+        {
+            if (!parts.TryGetValue((seam.A.PieceId, seam.A.Edge), out var a) || !parts.TryGetValue((seam.B.PieceId, seam.B.Edge), out var b) || ReferenceEquals(a, b))
+            {
+                seams.Add(seam);
+                continue;
+            }
+            // Sewn start-to-end, a fraction f along A meets 1 - f along B; sewn start-to-start, f meets f.
+            float Across(float f) => seam.Reversed ? f : 1 - f;
+            float tolerance = 0.5f / MathF.Max(lengths[(seam.A.PieceId, seam.A.Edge)], 1e-3f);
+            var breaksA = a.Skip(1).Select(p => p.F0).ToList();
+            var breaksB = b.Skip(1).Select(p => Across(p.F0)).ToList();
+            foreach (float f in breaksA.Where(f => !breaksB.Any(g => MathF.Abs(f - g) <= tolerance)))
+                SplitPart(b, Across(f));
+            foreach (float g in breaksB.Where(g => !breaksA.Any(f => MathF.Abs(f - g) <= tolerance)))
+                SplitPart(a, g);
+            var other = seam.Reversed ? b : Enumerable.Reverse(b).ToList();
+            for (int i = 0; i < Math.Min(a.Count, other.Count); i++)
+                sewn.Add((a[i], other[i], seam.Reversed, i == 0 ? seam.Id : Document.NewId()));
+        }
+        // Numbers are read off only now, after every point has been inserted.
+        foreach (var (a, b, reversed, id) in sewn)
+            seams.Add(new Seam { Id = id, A = new EdgeRef(a.Piece.Id, EdgeNumber(a)), B = new EdgeRef(b.Piece.Id, EdgeNumber(b)), Reversed = reversed });
+        foreach (var (cutBase, cutBand) in cuts)
+            seams.Add(new Seam { A = new EdgeRef(cutBase.Piece.Id, EdgeNumber(cutBase)), B = new EdgeRef(cutBand.Piece.Id, EdgeNumber(cutBand)) });
+        garment.Seams = seams;
+
+        // Drape every piece whose mesh changed as it was: a band like the piece it was cut from.
+        if (before.Count == 0)
+            return;
+        var mesh = Mesher.Build(garment);
+        var samplers = new Dictionary<string, SurfaceSampler>();
+        foreach (var piece in garment.Pieces)
+        {
+            string from = source.GetValueOrDefault(piece.Id, piece.Id);
+            if (mesh.Find(piece.Id) is not { } pieceMesh || !before.TryGetValue(from, out var old))
+                continue;
+            if (from == piece.Id && old.Mesh.Key == pieceMesh.Key)
+                continue;
+            if (!samplers.TryGetValue(from, out var sampler))
+                samplers[from] = sampler = new SurfaceSampler(old.Mesh, old.Positions, Mesher.ComputeNormals(old.Positions, old.Mesh.Triangles));
+            var drape = new float[pieceMesh.VertexCount * 3];
+            for (int i = 0; i < pieceMesh.VertexCount; i++)
+            {
+                var (p, _) = sampler.At(pieceMesh.Points[i]);
+                drape[3 * i] = p.X;
+                drape[3 * i + 1] = p.Y;
+                drape[3 * i + 2] = p.Z;
+            }
+            piece.Drape = drape;
+            piece.DrapeKey = pieceMesh.Key;
+        }
+    }
+
+    /// <summary>
+    /// Places a piece cut from <paramref name="old"/> (what is left of it, or a band) where that part of it was in 3D,
+    /// following its wrap.
+    /// </summary>
+    private static void Place(PatternPiece old, PatternPiece piece)
+    {
+        var (oldMin, oldMax) = Outline.Bounds(old);
+        var (min, max) = Outline.Bounds(piece);
+        var (position, rotation) = Mesher.ArrangedFrame(old, (min + max) / 2);
+        float curvature = old.Placement.Curvature;
+        piece.Placement = new Placement
+        {
+            Position = position,
+            Rotation = MathF.Abs(curvature) > 0.05f ? ToEuler(rotation) : old.Placement.Rotation,
+            Curvature = curvature * (max.X - min.X) / MathF.Max(oldMax.X - oldMin.X, 1e-3f),
+        };
+    }
+
+    /// <summary>Splits the part of an edge that fraction <paramref name="f"/> falls in, inserting a point there.</summary>
+    private static void SplitPart(List<EdgePart> list, float f)
+    {
+        int i = list.FindIndex(p => f > p.F0 + 1e-4f && f < p.F1 - 1e-4f);
+        if (i < 0)
+            return;
+        var part = list[i];
+        var (loop, k) = Locate(part.Piece, part.Start);
+        var start = loop[k];
+        var (firstCurve, middle, secondCurve) = Inset.SplitEdge(start.Position, start.Curve, loop[(k + 1) % loop.Count].Position, (f - part.F0) / (part.F1 - part.F0));
+        start.Curve = firstCurve;
+        var inserted = new PatternPoint { Position = middle, Curve = secondCurve };
+        loop.Insert(k + 1, inserted);
+        list[i] = part with { F1 = f };
+        list.Insert(i + 1, new EdgePart(part.Piece, inserted, f, part.F1));
+    }
+
+    private static (List<PatternPoint> Loop, int Index) Locate(PatternPiece piece, PatternPoint point)
+    {
+        foreach (var (loop, _) in piece.Loops())
+        {
+            int k = loop.FindIndex(p => ReferenceEquals(p, point));
+            if (k >= 0)
+                return (loop, k);
+        }
+        throw new InvalidOperationException("The point is not part of the piece.");
+    }
+
+    private static int EdgeNumber(EdgePart part)
+    {
+        foreach (var (loop, start) in part.Piece.Loops())
+        {
+            int k = loop.FindIndex(p => ReferenceEquals(p, part.Start));
+            if (k >= 0)
+                return start + k;
+        }
+        throw new InvalidOperationException("The edge is not part of the piece.");
+    }
+
+    /// <summary>
     /// Reads positions off a piece's simulated surface by pattern position: the point of the surface that was at a
     /// given place in the flat pattern, and the surface normal there.
     /// </summary>

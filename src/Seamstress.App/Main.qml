@@ -172,6 +172,7 @@ ApplicationWindow {
         "tool.editPoints": () => App.tool = "EditPoints",
         "tool.transformPoints": () => App.tool = "TransformPoints",
         "tool.sew": () => App.tool = "Sew",
+        "tool.insetBand": () => App.tool = "InsetBand",
         "tool.polygon": () => App.tool = "Polygon",
         "tool.rectangle": () => App.tool = "Rectangle",
         "tool.ellipse": () => App.tool = "Ellipse",
@@ -403,6 +404,8 @@ ApplicationWindow {
                 ToolChoice { text: tr("Transform Points"); tool: "TransformPoints"; command: "tool.transformPoints"; tip: tr("Select points and move, rotate or scale them with handles") }
                 ButtonDivider {}
                 ToolChoice { text: tr("Sew"); tool: "Sew"; command: "tool.sew"; tip: tr("Click two edges to sew them together") }
+                ButtonDivider {}
+                ToolChoice { text: tr("Inset Band"); tool: "InsetBand"; command: "tool.insetBand"; tip: tr("Cut a band (a waistband, collar band or facing) off pieces along the edges you click, already sewn on") }
                 GroupDivider {}
                 ToolChoice { text: tr("Polygon"); tool: "Polygon"; command: "tool.polygon"; tip: tr("Draw a piece corner by corner") }
                 ButtonDivider {}
@@ -686,13 +689,14 @@ ApplicationWindow {
                                 checked: makeHumanDialog.ticked.indexOf(modelData.id) >= 0
                                 onToggled: makeHumanDialog.tick(modelData.id, checked)
                             }
-                            SpinBox {
+                            NumberField {
                                 Layout.preferredWidth: 110
                                 from: 0
                                 to: App.maxMakeHumanZDepth
-                                editable: true
+                                decimals: 0
+                                step: 1
                                 value: modelData.zDepth
-                                onValueModified: makeHumanDialog.setZDepth(modelData.id, value)
+                                onEdited: (v) => makeHumanDialog.setZDepth(modelData.id, Math.round(v))
                                 ToolTip.visible: hovered
                                 ToolTip.text: tr("The layer MakeHuman draws this garment in; higher is further out. 50 is the default.")
                             }

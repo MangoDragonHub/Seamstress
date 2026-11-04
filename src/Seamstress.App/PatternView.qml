@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 
 // 2D viewport: draws the pattern pieces (or their UV layout) and forwards pointer input to the editor.
 // World coordinates are centimetres with Y up; in UV mode they are texture units. With imperial units only the
@@ -290,6 +291,23 @@ Item {
                 ctx.fillText(label, root.sx(p.label[0]), root.sy(p.label[1]) + 4)
             }
 
+            if (s.inset) {
+                // Inset Band preview: each band shaded, its cut line dashed, the chosen edges drawn thick; all in
+                // red when the width does not work.
+                const colour = s.inset.problem !== undefined ? Qt.color("#e5484d") : root.accent
+                for (const band of s.inset.bands) {
+                    traceShape(ctx, band.outline, band.holes)
+                    ctx.fillStyle = Qt.alpha(colour, 0.35)
+                    ctx.fill()
+                }
+                ctx.strokeStyle = colour
+                ctx.lineWidth = 2
+                ctx.setLineDash([6, 4])
+                for (const cut of s.inset.cuts) { trace(ctx, cut, false); ctx.stroke() }
+                ctx.setLineDash([])
+                ctx.lineWidth = 5
+                for (const edge of s.inset.edges) { trace(ctx, edge, false); ctx.stroke() }
+            }
             if (s.hover) {
                 ctx.strokeStyle = App.themeAnnotation; ctx.lineWidth = 4
                 trace(ctx, s.hover, false); ctx.stroke()
@@ -361,6 +379,8 @@ Item {
                 measure(ctx, s.draftMeasures[i], s.draftMeasures[i + 1], root.lengthText(s.draftMeasures[i + 2]), 0, 0)
             if (s.draftSize)
                 measure(ctx, s.draftSize[0], s.draftSize[1], root.lengthText(s.draftSize[2]) + "  ×  " + root.lengthText(s.draftSize[3]), 0, 0)
+            if (s.inset && s.inset.label)
+                measure(ctx, s.inset.label[0], s.inset.label[1], root.lengthText(s.inset.width), 0, 0)
             if (s.ruler) {
                 // Ruler: a line between the two ends with end stops, a tick every grid square and the distance.
                 const ax = root.sx(s.ruler[0]), ay = root.sy(s.ruler[1]), bx = root.sx(s.ruler[2]), by = root.sy(s.ruler[3])
@@ -479,6 +499,69 @@ Item {
         font.bold: true
         opacity: 0.75
     }
+    // Inset Band: the width of the bands, and Apply / Cancel, while edges are chosen.
+    Pane {
+        id: insetPanel
+        readonly property var inset: root.scene.inset !== undefined ? root.scene.inset : ({ count: 0, pieces: 0, width: 0 })
+        readonly property bool problem: inset.problem !== undefined
+        readonly property real unit: App.imperial ? 2.54 : 1
+        readonly property real shownWidth: inset.width / unit
+        visible: !root.uv && root.scene.tool === "InsetBand" && inset.count > 0
+        anchors { right: parent.right; top: parent.top; margins: 8 }
+        padding: 10
+        width: 250
+        background: Rectangle {
+            color: palette.window
+            border.color: Qt.alpha(palette.windowText, 0.2)
+            radius: 6
+            // Clicks on the panel stay on the panel.
+            MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons }
+        }
+        ColumnLayout {
+            width: insetPanel.availableWidth
+            spacing: 6
+            Label { text: root.tr("Inset Band"); font.bold: true }
+            Label {
+                opacity: 0.75
+                text: (insetPanel.inset.count === 1 ? root.tr("1 edge") : root.tr("%1 edges").arg(insetPanel.inset.count)) + ", "
+                      + (insetPanel.inset.pieces === 1 ? root.tr("1 piece") : root.tr("%1 pieces").arg(insetPanel.inset.pieces))
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                Label { text: root.tr("Width") }
+                NumberField {
+                    id: widthField
+                    Layout.fillWidth: true
+                    implicitHeight: 26
+                    padding: 3
+                    // The preview follows as you type or drag; Enter cuts the bands.
+                    live: true
+                    from: 0.05
+                    decimals: 2
+                    step: App.imperial ? 0.125 : 0.5
+                    value: insetPanel.shownWidth
+                    onEdited: (v) => { if (v > 0) App.insetWidth = v * insetPanel.unit }
+                    onAccepted: App.applyInset()
+                }
+                Label { text: App.imperial ? "in" : "cm"; opacity: 0.6 }
+            }
+            Label {
+                visible: insetPanel.problem
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                color: "#e5484d"
+                text: insetPanel.problem ? insetPanel.inset.problem : ""
+            }
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                spacing: 6
+                Button { text: root.tr("Cancel"); onClicked: { App.cancelTool(); root.forceActiveFocus() } }
+                Button { text: root.tr("Apply"); highlighted: true; enabled: !insetPanel.problem; onClicked: { App.applyInset(); root.forceActiveFocus() } }
+            }
+        }
+    }
+
     Label {
         id: coords
         anchors { right: parent.right; bottom: parent.bottom; margins: 8 }

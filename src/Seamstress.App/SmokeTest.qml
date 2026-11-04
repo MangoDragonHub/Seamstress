@@ -194,6 +194,25 @@ QtObject {
         check("a click clears the ruler", scene().ruler === undefined)
         App.tool = "Select"
 
+        // Inset Band: the top of the first rectangle, 5 cm wide. Its right side is sewn to the second rectangle,
+        // so that seam is split and the second rectangle gets a point where the band ends.
+        App.tool = "InsetBand"
+        const piecesBefore = scene().pieces.length, seamsBefore = scene().seams.length
+        App.pointerDown(20, 60, 1, false); App.pointerUp(20, 60)
+        App.insetWidth = 5
+        const inset = scene().inset
+        check("inset band previewed", inset !== undefined && inset.count === 1 && inset.bands.length === 1
+              && inset.cuts.length === 1 && inset.problem === undefined)
+        App.insetWidth = 80
+        check("too wide a band is refused", scene().inset.problem !== undefined)
+        App.insetWidth = 5
+        App.confirmTool()
+        check("inset band cut", scene().pieces.length === piecesBefore + 1 && scene().seams.length === seamsBefore + 2
+              && App.undoText === "Undo Inset band" && scene().inset.count === 0)
+        App.undo()
+        check("inset band undone", scene().pieces.length === piecesBefore && scene().seams.length === seamsBefore)
+        App.tool = "Select"
+
         // Orthographic 3D view and the right-click menu.
         viewport.orthographic = true
         check("orthographic camera", viewport.activeCamera !== null && viewport.magnification > 0)

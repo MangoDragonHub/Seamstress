@@ -62,38 +62,28 @@ Pane {
         }
     }
 
-    // A labelled number box. Commits on Enter or when it loses focus; arrow keys step the value.
+    // A labelled number box: type a value, or drag in the box to change it (see NumberField).
     component NumberRow: RowLayout {
         id: numberRow
         property string label: ""
         property real value: 0
         property int decimals: 2
         property real step: 1
+        property real from: -1e9
         property string suffix: ""
         signal edited(real value)
         Layout.fillWidth: true
         spacing: 6
-        onValueChanged: if (!field.activeFocus) field.text = value.toFixed(decimals)
         Label { text: numberRow.label; Layout.preferredWidth: 118; elide: Text.ElideRight; opacity: 0.85 }
-        TextField {
-            id: field
+        NumberField {
             Layout.fillWidth: true
             implicitHeight: 24
             padding: 3
-            selectByMouse: true
-            horizontalAlignment: Text.AlignRight
-            text: numberRow.value.toFixed(numberRow.decimals)
-            validator: DoubleValidator { notation: DoubleValidator.StandardNotation; locale: "C" }
-            function commit() {
-                const v = Number(text)
-                if (!isNaN(v) && Math.abs(v - numberRow.value) > 1e-9)
-                    numberRow.edited(v)
-                else
-                    text = numberRow.value.toFixed(numberRow.decimals)
-            }
-            onEditingFinished: commit()
-            Keys.onUpPressed: { numberRow.edited(Number(text) + numberRow.step) }
-            Keys.onDownPressed: { numberRow.edited(Number(text) - numberRow.step) }
+            value: numberRow.value
+            decimals: numberRow.decimals
+            step: numberRow.step
+            from: numberRow.from
+            onEdited: (v) => numberRow.edited(v)
         }
         Label { visible: numberRow.suffix !== ""; text: numberRow.suffix; opacity: 0.6; Layout.preferredWidth: 26 }
     }
@@ -210,7 +200,7 @@ Pane {
                 NumberRow {
                     visible: root.sel.kind === "pieces"
                     label: tr("Piece override")
-                    decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.05 : 0.1; suffix: root.lengthName
+                    decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.05 : 0.1; from: 0; suffix: root.lengthName
                     value: (root.sel.piece ? root.sel.piece.particleDistance : 0) / root.cmUnit
                     onEdited: (v) => App.setPieceValue("particleDistance", v * root.cmUnit)
                 }

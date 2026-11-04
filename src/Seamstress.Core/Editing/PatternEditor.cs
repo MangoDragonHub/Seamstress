@@ -25,6 +25,9 @@ public enum PatternTool
     Rectangle,
     Ellipse,
     Ruler,
+
+    /// <summary>Cuts a band (a waistband, collar band or facing) off pieces along the edges clicked.</summary>
+    InsetBand,
 }
 
 /// <summary>
@@ -33,7 +36,7 @@ public enum PatternTool
 /// </summary>
 public sealed class PatternEditor
 {
-    private enum Drag { None, Pieces, Point, Control, Bend, Shape, Uv, PointsMove, PointsRotate, PointsScale, Marquee, Ruler }
+    private enum Drag { None, Pieces, Point, Control, Bend, Shape, Uv, PointsMove, PointsRotate, PointsScale, Marquee, Ruler, InsetWidth }
 
     /// <summary>Sizes of the 2D handles in screen pixels: the length of the arrows and the radius of the ring.</summary>
     public const float GizmoArrow = 64, GizmoRing = 88;
@@ -75,6 +78,10 @@ public sealed class PatternEditor
     private bool _constrain;
     private bool _onHandle;                 // the last press landed on one of the 2D handles
     private Vector2? _rulerStart, _rulerEnd;
+    private readonly List<EdgeRef> _insetEdges = new();   // edges chosen with the Inset Band tool
+    private float _insetWidth = DefaultInsetWidth;
+    private EdgeRef? _insetDrag;                            // the edge a width drag started on
+    private bool _insetWasChosen;                           // ...and whether it was chosen before the press
 
     /// <summary>Raised when something only the 2D view shows (hover, draft shape, tool) changed.</summary>
     public event Action? Changed;
@@ -109,6 +116,61 @@ public sealed class PatternEditor
     }
 
     public EdgeRef? PendingEdge => _pendingEdge;
+
+    /// <summary>Width a band starts out with, in centimetres.</summary>
+    public const float DefaultInsetWidth = 3f;
+
+    /// <summary>How wide the Inset Band tool cuts its bands, in centimetres.</summary>
+    public float InsetWidth
+    {
+        get => _insetWidth;
+        set
+        {
+            float width = Math.Clamp(float.IsFinite(value) ? value : DefaultInsetWidth, 0.05f, 500f);
+            if (MathF.Abs(width - _insetWidth) < 1e-6f)
+                return;
+            _insetWidth = width;
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>The edges chosen with the Inset Band tool that still exist.</summary>
+    public IReadOnlyList<EdgeRef> InsetEdges
+        => _insetEdges.Where(e => Doc.FindPiece(e.PieceId) is { } piece && e.Edge < piece.EdgeCount).ToList();
+
+    /// <summary>Why the chosen edges cannot be cut at the current width, or null when they can.</summary>
+    public string? InsetProblem
+    {
+        get
+        {
+            _workspace.PlanInsetBand(InsetEdges, _insetWidth, out var problem);
+            return problem;
+        }
+    }
+
+    /// <summary>Cuts the bands chosen with the Inset Band tool; returns them (none when there is a problem).</summary>
+    public List<PatternPiece> ApplyInset()
+    {
+        var edges = InsetEdges;
+        if (edges.Count == 0)
+            return new List<PatternPiece>();
+        var created = _workspace.InsetBand(edges, _insetWidth);
+        if (created.Count > 0)
+        {
+            _insetEdges.Clear();
+            Changed?.Invoke();
+        }
+        return created;
+    }
+
+    /// <summary>Forgets the edges chosen with the Inset Band tool.</summary>
+    public void ClearInset()
+    {
+        if (_insetEdges.Count == 0)
+            return;
+        _insetEdges.Clear();
+        Changed?.Invoke();
+    }
 
     /// <summary>
     /// Shift held while drawing: rectangles become squares, ellipses become circles, and each polygon side snaps
@@ -262,6 +324,7 @@ public sealed class PatternEditor
             PatternTool.Rectangle => Lang.T("Drag to draw a rectangular piece. Hold Shift for a square."),
             PatternTool.Ellipse => Lang.T("Drag to draw an elliptical piece. Hold Shift for a circle."),
             PatternTool.Ruler => Lang.T("Drag to measure a distance; the ends catch on pattern points. Hold Shift to keep to 15° steps. Click to clear."),
+            PatternTool.InsetBand => Lang.T("Click the edges to cut a band from, on one or more pieces. Drag inward from a chosen edge to set the width (Shift snaps). Enter applies, Esc cancels."),
             _ => "",
         };
 
@@ -681,6 +744,24 @@ public sealed class PatternEditor
                         Measure();
                     break;
                 }
+            case PatternTool.InsetBand:
+                {
+                    // A click picks an edge or drops it again; a drag from a picked edge sets the width.
+                    if (HitEdge(world, tolerance) is not { } edge)
+                    {
+                        if (!additive)
+                            ClearInset();
+                        break;
+                    }
+                    var hit = new EdgeRef(edge.Piece.Id, edge.Edge);
+                    _insetWasChosen = _insetEdges.Any(e => e.Matches(hit.PieceId, hit.Edge));
+                    if (!_insetWasChosen)
+                        _insetEdges.Add(hit);
+                    _insetDrag = hit;
+                    _drag = Drag.InsetWidth;
+                    Changed?.Invoke();
+                    break;
+                }
             case PatternTool.EditPoints:
                 {
                     if (HitPoint(world, tolerance) is { } point)
@@ -869,6 +950,15 @@ public sealed class PatternEditor
                 _rulerEnd = RulerPoint(world, tolerance, _rulerStart);
                 Changed?.Invoke();
                 return;
+            case Drag.InsetWidth:
+                if (_insetDrag != null && Doc.FindPiece(_insetDrag.PieceId) is { } inset && _insetDrag.Edge < inset.EdgeCount)
+                {
+                    float width = Outline.DistanceToPolyline(world - inset.Origin, Outline.FlattenEdge(inset, _insetDrag.Edge), false);
+                    if (_constrain && LengthStep > 0)
+                        width = MathF.Max(LengthStep, MathF.Round(width / LengthStep) * LengthStep);
+                    InsetWidth = width;
+                }
+                return;
         }
 
         if (_uvMode)
@@ -879,7 +969,7 @@ public sealed class PatternEditor
             _draftCursor = PolygonPoint(world);
             Changed?.Invoke();
         }
-        else if (_tool is PatternTool.Sew or PatternTool.EditPoints)
+        else if (_tool is PatternTool.Sew or PatternTool.EditPoints or PatternTool.InsetBand)
         {
             var edge = HitEdge(world, tolerance);
             var hover = edge == null ? null : new EdgeRef(edge.Value.Piece.Id, edge.Value.Edge);
@@ -943,6 +1033,13 @@ public sealed class PatternEditor
             case Drag.Ruler:
                 if (!_dragMoved)
                     _rulerStart = _rulerEnd = null;
+                Changed?.Invoke();
+                break;
+            case Drag.InsetWidth:
+                // Clicking an edge that was already picked drops it.
+                if (!_dragMoved && _insetWasChosen && _insetDrag != null)
+                    _insetEdges.RemoveAll(e => e.Matches(_insetDrag.PieceId, _insetDrag.Edge));
+                _insetDrag = null;
                 Changed?.Invoke();
                 break;
             case Drag.Marquee:
@@ -1017,6 +1114,8 @@ public sealed class PatternEditor
     {
         if (_tool == PatternTool.Polygon && _draft.Count >= 3)
             FinishPolygon();
+        else if (_tool == PatternTool.InsetBand)
+            ApplyInset();
     }
 
     /// <summary>Esc: abandons whatever is in progress.</summary>
@@ -1033,6 +1132,8 @@ public sealed class PatternEditor
         _points.Clear();
         _marqueeEnd = null;
         _rulerStart = _rulerEnd = null;
+        _insetEdges.Clear();
+        _insetDrag = null;
         Changed?.Invoke();
     }
 
@@ -1056,6 +1157,81 @@ public sealed class PatternEditor
     }
 
     private static string Q(string s) => System.Text.Json.JsonSerializer.Serialize(s);
+
+    /// <summary>
+    /// The Inset Band preview: the chosen edges, the bands they would make with their cut lines, the width and where
+    /// to show it (x, y, then the direction into the cloth), and what is wrong, if anything.
+    /// </summary>
+    private void AppendInset(StringBuilder sb)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        var edges = InsetEdges;
+        sb.Append(",\"inset\":{\"edges\":[");
+        for (int i = 0; i < edges.Count; i++)
+        {
+            var piece = Doc.FindPiece(edges[i].PieceId)!;
+            if (i > 0)
+                sb.Append(',');
+            AppendPoints(sb, Outline.FlattenEdge(piece, edges[i].Edge).Select(p => p + piece.Origin));
+        }
+        sb.Append("],\"bands\":[");
+        string? problem = null;
+        if (edges.Count > 0)
+        {
+            var plans = _workspace.PlanInsetBand(edges, _insetWidth, out problem);
+            bool first = true;
+            foreach (var (piece, result) in plans)
+            {
+                foreach (var band in result.Bands)
+                {
+                    var shape = new PatternPiece { Points = band.Outline, Holes = band.Holes };
+                    sb.Append(first ? "" : ",").Append("{\"outline\":");
+                    first = false;
+                    AppendPoints(sb, Outline.Flatten(shape).Select(p => p + piece.Origin));
+                    sb.Append(",\"holes\":[");
+                    var holes = Outline.FlattenHoles(shape);
+                    for (int h = 0; h < holes.Count; h++)
+                    {
+                        if (h > 0)
+                            sb.Append(',');
+                        AppendPoints(sb, holes[h].Select(p => p + piece.Origin));
+                    }
+                    sb.Append("]}");
+                }
+            }
+            sb.Append("],\"cuts\":[");
+            first = true;
+            foreach (var (piece, result) in plans)
+            {
+                foreach (var line in result.CutLines)
+                {
+                    sb.Append(first ? "" : ",");
+                    first = false;
+                    AppendPoints(sb, line.Select(p => p + piece.Origin));
+                }
+            }
+        }
+        else
+        {
+            sb.Append("],\"cuts\":[");
+        }
+        sb.Append(']');
+        sb.Append(inv, $",\"width\":{_insetWidth:0.###}");
+        if (edges.Count > 0 && Doc.FindPiece(edges[0].PieceId) is { } labelled)
+        {
+            // Halfway across the band from the middle of the first chosen edge.
+            var pts = Outline.SampleEdge(labelled, edges[0].Edge, 2);
+            var along = pts[2] - pts[0];
+            var inward = along.LengthSquared() > 1e-12f ? Vector2.Normalize(new Vector2(-along.Y, along.X)) : Vector2.Zero;
+            var at = pts[1] + labelled.Origin + inward * (_insetWidth / 2);
+            sb.Append(inv, $",\"label\":[{at.X:0.###},{at.Y:0.###},{inward.X:0.##},{inward.Y:0.##}]");
+        }
+        sb.Append(",\"count\":").Append(edges.Count);
+        sb.Append(",\"pieces\":").Append(edges.Select(e => e.PieceId).Distinct().Count());
+        if (edges.Count > 0 && problem != null)
+            sb.Append(",\"problem\":").Append(Q(problem));
+        sb.Append('}');
+    }
 
     /// <summary>Everything the 2D viewport draws, as JSON. Coordinates are pattern centimetres, or UV units in UV mode.</summary>
     public string SceneJson(int textureResolution)
@@ -1227,6 +1403,9 @@ public sealed class PatternEditor
             }
             sb.Append(']');
         }
+
+        if (!_uvMode && _tool == PatternTool.InsetBand)
+            AppendInset(sb);
 
         // The ruler: both ends and the distance between them.
         if (!_uvMode && Ruler is { } ruler)
