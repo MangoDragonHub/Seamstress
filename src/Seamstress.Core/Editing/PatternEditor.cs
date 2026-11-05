@@ -28,6 +28,9 @@ public enum PatternTool
 
     /// <summary>Cuts a band (a waistband, collar band or facing) off pieces along the edges clicked.</summary>
     InsetBand,
+
+    /// <summary>Cuts pieces in two along a line drawn across them.</summary>
+    Cut,
 }
 
 /// <summary>
@@ -36,7 +39,7 @@ public enum PatternTool
 /// </summary>
 public sealed class PatternEditor
 {
-    private enum Drag { None, Pieces, Point, Control, Bend, Shape, Uv, PointsMove, PointsRotate, PointsScale, Marquee, Ruler, InsetWidth }
+    private enum Drag { None, Pieces, Point, Control, Bend, Shape, Uv, PointsMove, PointsRotate, PointsScale, Marquee, Ruler, InsetWidth, Cut }
 
     /// <summary>Sizes of the 2D handles in screen pixels: the length of the arrows and the radius of the ring.</summary>
     public const float GizmoArrow = 64, GizmoRing = 88;
@@ -78,6 +81,7 @@ public sealed class PatternEditor
     private bool _constrain;
     private bool _onHandle;                 // the last press landed on one of the 2D handles
     private Vector2? _rulerStart, _rulerEnd;
+    private Vector2? _cutStart, _cutEnd;
     private readonly List<EdgeRef> _insetEdges = new();   // edges chosen with the Inset Band tool
     private float _insetWidth = DefaultInsetWidth;
     private EdgeRef? _insetDrag;                            // the edge a width drag started on
@@ -85,6 +89,9 @@ public sealed class PatternEditor
 
     /// <summary>Raised when something only the 2D view shows (hover, draft shape, tool) changed.</summary>
     public event Action? Changed;
+
+    /// <summary>Raised after a cut line was released, with what it cut or why it did nothing.</summary>
+    public event Action<Workspace.CutOutcome>? CutMade;
 
     public PatternEditor(Workspace workspace) => _workspace = workspace;
 
@@ -196,6 +203,8 @@ public sealed class PatternEditor
                 MovePoints(_dragLast);
             else if (_drag == Drag.Ruler && _dragMoved)
                 _rulerEnd = RulerPoint(_dragLast, _rulerTolerance, _rulerStart);
+            else if (_drag == Drag.Cut && _dragMoved)
+                _cutEnd = CutPoint(_dragLast, _cutStart);
             else if (_tool == PatternTool.Polygon && _draft.Count > 0 && _draftCursor != null)
                 _draftCursor = PolygonPoint(_draftCursorRaw);
             else
@@ -248,6 +257,22 @@ public sealed class PatternEditor
 
     /// <summary>The two ends of the ruler in pattern centimetres, or null when nothing is being measured.</summary>
     public (Vector2 A, Vector2 B)? Ruler => _rulerStart is { } a && _rulerEnd is { } b ? (a, b) : null;
+
+    /// <summary>The line being drawn with the Cut tool, or null when none is.</summary>
+    public (Vector2 A, Vector2 B)? CutLine => _cutStart is { } a && _cutEnd is { } b ? (a, b) : null;
+
+    /// <summary>The far end of a cut line: Shift keeps it to 15° steps from the near end.</summary>
+    private Vector2 CutPoint(Vector2 world, Vector2? from)
+    {
+        if (!_constrain || from is not { } a)
+            return world;
+        var d = world - a;
+        if (d.LengthSquared() < 1e-10f)
+            return world;
+        const float angleStep = MathF.PI / 12;
+        float angle = MathF.Round(MathF.Atan2(d.Y, d.X) / angleStep) * angleStep;
+        return a + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * d.Length();
+    }
 
     /// <summary>
     /// Double-click on a piece: switches to Transform Points with every point of the piece selected, so the whole
@@ -325,6 +350,7 @@ public sealed class PatternEditor
             PatternTool.Ellipse => Lang.T("Drag to draw an elliptical piece. Hold Shift for a circle."),
             PatternTool.Ruler => Lang.T("Drag to measure a distance; the ends catch on pattern points. Hold Shift to keep to 15° steps. Click to clear."),
             PatternTool.InsetBand => Lang.T("Click the edges to cut a band from, on one or more pieces. Drag inward from a chosen edge to set the width (Shift snaps). Enter applies, Esc cancels."),
+            PatternTool.Cut => Lang.T("Drag a straight line across the pieces to cut them apart. Hold Shift to keep to 15° steps. Esc cancels."),
             _ => "",
         };
 
@@ -762,6 +788,11 @@ public sealed class PatternEditor
                     Changed?.Invoke();
                     break;
                 }
+            case PatternTool.Cut:
+                _cutStart = _cutEnd = CutPoint(world, null);
+                _drag = Drag.Cut;
+                Changed?.Invoke();
+                break;
             case PatternTool.EditPoints:
                 {
                     if (HitPoint(world, tolerance) is { } point)
@@ -950,6 +981,10 @@ public sealed class PatternEditor
                 _rulerEnd = RulerPoint(world, tolerance, _rulerStart);
                 Changed?.Invoke();
                 return;
+            case Drag.Cut:
+                _cutEnd = CutPoint(world, _cutStart);
+                Changed?.Invoke();
+                return;
             case Drag.InsetWidth:
                 if (_insetDrag != null && Doc.FindPiece(_insetDrag.PieceId) is { } inset && _insetDrag.Edge < inset.EdgeCount)
                 {
@@ -1035,6 +1070,18 @@ public sealed class PatternEditor
                     _rulerStart = _rulerEnd = null;
                 Changed?.Invoke();
                 break;
+            case Drag.Cut:
+                {
+                    var line = CutLine;
+                    _cutStart = _cutEnd = null;
+                    if (_dragMoved && line is { } cut)
+                    {
+                        var outcome = _workspace.CutPieces(cut.A, cut.B);
+                        CutMade?.Invoke(outcome);
+                    }
+                    Changed?.Invoke();
+                    break;
+                }
             case Drag.InsetWidth:
                 // Clicking an edge that was already picked drops it.
                 if (!_dragMoved && _insetWasChosen && _insetDrag != null)
@@ -1132,6 +1179,7 @@ public sealed class PatternEditor
         _points.Clear();
         _marqueeEnd = null;
         _rulerStart = _rulerEnd = null;
+        _cutStart = _cutEnd = null;
         _insetEdges.Clear();
         _insetDrag = null;
         Changed?.Invoke();
@@ -1410,6 +1458,14 @@ public sealed class PatternEditor
         // The ruler: both ends and the distance between them.
         if (!_uvMode && Ruler is { } ruler)
             sb.Append(inv, $",\"ruler\":[{ruler.A.X:0.###},{ruler.A.Y:0.###},{ruler.B.X:0.###},{ruler.B.Y:0.###},{Vector2.Distance(ruler.A, ruler.B):0.###}]");
+
+        // The line being drawn with the Cut tool.
+        if (!_uvMode && CutLine is { } cut)
+        {
+            var along = cut.B - cut.A;
+            if (along.LengthSquared() > 1e-8f)
+                sb.Append(inv, $",\"cut\":[{cut.A.X:0.###},{cut.A.Y:0.###},{cut.B.X:0.###},{cut.B.Y:0.###}]");
+        }
 
         if (_draft.Count > 0)
         {

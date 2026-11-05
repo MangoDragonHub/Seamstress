@@ -49,6 +49,7 @@
     <Compile Include="**\*.cs" Exclude="obj\**;bin\**" />
     <None Include="*.qml" />
     <QtResource Include="icons/seamstress.svg" />
+    <QtResource Include="icons/tools/*.svg" />
   </ItemGroup>
 
   <!-- The native host the bridge generates gives .NET about one second to start, then quits with ".NET host not ready

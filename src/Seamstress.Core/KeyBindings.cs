@@ -37,6 +37,7 @@ public static class KeyBindings
         new("tool.transformPoints", "Tools", "Transform Points", new[] { "T" }),
         new("tool.sew", "Tools", "Sew", new[] { "S" }),
         new("tool.insetBand", "Tools", "Inset Band", new[] { "I" }),
+        new("tool.cut", "Tools", "Cut", new[] { "C" }),
         new("tool.polygon", "Tools", "Polygon", new[] { "P" }),
         new("tool.rectangle", "Tools", "Rectangle", new[] { "B" }),
         new("tool.ellipse", "Tools", "Ellipse", new[] { "O" }),

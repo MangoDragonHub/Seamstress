@@ -1310,6 +1310,182 @@ public sealed class Workspace
     }
 
     /// <summary>
+    /// Splits every visible piece the line from <paramref name="start"/> to <paramref name="end"/> divides, in pattern
+    /// coordinates, as one undo step. Each piece becomes two or more pieces of the same fabric, group and placement;
+    /// draped pieces stay draped. Seams on edges the cut did not divide stay sewn; a seam on an edge that was divided
+    /// is dropped, since its edge is no longer one edge. The resulting pieces become the selection.
+    /// </summary>
+    public CutOutcome CutPieces(Vector2 start, Vector2 end)
+    {
+        var plans = new Dictionary<string, (PatternPiece Piece, Garment Garment, Cut.Result Result)>();
+        string? problem = null;
+        foreach (var garment in Document.Garments)
+        {
+            foreach (var piece in garment.Pieces)
+            {
+                if (piece.Points.Count < 3 || !IsEffectivelyVisible(garment, piece))
+                    continue;
+                var planned = Cut.Plan(piece, start - piece.Origin, end - piece.Origin, out var why);
+                if (planned != null)
+                    plans[piece.Id] = (piece, garment, planned);
+                else
+                    problem ??= why;
+            }
+        }
+        if (plans.Count == 0)
+            return new CutOutcome(new List<PatternPiece>(), 0, problem ?? Lang.T("Draw the cut line across a piece."));
+
+        var draped = new Dictionary<string, (PieceMesh Mesh, Vector3[] Positions)>();
+        foreach (var garmentId in plans.Values.Select(p => p.Garment.Id).Distinct())
+        {
+            var garment = Document.FindGarment(garmentId)!;
+            var mesh = MeshFor(garment);
+            foreach (var (piece, _, _) in plans.Values.Where(p => p.Garment.Id == garmentId))
+            {
+                if (mesh.Find(piece.Id) is { } pieceMesh && piece.Drape != null && piece.DrapeKey == pieceMesh.Key)
+                    draped[piece.Id] = (pieceMesh, Mesher.CurrentPositions(piece, pieceMesh));
+            }
+        }
+
+        var made = new List<PatternPiece>();
+        var sourceOf = new Dictionary<string, string>();
+        var mappings = new Dictionary<(string Piece, int Edge), (string Piece, int Edge, bool Flipped)>();
+        History.Execute(plans.Count == 1 ? Lang.T("Cut piece") : Lang.T("Cut pieces"), doc =>
+        {
+            foreach (var (pieceId, plan) in plans)
+            {
+                var garment = doc.GarmentOfPiece(pieceId)!;
+                var piece = garment.FindPiece(pieceId)!;
+                var old = piece.Clone();
+                var shapes = plan.Result.Shapes;
+
+                ApplyCutShape(piece, shapes[0], old);
+                MapCutEdges(mappings, pieceId, piece.Id, shapes[0]);
+                made.Add(piece);
+                sourceOf[piece.Id] = pieceId;
+
+                int at = garment.Pieces.IndexOf(piece);
+                int listed = garment.LayerOrder.IndexOf(piece.Id);
+                for (int i = 1; i < shapes.Count; i++)
+                {
+                    var added = new PatternPiece
+                    {
+                        Name = doc.UniqueName($"{old.Name} {i + 1}"),
+                        GroupId = old.GroupId,
+                        Visible = old.Visible,
+                        Origin = old.Origin,
+                        Physics = old.Physics.Clone(),
+                        MaterialId = old.MaterialId,
+                        ParticleDistance = old.ParticleDistance,
+                        Uv = old.Uv.Clone(),
+                        FlipNormals = old.FlipNormals,
+                    };
+                    ApplyCutShape(added, shapes[i], old);
+                    garment.Pieces.Insert(at + i, added);
+                    if (listed >= 0)
+                        garment.LayerOrder.Insert(listed + i, added.Id);
+                    MapCutEdges(mappings, pieceId, added.Id, shapes[i]);
+                    made.Add(added);
+                    sourceOf[added.Id] = pieceId;
+                }
+            }
+
+            foreach (var garment in doc.Garments)
+            {
+                if (!plans.Keys.Any(id => garment.FindPiece(id) != null))
+                    continue;
+                var seams = new List<Seam>();
+                foreach (var seam in garment.Seams)
+                {
+                    if (!TryMapCutEdge(seam.A, plans, mappings, out var a, out bool flipA)
+                        || !TryMapCutEdge(seam.B, plans, mappings, out var b, out bool flipB))
+                        continue;
+                    seams.Add(new Seam { Id = seam.Id, A = a, B = b, Reversed = seam.Reversed ^ flipA ^ flipB });
+                }
+                garment.Seams = seams;
+            }
+
+            foreach (var garment in doc.Garments)
+            {
+                var changed = made.Where(p => garment.FindPiece(p.Id) != null && draped.ContainsKey(sourceOf[p.Id])).ToList();
+                if (changed.Count == 0)
+                    continue;
+                var mesh = MeshFor(garment);
+                var samplers = new Dictionary<string, SurfaceSampler>();
+                foreach (var piece in changed)
+                {
+                    string source = sourceOf[piece.Id];
+                    if (!samplers.TryGetValue(source, out var sampler))
+                    {
+                        var old = draped[source];
+                        samplers[source] = sampler = new SurfaceSampler(old.Mesh, old.Positions, Mesher.ComputeNormals(old.Positions, old.Mesh.Triangles));
+                    }
+                    if (mesh.Find(piece.Id) is not { } pieceMesh)
+                        continue;
+                    var drape = new float[pieceMesh.VertexCount * 3];
+                    for (int i = 0; i < pieceMesh.VertexCount; i++)
+                    {
+                        var (position, _) = sampler.At(pieceMesh.Points[i]);
+                        drape[3 * i] = position.X;
+                        drape[3 * i + 1] = position.Y;
+                        drape[3 * i + 2] = position.Z;
+                    }
+                    piece.Drape = drape;
+                    piece.DrapeKey = pieceMesh.Key;
+                }
+            }
+        });
+
+        SelectedPieces.Clear();
+        SelectedPoint = null;
+        SelectedSeamId = null;
+        foreach (var piece in made)
+            SelectedPieces.Add(piece.Id);
+        SelectionChanged?.Invoke();
+        return new CutOutcome(made, plans.Count, null);
+    }
+
+    /// <summary>The pieces a cut made: the resulting pieces, how many pieces the line divided, and why it did nothing.</summary>
+    public sealed record CutOutcome(List<PatternPiece> Pieces, int SourcePieces, string? Problem);
+
+    private static void ApplyCutShape(PatternPiece target, Cut.Shape shape, PatternPiece old)
+    {
+        target.Points = shape.Outline.Select(p => p.Clone()).ToList();
+        target.Holes = shape.Holes.Select(h => h.Select(p => p.Clone()).ToList()).ToList();
+        Place(old, target);
+        target.ClearDrape();
+        target.ClearPins();
+    }
+
+    private static void MapCutEdges(Dictionary<(string Piece, int Edge), (string Piece, int Edge, bool Flipped)> mappings,
+        string oldPieceId, string newPieceId, Cut.Shape shape)
+    {
+        foreach (var (oldEdge, (newEdge, flipped)) in shape.WholeEdges)
+            mappings[(oldPieceId, oldEdge)] = (newPieceId, newEdge, flipped);
+    }
+
+    private static bool TryMapCutEdge(EdgeRef edge, IReadOnlyDictionary<string, (PatternPiece Piece, Garment Garment, Cut.Result Result)> plans,
+        IReadOnlyDictionary<(string Piece, int Edge), (string Piece, int Edge, bool Flipped)> mappings,
+        out EdgeRef mapped, out bool flipped)
+    {
+        if (!plans.ContainsKey(edge.PieceId))
+        {
+            mapped = new EdgeRef(edge.PieceId, edge.Edge);
+            flipped = false;
+            return true;
+        }
+        if (mappings.TryGetValue((edge.PieceId, edge.Edge), out var found))
+        {
+            mapped = new EdgeRef(found.Piece, found.Edge);
+            flipped = found.Flipped;
+            return true;
+        }
+        mapped = edge;
+        flipped = false;
+        return false;
+    }
+
+    /// <summary>
     /// Places a piece cut from <paramref name="old"/> (what is left of it, or a band) where that part of it was in 3D,
     /// following its wrap.
     /// </summary>

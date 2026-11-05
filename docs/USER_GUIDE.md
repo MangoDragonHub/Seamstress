@@ -90,6 +90,8 @@ The borders between the panels can be dragged to resize them.
 
 ### The tools
 
+The toolbar shows each tool as an icon. Hover over an icon to see its name, what it does and its key.
+
 ![Toolbar with each tool numbered](images/toolbar.png)
 
 | # | Tool | Key | What it does |
@@ -98,14 +100,15 @@ The borders between the panels can be dragged to resize them.
 | 2 | **Edit Points** | A | Drag a point to move it. Drag an edge to curve it. Double-click an edge to add a point. |
 | 3 | **Transform Points** | T | Select one point or several, then move or rotate them with handles. Does not bend edges. |
 | 4 | **Sew** | S | Click one edge, then another, to sew them together. |
-| | **Inset Band** | I | Cut a waistband, collar band or facing off pieces along the edges you click, already sewn on (see [Cutting bands from edges](#cutting-bands-from-edges)). |
-| 5 | **Polygon** | P | Click to place corners; click the first corner again, double-click, or press Enter to finish. |
-| 6 | **Rectangle** | B | Drag out a rectangular piece. |
-| 7 | **Ellipse** | O | Drag out an elliptical piece. |
-| 8 | **Ruler** | M | Measure a distance in the 2D view, or between two points on the cloth or avatar in the 3D view (see [Measuring with the Ruler](#measuring-with-the-ruler)). |
-| 9 | Undo | Ctrl+Z | Undo the last change. Hover to see what it will undo. |
-| 10 | Redo | Ctrl+Shift+Z | Redo. |
-| 11 | **Pattern / UV Layout** | U | Switch the 2D view between the pattern and the UV layout. |
+| 5 | **Inset Band** | I | Cut a waistband, collar band or facing off pieces along the edges you click, already sewn on (see [Cutting bands from edges](#cutting-bands-from-edges)). |
+| 6 | **Cut** | C | Drag a line across pieces to cut them into separate pieces (see [Cutting pieces apart](#cutting-pieces-apart)). |
+| 7 | **Polygon** | P | Click to place corners; click the first corner again, double-click, or press Enter to finish. |
+| 8 | **Rectangle** | B | Drag out a rectangular piece. |
+| 9 | **Ellipse** | O | Drag out an elliptical piece. |
+| 10 | **Ruler** | M | Measure a distance in the 2D view, or between two points on the cloth or avatar in the 3D view (see [Measuring with the Ruler](#measuring-with-the-ruler)). |
+| 11 | Undo | Ctrl+Z | Undo the last change. Hover to see what it will undo. |
+| 12 | Redo | Ctrl+Shift+Z | Redo. |
+| 13 | **Pattern / UV Layout** | U | Switch the 2D view between the pattern and the UV layout. |
 
 The keys are the defaults; every one of them can be changed in [Preferences ▸ Keyboard](#keyboard-shortcuts).
 
@@ -134,7 +137,7 @@ maps what you already know to where it lives here.
 | Selecting several points and moving or rotating them | **Transform Points** tool (**T**) |
 | Edit Curvature | **Edit Points** tool: drag an edge to bend it |
 | Add Point / Split Line | **Edit Points** tool: double-click an edge |
-| Internal shape ▸ Cut / Convert to Hole | Draw the shape as a piece on top, select both, **Edit ▸ Cut Hole** |
+| Internal shape ▸ Cut / Convert to Hole | **Cut** (**C**) splits pieces along a drawn line; for a hole, draw the shape as a piece on top, select both, **Edit ▸ Cut Hole** |
 | Offset as Internal Line, then Cut & Sew (for a waistband or facing) | **Inset Band** tool (**I**): click the edges, set the width, Apply |
 | Segment Sewing | **Sew** tool (**S**): click one edge, then the other |
 | Edit Sewing ▸ reverse a twisted seam | Select the seam, then **Reverse Direction** in Properties |
@@ -352,6 +355,22 @@ What you get:
 The width has to fit. When it does not, the preview turns red, the panel says why and **Apply** is unavailable:
 the cut would cross another edge or a hole, it would run past the end of the edge beside the band, or a curve
 bulges more tightly than the band is wide.
+
+### Cutting pieces apart
+
+Use **Cut** (**C**) to split one or more pieces with a straight line:
+
+1. Pick **Cut** and drag a line across the pieces you want to divide. Hold **Shift** to keep the line to 15° steps.
+2. Release the mouse button. Every visible piece the line crosses is cut into separate pieces.
+
+![The T-shirt front cut across its middle into two separate pieces](images/cut.png)
+
+The cut keeps curves, holes and the fabric settings. Pieces stay where they were in the pattern and in 3D, and
+draped pieces stay draped. Seams on edges that the cut does not divide stay sewn; a seam on an edge that is
+divided is removed, because that edge is no longer one edge.
+
+A line that does not divide a piece into at least two pieces does nothing; the status bar says why. **Ctrl+Z**
+undoes the cut in one step.
 
 ---
 
@@ -994,6 +1013,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | --- | --- |
 | V / A / T / S | Select / Edit Points / Transform Points / Sew |
 | I | Inset Band |
+| C | Cut pieces along a drawn line |
 | Q / W / E / R | Handles: all / move only / rotate only / scale only (both views) |
 | P / B / O | Polygon / Rectangle / Ellipse |
 | M | Ruler |
@@ -1024,7 +1044,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | Ctrl + drag | — | Orbit around the avatar |
 | Ctrl + click | Add to the selection | Add to the selection |
 | Shift + click | — | Add to the selection |
-| Shift while drawing | Square, circle, or a snapped polygon side | — |
+| Shift while drawing | Square, circle, a snapped polygon side, or a 15° cut line | — |
 | Shift + drag | — | Pan |
 | Shift + drag a move arrow | — | Snap the piece to the grid along that axis |
 | Shift + drag a point (Edit Points) | Snap the point to the grid | — |
@@ -1036,6 +1056,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | Scroll | Zoom about the cursor | Zoom |
 | Double-click | Finish a polygon; add a point on an edge (Edit Points); select every point of a piece | — |
 | Drag (Ruler) | Measure; the ends catch on pattern points | Click or drag between two points on the cloth or avatar |
+| Drag (Cut) | Draw a straight line and cut every visible piece it crosses into separate pieces | — |
 | Click / drag an edge (Inset Band) | Choose the edge, or drop it again; drag inward to set the band's width | — |
 | Drag on empty space (Transform Points) | Box-select points | — |
 

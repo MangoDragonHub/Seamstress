@@ -308,6 +308,18 @@ Item {
                 ctx.lineWidth = 5
                 for (const edge of s.inset.edges) { trace(ctx, edge, false); ctx.stroke() }
             }
+            if (s.cut) {
+                // Cut: the line being drawn, with stops at both ends.
+                const ax = root.sx(s.cut[0]), ay = root.sy(s.cut[1]), bx = root.sx(s.cut[2]), by = root.sy(s.cut[3])
+                ctx.strokeStyle = root.accent
+                ctx.lineWidth = 2
+                ctx.setLineDash([7, 4])
+                ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke()
+                ctx.setLineDash([])
+                ctx.fillStyle = root.accent
+                ctx.beginPath(); ctx.arc(ax, ay, 3.5, 0, Math.PI * 2); ctx.fill()
+                ctx.beginPath(); ctx.arc(bx, by, 3.5, 0, Math.PI * 2); ctx.fill()
+            }
             if (s.hover) {
                 ctx.strokeStyle = App.themeAnnotation; ctx.lineWidth = 4
                 trace(ctx, s.hover, false); ctx.stroke()

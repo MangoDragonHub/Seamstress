@@ -42,6 +42,8 @@ ApplicationWindow {
     property string pendingExport: ""
     // A text box has the keyboard: Enter and Escape belong to it rather than to the tool shortcuts.
     readonly property bool typing: activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined
+    // The toolbar icons are monochrome and take their colour from the palette.
+    readonly property string toolIcons: "qrc:/assemblies/Seamstress/icons/tools/"
     // Interface texts in the language chosen in Preferences; reading the revision redoes the binding when it changes.
     function tr(text) { App.languageRevision; return App.tr(text) }
 
@@ -173,6 +175,7 @@ ApplicationWindow {
         "tool.transformPoints": () => App.tool = "TransformPoints",
         "tool.sew": () => App.tool = "Sew",
         "tool.insetBand": () => App.tool = "InsetBand",
+        "tool.cut": () => App.tool = "Cut",
         "tool.polygon": () => App.tool = "Polygon",
         "tool.rectangle": () => App.tool = "Rectangle",
         "tool.ellipse": () => App.tool = "Ellipse",
@@ -370,11 +373,20 @@ ApplicationWindow {
 
                 component ToolChoice: ToolButton {
                     property string tool: ""
+                    property string label: ""
                     property string tip: ""
                     property string command: ""
+                    property string iconFile: ""
                     checkable: true
                     checked: App.tool === tool && !App.uvMode
                     enabled: !App.uvMode || tool === "Select"
+                    display: AbstractButton.IconOnly
+                    icon.source: window.toolIcons + iconFile
+                    icon.width: 22
+                    icon.height: 22
+                    icon.color: enabled ? palette.buttonText : palette.placeholderText
+                    Accessible.name: label
+                    Accessible.description: tip
                     onClicked: App.tool = tool
                     ToolTip.visible: hovered
                     ToolTip.delay: 500
@@ -388,40 +400,73 @@ ApplicationWindow {
                     Layout.leftMargin: 2
                     Layout.rightMargin: 2
                     color: palette.mid
+                    opacity: 0.55
                 }
                 component GroupDivider: Rectangle {
                     implicitWidth: 1
                     implicitHeight: 26
                     Layout.leftMargin: 10
                     Layout.rightMargin: 10
-                    color: palette.light
+                    color: palette.mid
                 }
 
-                ToolChoice { text: tr("Select"); tool: "Select"; command: "tool.select"; tip: tr("Select and move pieces") }
+                ToolChoice { label: tr("Select"); tool: "Select"; command: "tool.select"; iconFile: "select.svg"; tip: tr("Select and move pieces") }
                 ButtonDivider {}
-                ToolChoice { text: tr("Edit Points"); tool: "EditPoints"; command: "tool.editPoints"; tip: tr("Move points, curve edges, add points") }
+                ToolChoice { label: tr("Edit Points"); tool: "EditPoints"; command: "tool.editPoints"; iconFile: "edit-points.svg"; tip: tr("Move points, curve edges, add points") }
                 ButtonDivider {}
-                ToolChoice { text: tr("Transform Points"); tool: "TransformPoints"; command: "tool.transformPoints"; tip: tr("Select points and move, rotate or scale them with handles") }
+                ToolChoice { label: tr("Transform Points"); tool: "TransformPoints"; command: "tool.transformPoints"; iconFile: "transform-points.svg"; tip: tr("Select points and move, rotate or scale them with handles") }
                 ButtonDivider {}
-                ToolChoice { text: tr("Sew"); tool: "Sew"; command: "tool.sew"; tip: tr("Click two edges to sew them together") }
+                ToolChoice { label: tr("Sew"); tool: "Sew"; command: "tool.sew"; iconFile: "sew.svg"; tip: tr("Click two edges to sew them together") }
                 ButtonDivider {}
-                ToolChoice { text: tr("Inset Band"); tool: "InsetBand"; command: "tool.insetBand"; tip: tr("Cut a band (a waistband, collar band or facing) off pieces along the edges you click, already sewn on") }
+                ToolChoice { label: tr("Inset Band"); tool: "InsetBand"; command: "tool.insetBand"; iconFile: "inset-band.svg"; tip: tr("Cut a band (a waistband, collar band or facing) off pieces along the edges you click, already sewn on") }
+                ButtonDivider {}
+                ToolChoice { label: tr("Cut"); tool: "Cut"; command: "tool.cut"; iconFile: "cut.svg"; tip: tr("Draw a line across pieces to cut them into separate pieces") }
                 GroupDivider {}
-                ToolChoice { text: tr("Polygon"); tool: "Polygon"; command: "tool.polygon"; tip: tr("Draw a piece corner by corner") }
+                ToolChoice { label: tr("Polygon"); tool: "Polygon"; command: "tool.polygon"; iconFile: "polygon.svg"; tip: tr("Draw a piece corner by corner") }
                 ButtonDivider {}
-                ToolChoice { text: tr("Rectangle"); tool: "Rectangle"; command: "tool.rectangle"; tip: tr("Drag out a rectangular piece") }
+                ToolChoice { label: tr("Rectangle"); tool: "Rectangle"; command: "tool.rectangle"; iconFile: "rectangle.svg"; tip: tr("Drag out a rectangular piece") }
                 ButtonDivider {}
-                ToolChoice { text: tr("Ellipse"); tool: "Ellipse"; command: "tool.ellipse"; tip: tr("Drag out an elliptical piece") }
+                ToolChoice { label: tr("Ellipse"); tool: "Ellipse"; command: "tool.ellipse"; iconFile: "ellipse.svg"; tip: tr("Drag out an elliptical piece") }
                 GroupDivider {}
-                ToolChoice { text: tr("Ruler"); tool: "Ruler"; command: "tool.ruler"; tip: tr("Measure distances in the 2D view, or between two points on the cloth or avatar in the 3D view") }
-                GroupDivider {}
-                ToolButton { text: "↶"; font.pixelSize: 18; enabled: App.canUndo; onClicked: App.undo(); ToolTip.visible: hovered; ToolTip.text: App.undoText }
-                ToolButton { text: "↷"; font.pixelSize: 18; enabled: App.canRedo; onClicked: App.redo(); ToolTip.visible: hovered; ToolTip.text: App.redoText }
+                ToolChoice { label: tr("Ruler"); tool: "Ruler"; command: "tool.ruler"; iconFile: "ruler.svg"; tip: tr("Measure distances in the 2D view, or between two points on the cloth or avatar in the 3D view") }
                 GroupDivider {}
                 ToolButton {
-                    text: App.uvMode ? tr("UV Layout") : tr("Pattern")
+                    display: AbstractButton.IconOnly
+                    icon.source: window.toolIcons + "undo.svg"
+                    icon.width: 22
+                    icon.height: 22
+                    icon.color: enabled ? palette.buttonText : palette.placeholderText
+                    enabled: App.canUndo
+                    Accessible.name: tr("Undo")
+                    Accessible.description: App.undoText
+                    onClicked: App.undo()
+                    ToolTip.visible: hovered
+                    ToolTip.text: App.undoText
+                }
+                ToolButton {
+                    display: AbstractButton.IconOnly
+                    icon.source: window.toolIcons + "redo.svg"
+                    icon.width: 22
+                    icon.height: 22
+                    icon.color: enabled ? palette.buttonText : palette.placeholderText
+                    enabled: App.canRedo
+                    Accessible.name: tr("Redo")
+                    Accessible.description: App.redoText
+                    onClicked: App.redo()
+                    ToolTip.visible: hovered
+                    ToolTip.text: App.redoText
+                }
+                GroupDivider {}
+                ToolButton {
+                    display: AbstractButton.IconOnly
+                    icon.source: window.toolIcons + (App.uvMode ? "uv-layout.svg" : "pattern.svg")
+                    icon.width: 22
+                    icon.height: 22
+                    icon.color: palette.buttonText
                     checkable: true
                     checked: App.uvMode
+                    Accessible.name: App.uvMode ? tr("UV Layout") : tr("Pattern")
+                    Accessible.description: tr("Switch the 2D view between the pattern and its UV layout")
                     onClicked: App.uvMode = checked
                     ToolTip.visible: hovered
                     ToolTip.text: tr("Switch the 2D view between the pattern and its UV layout") + window.keyHint("view.uv")

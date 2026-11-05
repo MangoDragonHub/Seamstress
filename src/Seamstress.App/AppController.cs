@@ -62,6 +62,12 @@ public partial class AppController : INotifyPropertyChanged
         _workspace.History.Changed += OnDocumentChanged;
         _workspace.SelectionChanged += OnDocumentChanged;
         _editor.Changed += () => SceneRevision++;
+        _editor.CutMade += outcome =>
+        {
+            StatusText = outcome.Problem ?? (outcome.SourcePieces == 1
+                ? Lang.F("Cut the piece into {0} pieces.", outcome.Pieces.Count)
+                : Lang.F("Cut {0} pieces into {1} pieces.", outcome.SourcePieces, outcome.Pieces.Count));
+        };
         if (_settings.DetectMakeHuman())
             TrySaveSettings();
         InitTheme();

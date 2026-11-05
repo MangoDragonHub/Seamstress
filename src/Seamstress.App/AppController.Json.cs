@@ -287,6 +287,19 @@ public partial class AppController
         // For documentation screenshots: "--view invert" turns the selected pieces' normals the other way.
         if (options.View.Contains("invert"))
             _workspace.InvertNormals();
+        if (options.View.Contains("cut") && _workspace.Document.AllPieces().FirstOrDefault() is { Points.Count: >= 3 } cutPiece)
+        {
+            // For documentation screenshots: cut the first piece across its middle with the Cut tool.
+            _editor.Tool = PatternTool.Cut;
+            var (min, max) = Outline.Bounds(cutPiece);
+            float y = cutPiece.Origin.Y + (min.Y + max.Y) / 2;
+            var from = new System.Numerics.Vector2(cutPiece.Origin.X + min.X - 10, y);
+            var to = new System.Numerics.Vector2(cutPiece.Origin.X + max.X + 10, y);
+            _editor.PointerDown(from, 0.5f, false);
+            _editor.PointerMove((from + to) / 2, 0.5f);
+            _editor.PointerMove(to, 0.5f);
+            _editor.PointerUp(to);
+        }
         if (options.View.Contains("inset"))
         {
             // For documentation screenshots: Inset Band with the top edge of each selected piece chosen (of each piece
