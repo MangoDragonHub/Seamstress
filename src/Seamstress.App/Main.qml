@@ -199,6 +199,7 @@ ApplicationWindow {
         "edit.invertNormals": () => App.invertNormals(),
         "edit.cutHole": () => App.cutHole(),
         "view.pinch": () => viewport.pinchMode = !viewport.pinchMode,
+        "view.rip": () => viewport.ripMode = !viewport.ripMode,
         "view.pinBrush": () => App.pinBrush = !App.pinBrush,
         "view.handles": () => viewport.showGizmo = !viewport.showGizmo,
         "view.avatar": () => viewport.showAvatar = !viewport.showAvatar,
@@ -344,6 +345,7 @@ ApplicationWindow {
                 KeyMenuItem { text: tr("3D: Wireframe (Topology)"); command: "view.wireframe"; checkable: true; checked: viewport.wireframe; onTriggered: viewport.wireframe = checked }
                 KeyMenuItem { text: tr("3D: Normal Direction"); command: "view.normals"; checkable: true; checked: viewport.showNormals; onTriggered: viewport.showNormals = checked }
                 KeyMenuItem { text: tr("3D: Pinch Cloth"); command: "view.pinch"; checkable: true; checked: viewport.pinchMode; onTriggered: viewport.pinchMode = checked }
+                KeyMenuItem { text: tr("3D: Rip Cloth"); command: "view.rip"; checkable: true; checked: viewport.ripMode; onTriggered: viewport.ripMode = checked }
                 KeyMenuItem { text: tr("3D: Pin Vertices"); command: "view.pinBrush"; checkable: true; checked: App.pinBrush; onTriggered: App.pinBrush = checked }
                 KeyMenuItem { text: tr("3D: Show Handles"); command: "view.handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
                 Menu {

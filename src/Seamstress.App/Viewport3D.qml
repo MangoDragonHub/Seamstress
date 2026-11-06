@@ -21,7 +21,19 @@ Item {
     // Distance of the scale boxes from the handle centre, in handle units (an arrow is 1 long).
     readonly property real scaleReach: App.gizmoMode === "Full" ? 1.2 : 0.85
     property bool pinchMode: false
-    onPinchModeChanged: if (pinchMode && App.pinBrush) App.pinBrush = false
+    onPinchModeChanged: {
+        if (pinchMode) {
+            if (App.pinBrush) App.pinBrush = false
+            ripMode = false
+        }
+    }
+    property bool ripMode: false
+    onRipModeChanged: {
+        if (ripMode) {
+            pinchMode = false
+            if (App.pinBrush) App.pinBrush = false
+        }
+    }
     property bool showAvatar: true
     property bool showThreads: true
     // Normal direction: each face's front (the side its normal points to) blue, its back red.
@@ -152,6 +164,7 @@ Item {
         if (App.startupView.indexOf("checker") >= 0) displayMode = "checker"
         if (App.startupView.indexOf("wire") >= 0) wireframe = true
         if (App.startupView.indexOf("pinch") >= 0) pinchMode = true
+        if (App.startupView.indexOf("rip") >= 0) ripMode = true
         if (App.startupView.indexOf("ortho") >= 0) orthographic = true
         if (App.startupView.indexOf("normals") >= 0) showNormals = true
         if (App.startupView.indexOf("ruler") >= 0) {
@@ -168,6 +181,7 @@ Item {
         function onPinBrushChanged() {
             if (App.pinBrush) {
                 root.pinchMode = false
+                root.ripMode = false
                 root.clearRuler()
                 root.wireframe = true
             } else {
@@ -327,7 +341,7 @@ Item {
         id: gizmoView
         anchors.fill: parent
         camera: root.orthographic ? gizmoOrtho : gizmoCamera
-        visible: root.hasGizmo && root.showGizmo && !App.simulating && !root.pinchMode && !root.measuring && !App.pinBrush
+        visible: root.hasGizmo && root.showGizmo && !App.simulating && !root.pinchMode && !root.ripMode && !root.measuring && !App.pinBrush
         environment: SceneEnvironment { backgroundMode: SceneEnvironment.Transparent; antialiasingMode: SceneEnvironment.MSAA }
 
         Node {
@@ -408,6 +422,38 @@ Item {
         }
     }
 
+    // The stroke being drawn with Rip, over the cloth so it stays visible.
+    Canvas {
+        id: ripCanvas
+        anchors.fill: parent
+        visible: mouse.mode === 7 && mouse.ripPoints.length > 1
+        renderStrategy: Canvas.Cooperative
+        readonly property var cameraState: [root.yaw, root.pitch, root.distance, root.target, root.orthographic, width, height]
+        onCameraStateChanged: Qt.callLater(requestPaint)
+        onVisibleChanged: if (visible) requestPaint()
+        onPaint: {
+            const ctx = getContext("2d")
+            ctx.reset()
+            if (mouse.ripPoints.length < 2)
+                return
+            ctx.strokeStyle = "#e5484d"
+            ctx.lineWidth = 2.5
+            ctx.lineJoin = "round"
+            ctx.beginPath()
+            for (let i = 0; i < mouse.ripPoints.length; i++) {
+                const p = view.mapFrom3DScene(mouse.ripPoints[i])
+                if (i === 0) ctx.moveTo(p.x, p.y)
+                else ctx.lineTo(p.x, p.y)
+            }
+            ctx.stroke()
+            ctx.fillStyle = "#ffe066"
+            for (const end of [mouse.ripPoints[0], mouse.ripPoints[mouse.ripPoints.length - 1]]) {
+                const p = view.mapFrom3DScene(end)
+                ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.fill()
+            }
+        }
+    }
+
     // The box dragged with the pin brush, over the scene.
     Rectangle {
         id: pinBox
@@ -428,14 +474,19 @@ Item {
         property real lastX: 0
         property real lastY: 0
         property real travelled: 0
-        property int mode: 0   // 1 orbit, 2 pan, 3 dragging a handle, 4 pinching cloth, 5 placing a ruler end, 6 pin box
+        property int mode: 0   // 1 orbit, 2 pan, 3 dragging a handle, 4 pinching cloth, 5 placing a ruler end, 6 pin box, 7 ripping
         hoverEnabled: root.rulerOpen
         property vector3d pinchStart: Qt.vector3d(0, 0, 0)
         property real pinchScale: 0
+        property string ripPieceId: ""
+        property var ripPoints: []
+        property bool ripPulling: false
         property bool pinDragging: false
         property bool pinAdditive: false
         cursorShape: mode === 4 ? Qt.ClosedHandCursor
+            : mode === 7 ? Qt.CrossCursor
             : App.pinBrush ? Qt.CrossCursor
+            : root.ripMode ? Qt.CrossCursor
             : root.pinchMode ? Qt.OpenHandCursor : Qt.ArrowCursor
         property string activePart: ""
         property real pressX: 0
@@ -518,6 +569,23 @@ Item {
                 mode = 6
                 return
             }
+            if (e.button === Qt.LeftButton && root.ripMode && !(e.modifiers & Qt.ShiftModifier)) {
+                // Rip: the stroke is collected on the surface; releasing tears the piece along it.
+                const hit = view.pick(e.x, e.y)
+                if (hit.objectHit && hit.objectHit.pid) {
+                    ripPieceId = hit.objectHit.pid
+                    ripPoints = [hit.scenePosition]
+                    pinchStart = hit.scenePosition
+                    const depth = hit.scenePosition.minus(camera.scenePosition).dotProduct(camera.forward)
+                    pinchScale = root.orthographic ? 1 / root.magnification : 2 * depth * Math.tan(camera.fieldOfView * Math.PI / 360) / view.height
+                    ripPulling = App.ripPullBegin(hit.scenePosition.x, hit.scenePosition.y, hit.scenePosition.z)
+                    mode = 7
+                    ripCanvas.requestPaint()
+                    return
+                }
+                mode = 0
+                return
+            }
             if (e.button === Qt.LeftButton && root.pinchMode && !(e.modifiers & Qt.ShiftModifier)) {
                 // Pinch: take hold of the cloth under the cursor. Ctrl-drag anywhere still rotates the camera.
                 const hit = view.pick(e.x, e.y)
@@ -568,6 +636,20 @@ Item {
                 const mx = (e.x - pressX) * pinchScale, my = (pressY - e.y) * pinchScale
                 const r = root.activeCamera.right, u = root.activeCamera.up
                 App.pinchMove(pinchStart.x + r.x * mx + u.x * my, pinchStart.y + r.y * mx + u.y * my, pinchStart.z + r.z * mx + u.z * my)
+            } else if (mode === 7) {
+                const hit = view.pick(e.x, e.y)
+                if (hit.objectHit && hit.objectHit.pid === ripPieceId) {
+                    const last = ripPoints.length > 0 ? ripPoints[ripPoints.length - 1] : null
+                    if (last === null || hit.scenePosition.minus(last).length() > 0.002) {
+                        ripPoints = ripPoints.concat([hit.scenePosition])
+                        ripCanvas.requestPaint()
+                    }
+                    if (ripPulling) {
+                        const mx = (e.x - pressX) * pinchScale, my = (pressY - e.y) * pinchScale
+                        const r = root.activeCamera.right, u = root.activeCamera.up
+                        App.ripPullMove(pinchStart.x + r.x * mx + u.x * my, pinchStart.y + r.y * mx + u.y * my, pinchStart.z + r.z * mx + u.z * my)
+                    }
+                }
             } else if (mode === 1) {
                 root.yaw -= dx * 0.4
                 root.pitch = Math.max(-89, Math.min(89, root.pitch - dy * 0.4))
@@ -599,6 +681,15 @@ Item {
                 }
             } else if (mode === 4) {
                 App.pinchEnd()
+            } else if (mode === 7) {
+                if (ripPulling)
+                    App.ripPullEnd()
+                ripPulling = false
+                if (ripPoints.length >= 2)
+                    App.rip(ripPieceId, JSON.stringify(ripPoints.map(p => [p.x, p.y, p.z])))
+                ripPoints = []
+                ripPieceId = ""
+                ripCanvas.requestPaint()
             } else if (mode === 5) {
                 // A drag places both ends at once; a click leaves the far end following the pointer.
                 if (travelled >= 4)
@@ -622,7 +713,7 @@ Item {
                     App.clearPinSelection()
             } else if (travelled < 4 && e.button === Qt.LeftButton && root.measuring) {
                 root.clearRuler()      // a click on empty space
-            } else if (travelled < 4 && e.button === Qt.LeftButton) {
+            } else if (travelled < 4 && e.button === Qt.LeftButton && !root.ripMode) {
                 // A click without dragging selects the piece under the cursor.
                 const hit = view.pick(e.x, e.y)
                 const additive = (e.modifiers & Qt.ControlModifier) !== 0 || (e.modifiers & Qt.ShiftModifier) !== 0
@@ -633,6 +724,14 @@ Item {
         onCanceled: {
             if (mode === 3) App.gizmoEnd()
             if (mode === 4) App.pinchEnd()
+            if (mode === 7) {
+                if (ripPulling)
+                    App.ripPullEnd()
+                ripPulling = false
+                ripPoints = []
+                ripPieceId = ""
+                ripCanvas.requestPaint()
+            }
             if (mode === 6)
                 pinDragging = false
             pinAdditive = false
@@ -712,6 +811,21 @@ Item {
             ToolTip.text: tr("Drag the cloth itself to tug it into place, during or after simulation")
         }
         ViewButton {
+            text: tr("Rip")
+            checkable: true
+            checked: root.ripMode
+            onToggled: {
+                root.ripMode = checked
+                if (checked) {
+                    root.pinchMode = false
+                    App.pinBrush = false
+                }
+            }
+            ToolTip.visible: hovered
+            readonly property string key: { App.keysRevision; return App.keyText("view.rip") }
+            ToolTip.text: tr("Drag across the cloth to tear it apart; a tear that separates the mesh makes a new piece") + (key !== "" ? " (" + key + ")" : "")
+        }
+        ViewButton {
             text: tr("Pin")
             checkable: true
             checked: App.pinBrush
@@ -748,6 +862,7 @@ Item {
         text: App.pinBrush ? tr("Pin: click vertices or drag a box  ·  Shift: add to the selection  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit")
             : root.measuring ? tr("Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Ctrl-drag: orbit")
             : root.pinchMode ? tr("Pinch: drag the cloth to pull it  ·  Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom")
+            : root.ripMode ? tr("Rip: drag across a piece of cloth to tear it  ·  Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom")
                             : tr("Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap")
     }
     Label {

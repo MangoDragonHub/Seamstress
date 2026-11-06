@@ -1334,7 +1334,58 @@ public sealed class Workspace
         }
         if (plans.Count == 0)
             return new CutOutcome(new List<PatternPiece>(), 0, problem ?? Lang.T("Draw the cut line across a piece."));
+        return ApplyCuts(plans, plans.Count == 1 ? Lang.T("Cut piece") : Lang.T("Cut pieces"));
+    }
 
+    /// <summary>
+    /// Tears one piece along a stroke drawn on its simulated surface. The 3D stroke is mapped back to the piece's
+    /// pattern coordinates, extended to the outline where it stops short, and applied like a freehand 2D cut. Pieces
+    /// the tear separates become new pattern pieces; a stroke that does not separate anything changes nothing.
+    /// </summary>
+    public CutOutcome RipPiece(string pieceId, IReadOnlyList<Vector3> stroke)
+    {
+        var garment = Document.GarmentOfPiece(pieceId);
+        var piece = garment?.FindPiece(pieceId);
+        if (garment == null || piece == null || piece.Points.Count < 3)
+            return new CutOutcome(new List<PatternPiece>(), 0, Lang.T("Drag across a piece of cloth to rip it."));
+        var mesh = MeshFor(garment).Find(pieceId);
+        if (mesh == null)
+            return new CutOutcome(new List<PatternPiece>(), 0, Lang.T("Drag across a piece of cloth to rip it."));
+        var positions = Mesher.CurrentPositions(piece, mesh);
+
+        var path = new List<Vector2>();
+        foreach (var at in stroke)
+        {
+            if (!ClosestPatternPoint(mesh, positions, at, out var local, out float distance) || distance > 0.25f)
+                continue;
+            if (path.Count == 0 || Vector2.DistanceSquared(path[^1], local) > 0.01f)
+                path.Add(local);
+        }
+        if (path.Count < 2)
+            return new CutOutcome(new List<PatternPiece>(), 0, Lang.T("Drag across a piece of cloth to rip it."));
+        float travelled = 0;
+        for (int i = 1; i < path.Count; i++)
+            travelled += Vector2.Distance(path[i - 1], path[i]);
+        if (travelled < 0.5f)
+            return new CutOutcome(new List<PatternPiece>(), 0, Lang.T("Drag across a piece of cloth to rip it."));
+
+        // A tear runs to the outline even when the pointer stopped on the cloth, so it can separate the piece.
+        if (ExtendToOuterBoundary(piece, path[0], path[0] - path[1]) is { } first && Vector2.Distance(first, path[0]) > 0.05f)
+            path.Insert(0, first);
+        if (ExtendToOuterBoundary(piece, path[^1], path[^1] - path[^2]) is { } last && Vector2.Distance(last, path[^1]) > 0.05f)
+            path.Add(last);
+
+        var result = Cut.Plan(piece, path, out var problem);
+        if (result == null)
+            return new CutOutcome(new List<PatternPiece>(), 0, problem);
+        return ApplyCuts(new Dictionary<string, (PatternPiece Piece, Garment Garment, Cut.Result Result)>
+        {
+            [pieceId] = (piece, garment, result),
+        }, Lang.T("Rip piece"));
+    }
+
+    private CutOutcome ApplyCuts(Dictionary<string, (PatternPiece Piece, Garment Garment, Cut.Result Result)> plans, string undoName)
+    {
         var draped = new Dictionary<string, (PieceMesh Mesh, Vector3[] Positions)>();
         foreach (var garmentId in plans.Values.Select(p => p.Garment.Id).Distinct())
         {
@@ -1350,7 +1401,7 @@ public sealed class Workspace
         var made = new List<PatternPiece>();
         var sourceOf = new Dictionary<string, string>();
         var mappings = new Dictionary<(string Piece, int Edge), (string Piece, int Edge, bool Flipped)>();
-        History.Execute(plans.Count == 1 ? Lang.T("Cut piece") : Lang.T("Cut pieces"), doc =>
+        History.Execute(undoName, doc =>
         {
             foreach (var (pieceId, plan) in plans)
             {
@@ -1444,6 +1495,108 @@ public sealed class Workspace
         SelectionChanged?.Invoke();
         return new CutOutcome(made, plans.Count, null);
     }
+
+    /// <summary>The pattern point under a point on a piece's current 3D surface, and how far the point was from it.</summary>
+    private static bool ClosestPatternPoint(PieceMesh mesh, Vector3[] positions, Vector3 at, out Vector2 local, out float distance)
+    {
+        local = Vector2.Zero;
+        distance = float.MaxValue;
+        bool found = false;
+        for (int t = 0; t < mesh.Triangles.Length; t += 3)
+        {
+            int ia = mesh.Triangles[t], ib = mesh.Triangles[t + 1], ic = mesh.Triangles[t + 2];
+            var closest = ClosestOnTriangle(at, positions[ia], positions[ib], positions[ic], out float wa, out float wb, out float wc);
+            float d = Vector3.Distance(closest, at);
+            if (d >= distance)
+                continue;
+            distance = d;
+            local = mesh.Points[ia] * wa + mesh.Points[ib] * wb + mesh.Points[ic] * wc;
+            found = true;
+        }
+        return found;
+    }
+
+    /// <summary>The closest point on a triangle and its barycentric weights.</summary>
+    private static Vector3 ClosestOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c, out float wa, out float wb, out float wc)
+    {
+        var ab = b - a;
+        var ac = c - a;
+        var ap = p - a;
+        float d1 = Vector3.Dot(ab, ap), d2 = Vector3.Dot(ac, ap);
+        if (d1 <= 0 && d2 <= 0)
+        {
+            (wa, wb, wc) = (1, 0, 0);
+            return a;
+        }
+        var bp = p - b;
+        float d3 = Vector3.Dot(ab, bp), d4 = Vector3.Dot(ac, bp);
+        if (d3 >= 0 && d4 <= d3)
+        {
+            (wa, wb, wc) = (0, 1, 0);
+            return b;
+        }
+        float vc = d1 * d4 - d3 * d2;
+        if (vc <= 0 && d1 >= 0 && d3 <= 0)
+        {
+            float v = d1 / (d1 - d3);
+            (wa, wb, wc) = (1 - v, v, 0);
+            return a + ab * v;
+        }
+        var cp = p - c;
+        float d5 = Vector3.Dot(ab, cp), d6 = Vector3.Dot(ac, cp);
+        if (d6 >= 0 && d5 <= d6)
+        {
+            (wa, wb, wc) = (0, 0, 1);
+            return c;
+        }
+        float vb = d5 * d2 - d1 * d6;
+        if (vb <= 0 && d2 >= 0 && d6 <= 0)
+        {
+            float w = d2 / (d2 - d6);
+            (wa, wb, wc) = (1 - w, 0, w);
+            return a + ac * w;
+        }
+        float va = d3 * d6 - d5 * d4;
+        if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0)
+        {
+            float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            (wa, wb, wc) = (0, 1 - w, w);
+            return b + (c - b) * w;
+        }
+        float denom = 1f / (va + vb + vc);
+        float vv = vb * denom, vw = vc * denom;
+        (wa, wb, wc) = (1 - vv - vw, vv, vw);
+        return a + ab * vv + ac * vw;
+    }
+
+    /// <summary>Where a ray from inside a piece first meets its outer outline, or null when it runs parallel to all sides.</summary>
+    private static Vector2? ExtendToOuterBoundary(PatternPiece piece, Vector2 from, Vector2 direction)
+    {
+        if (direction.LengthSquared() < 1e-10f)
+            return null;
+        var outer = Outline.Flatten(piece);
+        float best = float.MaxValue;
+        Vector2? hit = null;
+        for (int i = 0; i < outer.Count; i++)
+        {
+            var a = outer[i];
+            var b = outer[(i + 1) % outer.Count];
+            var edge = b - a;
+            float denom = Cross2(direction, edge);
+            if (MathF.Abs(denom) < 1e-10f)
+                continue;
+            var r = a - from;
+            float t = Cross2(r, edge) / denom;
+            float u = Cross2(r, direction) / denom;
+            if (t <= 1e-4f || u < -1e-5f || u > 1f + 1e-5f || t >= best)
+                continue;
+            best = t;
+            hit = from + direction * t;
+        }
+        return hit;
+    }
+
+    private static float Cross2(Vector2 a, Vector2 b) => a.X * b.Y - a.Y * b.X;
 
     /// <summary>The pieces a cut made: the resulting pieces, how many pieces the line divided, and why it did nothing.</summary>
     public sealed record CutOutcome(List<PatternPiece> Pieces, int SourcePieces, string? Problem);

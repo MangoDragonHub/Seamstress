@@ -462,6 +462,57 @@ public partial class AppController : INotifyPropertyChanged
         };
     }
 
+    /// <summary>While a rip stroke is drawn, a running simulation lets the grabbed cloth follow the hand.</summary>
+    public bool RipPullBegin(double x, double y, double z)
+    {
+        if (!_simulation.IsRunning)
+            return false;
+        _simulation.BeginPinch(new Vector3((float)x, (float)y, (float)z));
+        return true;
+    }
+
+    public void RipPullMove(double x, double y, double z)
+    {
+        if (_simulation.IsRunning)
+            _simulation.MovePinch(new Vector3((float)x, (float)y, (float)z));
+    }
+
+    public void RipPullEnd()
+    {
+        if (_simulation.IsRunning)
+            _simulation.EndPinch();
+    }
+
+    /// <summary>Rips a piece along a stroke drawn on its 3D surface; the points are [x, y, z] triples in metres.</summary>
+    public void Rip(string pieceId, string pointsJson)
+    {
+        var points = new List<Vector3>();
+        try
+        {
+            using var json = JsonDocument.Parse(pointsJson);
+            if (json.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var point in json.RootElement.EnumerateArray())
+                {
+                    if (point.ValueKind != JsonValueKind.Array || point.GetArrayLength() < 3)
+                        continue;
+                    points.Add(new Vector3(point[0].GetSingle(), point[1].GetSingle(), point[2].GetSingle()));
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            return;
+        }
+        if (points.Count < 2)
+        {
+            StatusText = Lang.T("Drag across a piece of cloth to rip it.");
+            return;
+        }
+        var outcome = _workspace.RipPiece(pieceId, points);
+        StatusText = outcome.Problem ?? Lang.F("Ripped the piece into {0} pieces.", outcome.Pieces.Count);
+    }
+
     // ---------------------------------------------------------------- 3D viewport
 
     public string ViewportModels() => _viewport.Sync(_workspace, _avatar);

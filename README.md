@@ -19,8 +19,9 @@ Marvelous Designer.
   body; **View ▸ 2D: Show Avatar** hides it.
 - **3D view** – shows the sewn pieces on an avatar. Orbit, pan, zoom, click to select, and drag the arrows and
   rings on a selected piece to move and rotate it. **Pinch** lets you drag the cloth itself, during or after
-  simulation, to tug bunched-up areas into place. **Pin** freezes chosen vertices so the rest of the cloth
-  settles around them; **Unpin All** (Simulation menu) releases them again. **Ortho** switches to an
+  simulation, to tug bunched-up areas into place. **Rip** tears a piece by dragging across its surface; when
+  the tear separates the cloth, the new pieces appear in the 2D view. **Pin** freezes chosen vertices so the
+  rest of the cloth settles around them; **Unpin All** (Simulation menu) releases them again. **Ortho** switches to an
   orthographic camera. **View ▸ 3D: Normal Direction** colours the front and back of every face, and **Invert
   Normals** (Properties) turns a piece that faces the wrong way.
 - **Measuring** – click an edge to read its length, or use the **Ruler** to measure between any two points
@@ -203,6 +204,7 @@ the finished garment stays put and the new one drapes over it.
 | F | Frame all in 2D | Esc / Enter | Cancel / finish the current tool |
 | T | Transform points | Q / W / E / R | Handles: all / move / rotate / scale |
 | I | Inset Band | C | Cut pieces along a drawn line |
+| X | Rip cloth in 3D | G | Pinch cloth in 3D |
 | M | Ruler (2D and 3D) | 5 | Orthographic 3D view on / off |
 | 1 / 3 / Ctrl+1 | 3D front / side / back | Right-click | Edit menu |
 

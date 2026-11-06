@@ -75,11 +75,11 @@ for i, x in enumerate([23, 68, 112, 157, 201, 245, 305, 349, 393, 452, 506, 541,
 save(canvas, "toolbar")
 
 # 3. 3D view buttons
-vb = load("overview").crop((384, 74, 801, 102)).resize((1251, 84), Image.LANCZOS)
-canvas = Image.new("RGB", (1251, 134), "#1e1f22"); canvas.paste(vb, (0, 0))
+vb = load("overview").crop((320, 74, 800, 102)).resize((1440, 84), Image.LANCZOS)
+canvas = Image.new("RGB", (1440, 134), "#1e1f22"); canvas.paste(vb, (0, 0))
 d = ImageDraw.Draw(canvas)
-for i, x in enumerate([407, 445, 483, 525, 593, 640, 681, 726, 773]):
-    badge(d, (x - 384) * 3, 108, i + 1, COLORS[i % len(COLORS)], 15)
+for i, x in enumerate([341, 380, 419, 460, 529, 577, 618, 655, 726, 773]):
+    badge(d, (x - 320) * 3, 108, i + 1, COLORS[i % len(COLORS)], 15)
 save(canvas, "view-buttons")
 
 # 4. Workflow: arranged, then simulated

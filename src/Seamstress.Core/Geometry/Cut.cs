@@ -56,11 +56,23 @@ public static class Cut
     /// the piece's local centimetres. Returns null with a reason when the line does not divide the piece.
     /// </summary>
     public static Result? Plan(PatternPiece piece, Vector2 start, Vector2 end, out string? problem)
+        => Plan(piece, new[] { start, end }, out problem);
+
+    /// <summary>
+    /// Splits <paramref name="piece"/> along a polyline in the piece's local centimetres, as used by a rip. The path
+    /// is only cut between its first and last boundary crossing, so a stroke that starts or ends inside the cloth
+    /// does not leave a loose slit. Returns null with a reason when the line does not divide the piece.
+    /// </summary>
+    public static Result? Plan(PatternPiece piece, IReadOnlyList<Vector2> path, out string? problem)
     {
         problem = null;
-        var direction = end - start;
-        float lengthSquared = direction.LengthSquared();
-        if (lengthSquared < 1e-8f)
+        var points = new List<Vector2>();
+        foreach (var point in path)
+        {
+            if (points.Count == 0 || Vector2.DistanceSquared(points[^1], point) > 1e-8f)
+                points.Add(point);
+        }
+        if (points.Count < 2)
         {
             problem = Lang.T("Draw the cut line across a piece.");
             return null;
@@ -70,51 +82,97 @@ public static class Cut
         var holes = Outline.FlattenHoles(piece);
         bool Material(Vector2 p) => Outline.Contains(outer, p) && !holes.Any(h => Outline.Contains(h, p));
 
-        // Split every boundary edge where the line crosses it, and keep every crossing along the line for the cuts.
+        // Split every boundary edge where the path crosses it. Crossings are kept per path segment so the cut
+        // edges can follow every turn of a freehand rip.
+        var splits = new Dictionary<int, List<float>>();
+        var crossingPoints = new List<(float Along, Vector2 Point)>[points.Count - 1];
+        for (int i = 1; i < points.Count; i++)
+        {
+            var a = points[i - 1];
+            var direction = points[i] - a;
+            float lengthSquared = direction.LengthSquared();
+            var found = crossingPoints[i - 1] = new List<(float, Vector2)>();
+            if (lengthSquared < 1e-8f)
+                continue;
+            foreach (var (loop, first) in piece.Loops())
+            {
+                for (int k = 0; k < loop.Count; k++)
+                {
+                    var from = loop[k];
+                    var to = loop[(k + 1) % loop.Count];
+                    foreach (float t in LineCrossings(a, direction, from.Position, from.Curve, to.Position))
+                    {
+                        var point = Eval(from.Position, from.Curve, to.Position, t);
+                        float along = Vector2.Dot(point - a, direction) / lengthSquared;
+                        if (along < -1e-4f || along > 1f + 1e-4f)
+                            continue;
+                        if (t > 1e-4f && t < 1f - 1e-4f)
+                        {
+                            int edge = first + k;
+                            if (!splits.TryGetValue(edge, out var list))
+                                splits[edge] = list = new List<float>();
+                            list.Add(t);
+                        }
+                        found.Add((Math.Clamp(along, 0f, 1f), point));
+                    }
+                }
+            }
+        }
+
+        var events = new List<(Vector2 Point, bool Crossing)>();
+        void AddEvent(Vector2 point, bool crossing)
+        {
+            if (events.Count > 0 && Vector2.DistanceSquared(events[^1].Point, point) <= NodeTolerance * NodeTolerance)
+            {
+                if (crossing)
+                    events[^1] = (point, true);
+                return;
+            }
+            events.Add((point, crossing));
+        }
+        for (int i = 1; i < points.Count; i++)
+        {
+            AddEvent(points[i - 1], false);
+            foreach (var crossing in crossingPoints[i - 1].OrderBy(c => c.Along))
+                AddEvent(crossing.Point, true);
+            AddEvent(points[i], false);
+        }
+        int firstCrossing = events.FindIndex(e => e.Crossing);
+        int lastCrossing = events.FindLastIndex(e => e.Crossing);
+        if (firstCrossing < 0 || lastCrossing <= firstCrossing)
+        {
+            problem = Lang.T("The cut line must cross the piece.");
+            return null;
+        }
+
         var segments = new List<Segment>();
-        var crossings = new List<Crossing>();
         foreach (var (loop, first) in piece.Loops())
         {
-            for (int i = 0; i < loop.Count; i++)
+            for (int k = 0; k < loop.Count; k++)
             {
-                var a = loop[i];
-                var b = loop[(i + 1) % loop.Count];
-                var ts = LineCrossings(start, direction, a.Position, a.Curve, b.Position);
-                var inside = new List<float>();
-                foreach (float t in ts)
-                {
-                    var point = Eval(a.Position, a.Curve, b.Position, t);
-                    float s = Vector2.Dot(point - start, direction) / lengthSquared;
-                    if (s < -1e-4f || s > 1f + 1e-4f)
-                        continue;
-                    crossings.Add(new Crossing(Math.Clamp(s, 0f, 1f), point));
-                    if (t > 1e-4f && t < 1f - 1e-4f)
-                        inside.Add(t);
-                }
-                inside.Sort();
+                var from = loop[k];
+                var to = loop[(k + 1) % loop.Count];
                 var stops = new List<float> { 0f };
-                foreach (float t in inside)
+                if (splits.TryGetValue(first + k, out var split))
                 {
-                    if (t - stops[^1] > 1e-5f)
-                        stops.Add(t);
+                    split.Sort();
+                    foreach (float t in split)
+                    {
+                        if (t - stops[^1] > 1e-5f && 1f - t > 1e-5f)
+                            stops.Add(t);
+                    }
                 }
                 if (1f - stops[^1] > 1e-5f)
                     stops.Add(1f);
                 for (int j = 1; j < stops.Count; j++)
                 {
                     float t0 = stops[j - 1], t1 = stops[j];
-                    var part = SubCurve(a.Position, a.Curve, b.Position, t0, t1);
+                    var part = SubCurve(from.Position, from.Curve, to.Position, t0, t1);
                     if ((part.B - part.A).LengthSquared() < 1e-12f && part.C == null)
                         continue;
-                    segments.Add(new Segment(part.A, part.C, part.B, first + i, t0, t1));
+                    segments.Add(new Segment(part.A, part.C, part.B, first + k, t0, t1));
                 }
             }
-        }
-
-        if (crossings.Count < 2)
-        {
-            problem = Lang.T("The cut line must cross the piece.");
-            return null;
         }
 
         var nodes = new List<Node>();
@@ -161,23 +219,15 @@ public static class Cut
                 AddPair(from, to, segment.C, segment.Edge, segment.F0, segment.F1, cut: false);
         }
 
-        // The parts of the line that lie on the cloth are new edges between the boundary crossings.
-        crossings.Sort((a, b) => a.S.CompareTo(b.S));
-        var unique = new List<Crossing>();
-        foreach (var crossing in crossings)
-        {
-            if (unique.Count > 0 && Vector2.DistanceSquared(unique[^1].Point, crossing.Point) <= NodeTolerance * NodeTolerance)
-                continue;
-            unique.Add(crossing);
-        }
+        // The parts of the path that lie on the cloth, from its first boundary crossing to its last, are new edges.
         bool hasCut = false;
-        for (int i = 1; i < unique.Count; i++)
+        for (int i = firstCrossing; i < lastCrossing; i++)
         {
-            var a = unique[i - 1];
-            var b = unique[i];
-            if (!Material((a.Point + b.Point) / 2))
+            var a = events[i].Point;
+            var b = events[i + 1].Point;
+            if (Vector2.DistanceSquared(a, b) < 1e-12f || !Material((a + b) / 2))
                 continue;
-            int from = GetNode(a.Point), to = GetNode(b.Point);
+            int from = GetNode(a), to = GetNode(b);
             if (from == to)
                 continue;
             AddPair(from, to, null, -1, 0, 1, cut: true);

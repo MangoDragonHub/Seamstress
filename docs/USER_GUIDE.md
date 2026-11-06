@@ -144,7 +144,7 @@ maps what you already know to where it lives here.
 | Simulate (Space) | **Simulate** (Space) |
 | Reset 3D Arrangement | **Reset** button, or **Simulation ▸ Reset Arrangement** |
 | Gizmo | The arrows and rings on the selected piece in the 3D view |
-| Dragging the cloth while simulating | **Pinch** (**G**) in the 3D view; it also works after the simulation has stopped |
+| Dragging the cloth while simulating | **Pinch** (**G**) in the 3D view; it also works after the simulation has stopped. **Rip** (**X**) tears the cloth along a dragged stroke |
 | Arrangement points | Not available. Place pieces with the gizmo or the numbers under **3D Arrangement**; **Wrap** curls a piece around an arm or leg |
 | Particle Distance | **Topology ▸ Particle distance** (per garment, with a per-piece override) |
 | Mesh type: Triangle / Quad | **Topology ▸ Faces**: Triangles or Quads |
@@ -428,13 +428,14 @@ simulation pulls each stitch shut.
 | 5 | **Checker** | Replace fabric colours with a checker texture, to judge UVs and texel density. |
 | 6 | **Wire** | Draw the outline of every face, to see the topology. (**View ▸ 3D: Normal Direction**, which has no button, colours the front and back of the faces; see [Normal direction](#normal-direction).) |
 | 7 | **Pinch** | Drag the cloth itself to tug it into place (see [Pinching the cloth](#pinching-the-cloth)). |
-| 8 | **Gizmo** | Show or hide the move, rotate and scale handles. **Q / W / E / R** choose which of them are shown. |
-| 9 | **Avatar** | Show or hide the avatar. Hidden, it still collides with the cloth. |
+| 8 | **Rip** | Drag across the cloth to tear it (see [Ripping the cloth](#ripping-the-cloth)). |
+| 9 | **Gizmo** | Show or hide the move, rotate and scale handles. **Q / W / E / R** choose which of them are shown. |
+| 10 | **Avatar** | Show or hide the avatar. Hidden, it still collides with the cloth. |
 
 **Orthographic view.** With **Ortho** on (or **5**, or **View ▸ 3D: Orthographic**) the camera has no
 perspective: things further away are not drawn smaller, so the two sides of a garment, or a sleeve and the
 body, can be compared by eye. Together with **Front** and **Side** it gives flat, technical-drawing views.
-Orbiting, panning, zooming, the handles, Pinch and the Ruler all work the same in both cameras.
+Orbiting, panning, zooming, the handles, Pinch, Rip and the Ruler all work the same in both cameras.
 
 ### Normal direction
 
@@ -515,6 +516,22 @@ body.
 - About 5 cm of cloth around the cursor is held; cloth further away is moved only by the fabric pulling on it.
 - Only garments that are being simulated can be pinched. If another garment is the active one and a simulation
   is already running, stop it first or tick **All garments**.
+
+### Ripping the cloth
+
+**Rip** tears a piece open along a stroke drawn on its surface. Turn it on in the 3D view (or press **X**), press
+on the cloth and drag across it. A red line follows the pointer; while a simulation is running the cloth is
+pulled along with it. On release the cloth tears open along the stroke.
+
+- A tear runs out to the piece's outline even when you stop short, so a rip that separates the cloth creates two
+  or more pieces. They are selected, and the same shapes appear in the 2D view. The stroke tears the piece it
+  starts on; it stops at that piece's edge.
+- The pieces keep the fabric, group, UVs and 3D arrangement. A draped piece stays draped, and the new piece is
+  draped from the cloth it was torn from.
+- Seams on edges the tear does not divide stay sewn; a seam on an edge that is divided is removed.
+- A very short drag does nothing. Ctrl+drag orbits the camera, Shift+drag pans, and the move/rotate handles are
+  hidden while Rip is on.
+- **Ctrl+Z** undoes the whole rip in one step.
 
 ### Pinning the cloth
 
@@ -1022,6 +1039,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | 1 / 3 / Ctrl+1 | 3D view from the front / side / back (number row or keypad) |
 | 5 | Orthographic 3D view on or off (number row or keypad) |
 | G | Turn Pinch on or off in the 3D view |
+| X | Turn Rip on or off in the 3D view |
 | Space | Start or stop simulation |
 | Enter | Finish the polygon being drawn; cut the bands previewed with Inset Band |
 | Esc | Cancel the current tool action |
@@ -1040,7 +1058,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 
 | | 2D view | 3D view |
 | --- | --- | --- |
-| Left button | The current tool | Click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it |
+| Left button | The current tool | Click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it; with Rip on, drag across the cloth to tear it |
 | Ctrl + drag | — | Orbit around the avatar |
 | Ctrl + click | Add to the selection | Add to the selection |
 | Shift + click | — | Add to the selection |
@@ -1057,6 +1075,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | Double-click | Finish a polygon; add a point on an edge (Edit Points); select every point of a piece | — |
 | Drag (Ruler) | Measure; the ends catch on pattern points | Click or drag between two points on the cloth or avatar |
 | Drag (Cut) | Draw a straight line and cut every visible piece it crosses into separate pieces | — |
+| Drag (Rip) | — | Tear the piece under the stroke; if the tear separates it, the new pieces appear in 2D |
 | Click / drag an edge (Inset Band) | Choose the edge, or drop it again; drag inward to set the band's width | — |
 | Drag on empty space (Transform Points) | Box-select points | — |
 
