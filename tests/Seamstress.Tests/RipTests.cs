@@ -89,6 +89,37 @@ public class RipTests
     }
 
     [Fact]
+    public void PinsAwayFromTheTearStayPinned()
+    {
+        var (ws, piece) = One();
+        var garment = ws.Document.GarmentOfPiece(piece.Id)!;
+        var mesh = ws.MeshFor(garment).Find(piece.Id)!;
+        var near = new Vector2(10, 10);
+        int pin = Enumerable.Range(0, mesh.VertexCount)
+            .OrderBy(i => Vector2.DistanceSquared(mesh.Points[i], near))
+            .First();
+        piece.Pins.Add(pin);
+        piece.PinKey = mesh.Key;
+        var at = mesh.Points[pin];
+        var stroke = new[]
+        {
+            At(ws, piece, new Vector2(30, 10)),
+            At(ws, piece, new Vector2(30, 40)),
+        };
+
+        var outcome = ws.RipPiece(piece.Id, stroke);
+
+        Assert.Null(outcome.Problem);
+        var pinnedPieces = outcome.Pieces.Where(p => p.Pins.Count > 0).ToList();
+        Assert.NotEmpty(pinnedPieces);
+        var owner = outcome.Pieces.Single(p => Outline.Contains(p, at));
+        Assert.NotEmpty(owner.Pins);
+        Assert.Equal(ws.MeshFor(garment).Find(owner.Id)!.Key, owner.PinKey);
+        foreach (var pinnedPiece in pinnedPieces)
+            Assert.Equal(ws.MeshFor(garment).Find(pinnedPiece.Id)!.Key, pinnedPiece.PinKey);
+    }
+
+    [Fact]
     public void UndoRestoresTheOriginalPiece()
     {
         var (ws, piece) = One();

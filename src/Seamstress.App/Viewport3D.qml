@@ -439,9 +439,12 @@ Item {
             ctx.strokeStyle = "#e5484d"
             ctx.lineWidth = 2.5
             ctx.lineJoin = "round"
+            const stroke = mouse.ripStraight && mouse.ripPoints.length > 1
+                ? [mouse.ripPoints[0], mouse.ripPoints[mouse.ripPoints.length - 1]]
+                : mouse.ripPoints
             ctx.beginPath()
-            for (let i = 0; i < mouse.ripPoints.length; i++) {
-                const p = view.mapFrom3DScene(mouse.ripPoints[i])
+            for (let i = 0; i < stroke.length; i++) {
+                const p = view.mapFrom3DScene(stroke[i])
                 if (i === 0) ctx.moveTo(p.x, p.y)
                 else ctx.lineTo(p.x, p.y)
             }
@@ -481,6 +484,9 @@ Item {
         property string ripPieceId: ""
         property var ripPoints: []
         property bool ripPulling: false
+        property bool ripStraight: false
+        property real ripLastX: 0
+        property real ripLastY: 0
         property bool pinDragging: false
         property bool pinAdditive: false
         cursorShape: mode === 4 ? Qt.ClosedHandCursor
@@ -569,8 +575,15 @@ Item {
                 mode = 6
                 return
             }
-            if (e.button === Qt.LeftButton && root.ripMode && !(e.modifiers & Qt.ShiftModifier)) {
-                // Rip: the stroke is collected on the surface; releasing tears the piece along it.
+            if (e.button === Qt.LeftButton && root.ripMode) {
+                // Rip: the stroke may start outside the cloth and may stop outside it; only the part on the piece
+                // is recorded, and the tear is carried to the outline. Shift makes the tear a straight line.
+                ripStraight = (e.modifiers & Qt.ShiftModifier) !== 0
+                ripPieceId = ""
+                ripPoints = []
+                ripLastX = e.x
+                ripLastY = e.y
+                ripPulling = false
                 const hit = view.pick(e.x, e.y)
                 if (hit.objectHit && hit.objectHit.pid) {
                     ripPieceId = hit.objectHit.pid
@@ -579,11 +592,9 @@ Item {
                     const depth = hit.scenePosition.minus(camera.scenePosition).dotProduct(camera.forward)
                     pinchScale = root.orthographic ? 1 / root.magnification : 2 * depth * Math.tan(camera.fieldOfView * Math.PI / 360) / view.height
                     ripPulling = App.ripPullBegin(hit.scenePosition.x, hit.scenePosition.y, hit.scenePosition.z)
-                    mode = 7
-                    ripCanvas.requestPaint()
-                    return
                 }
-                mode = 0
+                mode = 7
+                ripCanvas.requestPaint()
                 return
             }
             if (e.button === Qt.LeftButton && root.pinchMode && !(e.modifiers & Qt.ShiftModifier)) {
@@ -637,18 +648,29 @@ Item {
                 const r = root.activeCamera.right, u = root.activeCamera.up
                 App.pinchMove(pinchStart.x + r.x * mx + u.x * my, pinchStart.y + r.y * mx + u.y * my, pinchStart.z + r.z * mx + u.z * my)
             } else if (mode === 7) {
-                const hit = view.pick(e.x, e.y)
-                if (hit.objectHit && hit.objectHit.pid === ripPieceId) {
-                    const last = ripPoints.length > 0 ? ripPoints[ripPoints.length - 1] : null
-                    if (last === null || hit.scenePosition.minus(last).length() > 0.002) {
-                        ripPoints = ripPoints.concat([hit.scenePosition])
-                        ripCanvas.requestPaint()
+                // Sample across the whole pointer movement, so a fast stroke over the cloth is not missed and a
+                // stroke that starts or ends in empty space still picks up the cloth it crosses.
+                const dx = e.x - ripLastX, dy = e.y - ripLastY
+                const count = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 6))
+                for (let i = 1; i <= count; i++) {
+                    const hit = view.pick(ripLastX + dx * i / count, ripLastY + dy * i / count)
+                    if (hit.objectHit && hit.objectHit.pid) {
+                        if (ripPieceId === "")
+                            ripPieceId = hit.objectHit.pid
+                        if (hit.objectHit.pid === ripPieceId) {
+                            const last = ripPoints.length > 0 ? ripPoints[ripPoints.length - 1] : null
+                            if (last === null || hit.scenePosition.minus(last).length() > 0.002)
+                                ripPoints = ripPoints.concat([hit.scenePosition])
+                        }
                     }
-                    if (ripPulling) {
-                        const mx = (e.x - pressX) * pinchScale, my = (pressY - e.y) * pinchScale
-                        const r = root.activeCamera.right, u = root.activeCamera.up
-                        App.ripPullMove(pinchStart.x + r.x * mx + u.x * my, pinchStart.y + r.y * mx + u.y * my, pinchStart.z + r.z * mx + u.z * my)
-                    }
+                }
+                ripLastX = e.x
+                ripLastY = e.y
+                ripCanvas.requestPaint()
+                if (ripPulling) {
+                    const mx = (e.x - pressX) * pinchScale, my = (pressY - e.y) * pinchScale
+                    const r = root.activeCamera.right, u = root.activeCamera.up
+                    App.ripPullMove(pinchStart.x + r.x * mx + u.x * my, pinchStart.y + r.y * mx + u.y * my, pinchStart.z + r.z * mx + u.z * my)
                 }
             } else if (mode === 1) {
                 root.yaw -= dx * 0.4
@@ -685,10 +707,14 @@ Item {
                 if (ripPulling)
                     App.ripPullEnd()
                 ripPulling = false
-                if (ripPoints.length >= 2)
-                    App.rip(ripPieceId, JSON.stringify(ripPoints.map(p => [p.x, p.y, p.z])))
+                const ends = ripStraight && ripPoints.length >= 2
+                    ? [ripPoints[0], ripPoints[ripPoints.length - 1]]
+                    : ripPoints
+                if (ends.length >= 2)
+                    App.rip(ripPieceId, JSON.stringify(ends.map(p => [p.x, p.y, p.z])))
                 ripPoints = []
                 ripPieceId = ""
+                ripStraight = false
                 ripCanvas.requestPaint()
             } else if (mode === 5) {
                 // A drag places both ends at once; a click leaves the far end following the pointer.
@@ -730,6 +756,7 @@ Item {
                 ripPulling = false
                 ripPoints = []
                 ripPieceId = ""
+                ripStraight = false
                 ripCanvas.requestPaint()
             }
             if (mode === 6)
@@ -823,7 +850,7 @@ Item {
             }
             ToolTip.visible: hovered
             readonly property string key: { App.keysRevision; return App.keyText("view.rip") }
-            ToolTip.text: tr("Drag across the cloth to tear it apart; a tear that separates the mesh makes a new piece") + (key !== "" ? " (" + key + ")" : "")
+            ToolTip.text: tr("Drag across the cloth to tear it; hold Shift for a straight tear. The stroke may start or end outside the garment") + (key !== "" ? " (" + key + ")" : "")
         }
         ViewButton {
             text: tr("Pin")
@@ -862,7 +889,7 @@ Item {
         text: App.pinBrush ? tr("Pin: click vertices or drag a box  ·  Shift: add to the selection  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit")
             : root.measuring ? tr("Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Ctrl-drag: orbit")
             : root.pinchMode ? tr("Pinch: drag the cloth to pull it  ·  Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom")
-            : root.ripMode ? tr("Rip: drag across a piece of cloth to tear it  ·  Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom")
+            : root.ripMode ? tr("Rip: drag across a piece of cloth to tear it  ·  Shift: straight tear  ·  Ctrl-drag: orbit  ·  Middle/right-drag: pan  ·  Wheel: zoom")
                             : tr("Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap")
     }
     Label {

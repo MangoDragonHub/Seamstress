@@ -526,8 +526,10 @@ body.
 ### Ripping the cloth
 
 **Rip** tears a piece open along a stroke drawn on its surface. Turn it on in the 3D view (or press **X**), press
-on the cloth and drag across it. A red line follows the pointer; while a simulation is running the cloth is
-pulled along with it. On release the cloth tears open along the stroke.
+on the cloth (or start in empty space) and drag across it. A red line follows the pointer; while a simulation is
+running the cloth is pulled along with it. On release the cloth tears open along the stroke. Start and finish
+outside the garment if you like: the tear still reaches the cloth's edge. Hold **Shift** while starting the drag
+to tear in a straight line instead of following the surface.
 
 - A tear runs out to the piece's outline even when you stop short, so a rip that separates the cloth creates two
   or more pieces. They are selected, and the same shapes appear in the 2D view. The stroke tears the piece it
@@ -535,8 +537,8 @@ pulled along with it. On release the cloth tears open along the stroke.
 - The pieces keep the fabric, group, UVs and 3D arrangement. A draped piece stays draped, and the new piece is
   draped from the cloth it was torn from.
 - Seams on edges the tear does not divide stay sewn; a seam on an edge that is divided is removed.
-- A very short drag does nothing. Ctrl+drag orbits the camera, Shift+drag pans, and the move/rotate handles are
-  hidden while Rip is on.
+- A very short drag does nothing. Ctrl+drag orbits the camera, middle/right-drag pans, and the move/rotate
+  handles are hidden while Rip is on. Shift starts a straight rip instead of panning.
 - **Ctrl+Z** undoes the whole rip in one step.
 
 ### Pinning the cloth
@@ -1069,7 +1071,8 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | Ctrl + click | Add to the selection | Add to the selection |
 | Shift + click | — | Add to the selection |
 | Shift while drawing | Square, circle, a snapped polygon side, or a 15° cut line | — |
-| Shift + drag | — | Pan |
+| Shift + drag | — | Pan, except while Ripping: then it tears in a straight line |
+| Shift + drag (Rip) | — | Tear in a straight line |
 | Shift + drag a move arrow | — | Snap the piece to the grid along that axis |
 | Shift + drag a point (Edit Points) | Snap the point to the grid | — |
 | Shift + drag a point (Transform Points) | Snap the selected points to the grid | — |

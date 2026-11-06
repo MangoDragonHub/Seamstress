@@ -1387,14 +1387,23 @@ public sealed class Workspace
     private CutOutcome ApplyCuts(Dictionary<string, (PatternPiece Piece, Garment Garment, Cut.Result Result)> plans, string undoName)
     {
         var draped = new Dictionary<string, (PieceMesh Mesh, Vector3[] Positions)>();
+        var pinned = new Dictionary<string, List<Vector2>>();
         foreach (var garmentId in plans.Values.Select(p => p.Garment.Id).Distinct())
         {
             var garment = Document.FindGarment(garmentId)!;
             var mesh = MeshFor(garment);
             foreach (var (piece, _, _) in plans.Values.Where(p => p.Garment.Id == garmentId))
             {
-                if (mesh.Find(piece.Id) is { } pieceMesh && piece.Drape != null && piece.DrapeKey == pieceMesh.Key)
+                if (mesh.Find(piece.Id) is not { } pieceMesh)
+                    continue;
+                if (piece.Drape != null && piece.DrapeKey == pieceMesh.Key)
                     draped[piece.Id] = (pieceMesh, Mesher.CurrentPositions(piece, pieceMesh));
+                if (piece.PinKey == pieceMesh.Key && piece.Pins.Count > 0)
+                {
+                    pinned[piece.Id] = piece.Pins
+                        .Where(i => i >= 0 && i < pieceMesh.VertexCount)
+                        .Select(i => pieceMesh.Points[i]).ToList();
+                }
             }
         }
 
@@ -1483,6 +1492,42 @@ public sealed class Workspace
                     }
                     piece.Drape = drape;
                     piece.DrapeKey = pieceMesh.Key;
+                }
+            }
+
+            // Pins belong to mesh vertices, so they are carried across the cut by their pattern position. Pins in
+            // the part each new piece kept stay pinned; pins on the tear itself have nowhere left to go.
+            foreach (var garment in doc.Garments)
+            {
+                var changed = made.Where(p => garment.FindPiece(p.Id) != null && pinned.ContainsKey(sourceOf[p.Id])).ToList();
+                if (changed.Count == 0)
+                    continue;
+                var mesh = MeshFor(garment);
+                foreach (var piece in changed)
+                {
+                    if (mesh.Find(piece.Id) is not { } pieceMesh)
+                        continue;
+                    var kept = new HashSet<int>();
+                    foreach (var at in pinned[sourceOf[piece.Id]])
+                    {
+                        if (!ContainsOrTouches(piece, at))
+                            continue;
+                        int nearest = -1;
+                        float best = float.MaxValue;
+                        for (int i = 0; i < pieceMesh.VertexCount; i++)
+                        {
+                            float d = Vector2.DistanceSquared(pieceMesh.Points[i], at);
+                            if (d < best)
+                            {
+                                best = d;
+                                nearest = i;
+                            }
+                        }
+                        if (nearest >= 0)
+                            kept.Add(nearest);
+                    }
+                    piece.Pins = kept;
+                    piece.PinKey = kept.Count > 0 ? pieceMesh.Key : null;
                 }
             }
         });
@@ -1600,6 +1645,16 @@ public sealed class Workspace
 
     /// <summary>The pieces a cut made: the resulting pieces, how many pieces the line divided, and why it did nothing.</summary>
     public sealed record CutOutcome(List<PatternPiece> Pieces, int SourcePieces, string? Problem);
+
+    /// <summary>True when a point is on the cloth of a piece, including its outline and hole edges.</summary>
+    private static bool ContainsOrTouches(PatternPiece piece, Vector2 local)
+    {
+        if (Outline.Contains(piece, local))
+            return true;
+        if (Outline.DistanceToPolyline(local, Outline.Flatten(piece), true) > 0.05f)
+            return false;
+        return !Outline.FlattenHoles(piece).Any(h => Outline.Contains(h, local));
+    }
 
     private static void ApplyCutShape(PatternPiece target, Cut.Shape shape, PatternPiece old)
     {
