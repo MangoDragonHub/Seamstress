@@ -90,6 +90,8 @@ The borders between the panels can be dragged to resize them.
 
 ### The tools
 
+The toolbar shows each tool as an icon. Hover over an icon to see its name, what it does and its key.
+
 ![Toolbar with each tool numbered](images/toolbar.png)
 
 | # | Tool | Key | What it does |
@@ -97,14 +99,16 @@ The borders between the panels can be dragged to resize them.
 | 1 | **Select** | V | Click a piece to select it, drag to move it in the pattern. Ctrl+click adds to the selection. Click a seam's dashed line to select the seam. Double-click a piece to select all its points. |
 | 2 | **Edit Points** | A | Drag a point to move it. Drag an edge to curve it. Double-click an edge to add a point. |
 | 3 | **Transform Points** | T | Select one point or several, then move or rotate them with handles. Does not bend edges. |
-| 4 | **Sew** | S | Click one edge, then another, to sew them together. |
-| 5 | **Polygon** | P | Click to place corners; click the first corner again, double-click, or press Enter to finish. |
-| 6 | **Rectangle** | B | Drag out a rectangular piece. |
-| 7 | **Ellipse** | O | Drag out an elliptical piece. |
-| 8 | **Ruler** | M | Measure a distance in the 2D view, or between two points on the cloth or avatar in the 3D view (see [Measuring with the Ruler](#measuring-with-the-ruler)). |
-| 9 | Undo | Ctrl+Z | Undo the last change. Hover to see what it will undo. |
-| 10 | Redo | Ctrl+Shift+Z | Redo. |
-| 11 | **Pattern / UV Layout** | U | Switch the 2D view between the pattern and the UV layout. |
+| 4 | **Sew** | S | Click one edge, then another, to sew them together, or drag a box around several edges and press Enter. |
+| 5 | **Inset Band** | I | Cut a waistband, collar band or facing off pieces along the edges you click, already sewn on (see [Cutting bands from edges](#cutting-bands-from-edges)). |
+| 6 | **Cut** | C | Drag a line across pieces to cut them into separate pieces (see [Cutting pieces apart](#cutting-pieces-apart)). |
+| 7 | **Polygon** | P | Click to place corners; click the first corner again, double-click, or press Enter to finish. |
+| 8 | **Rectangle** | B | Drag out a rectangular piece. |
+| 9 | **Ellipse** | O | Drag out an elliptical piece. |
+| 10 | **Ruler** | M | Measure a distance in the 2D view, or between two points on the cloth or avatar in the 3D view (see [Measuring with the Ruler](#measuring-with-the-ruler)). |
+| 11 | Undo | Ctrl+Z | Undo the last change. Hover to see what it will undo. |
+| 12 | Redo | Ctrl+Shift+Z | Redo. |
+| 13 | **Pattern / UV Layout** | U | Switch the 2D view between the pattern and the UV layout. |
 
 The keys are the defaults; every one of them can be changed in [Preferences ▸ Keyboard](#keyboard-shortcuts).
 
@@ -133,13 +137,14 @@ maps what you already know to where it lives here.
 | Selecting several points and moving or rotating them | **Transform Points** tool (**T**) |
 | Edit Curvature | **Edit Points** tool: drag an edge to bend it |
 | Add Point / Split Line | **Edit Points** tool: double-click an edge |
-| Internal shape ▸ Cut / Convert to Hole | Draw the shape as a piece on top, select both, **Edit ▸ Cut Hole** |
+| Internal shape ▸ Cut / Convert to Hole | **Cut** (**C**) splits pieces along a drawn line; for a hole, draw the shape as a piece on top, select both, **Edit ▸ Cut Hole** |
+| Offset as Internal Line, then Cut & Sew (for a waistband or facing) | **Inset Band** tool (**I**): click the edges, set the width, Apply |
 | Segment Sewing | **Sew** tool (**S**): click one edge, then the other |
 | Edit Sewing ▸ reverse a twisted seam | Select the seam, then **Reverse Direction** in Properties |
 | Simulate (Space) | **Simulate** (Space) |
 | Reset 3D Arrangement | **Reset** button, or **Simulation ▸ Reset Arrangement** |
 | Gizmo | The arrows and rings on the selected piece in the 3D view |
-| Dragging the cloth while simulating | **Pinch** (**G**) in the 3D view; it also works after the simulation has stopped |
+| Dragging the cloth while simulating | **Pinch** (**G**) in the 3D view; it also works after the simulation has stopped. **Rip** (**X**) tears the cloth along a dragged stroke |
 | Arrangement points | Not available. Place pieces with the gizmo or the numbers under **3D Arrangement**; **Wrap** curls a piece around an arm or leg |
 | Particle Distance | **Topology ▸ Particle distance** (per garment, with a per-piece override) |
 | Mesh type: Triangle / Quad | **Topology ▸ Faces**: Triangles or Quads |
@@ -201,8 +206,8 @@ across. Shift can be pressed or released in the middle of a drag.
 With the **Select** tool, a selected piece shows the same handles as the 3D view (see
 [Choosing which handles are shown](#choosing-which-handles-are-shown)). The arrows move the piece along one
 axis, the ring turns it, and the boxes scale it: red for width, green for height, yellow for both. Hold
-**Shift** while turning for 15° steps and while scaling for steps of a tenth. You can still drag the piece
-itself to move it freely.
+**Shift** while turning for 15° steps and while scaling for steps of a tenth, or while moving to snap the
+piece's position to the grid. You can still drag the piece itself to move it freely.
 
 ### Measuring edges
 
@@ -252,7 +257,8 @@ also show a yellow handle.
 
 With **Shift** held, the point snaps to the nearest crossing of the smallest squares on screen, so the step
 follows the zoom: zoom in for finer steps (down to 1 mm, or 1/8 in in imperial) and out for coarser ones. The
-scale bar in the corner says how big a square is.
+same snapping moves points in **Transform Points** and pieces in **Select**. The scale bar in the corner says
+how big a square is.
 
 ### Arranging pieces in the pattern
 
@@ -269,7 +275,7 @@ the UVs), not the 3D placement. The **Edit** menu also has **Duplicate** (Ctrl+D
 - **Scale:** with two or more points selected, drag a box to scale them about their middle: red for width,
   green for height, yellow for both. **Q / W / E / R** choose which handles are shown.
 
-- **Select:** click a point; **Ctrl+click** (or Shift+click) adds or removes one; drag a box over empty space
+- **Select:** click a point; **Ctrl+click** adds or removes one; drag a box over empty space
   to select every point inside it, across pieces. **Ctrl+A** selects every point of the active garment.
   Click empty space to clear the selection.
 - **Select a whole shape:** double-click inside a piece. This works from the **Select** and **Edit Points**
@@ -278,7 +284,7 @@ the UVs), not the 3D placement. The **Edit** menu also has **Duplicate** (Ctrl+D
   on an edge still adds a point there.)
 - **Move:** handles appear in the middle of the selected points. Drag the red arrow to move them left–right
   only, the green arrow up–down only, or the white square to move them freely. You can also just drag any
-  selected point. Hold **Shift** on a free drag to keep to one axis.
+  selected point. Hold **Shift** to snap the points to the grid (use an arrow to keep to one axis).
 - **Rotate:** with two or more points selected, drag the blue ring to turn them about their middle. Hold
   **Shift** for 15° steps.
 - **Delete** removes the selected points (a piece always keeps at least three). Selecting every point of a
@@ -314,6 +320,58 @@ right-click and choose **Cut Hole** (also in the **Edit** menu).
 - In the 2D view you see through a hole to the grid and to any piece beneath it, and a click there selects
   what is underneath.
 
+### Cutting bands from edges
+
+A waistband, collar band, neckband or facing has to match the edge it is sewn to exactly. Instead of drawing it
+as a separate piece, cut it off the piece itself: pick **Inset Band** (**I**), click the edges, set the width and
+press **Apply**.
+
+![The waists of a skirt's front and back chosen with Inset Band: each band shaded, its cut line dashed, and the width panel](images/inset-band.png)
+
+1. **Click the edges** the band runs along: the waist of the front, say, and the waist of the back. Edges of
+   several pieces can be chosen at once. Click a chosen edge again to drop it; click empty space to start over.
+2. **Set the width.** Drag inward from a chosen edge, or use the Width box in the panel in the top-right corner of
+   the 2D view: type a number, or drag left or right in the box. Hold **Shift** while dragging an edge for whole
+   centimetres (or quarter inches). Each band is previewed as you go, shaded, with its cut line dashed.
+3. **Apply** (or press **Enter**). **Esc** or **Cancel** drops the choice without cutting anything.
+
+What you get:
+
+- Each piece is cut along the dashed line. What was beyond it becomes a new piece, **"… band"**, of the same fabric.
+  It is left exactly where it was cut, in the pattern and in 3D, so you see the cut; drag it aside in the pattern
+  if you like. A draped piece stays draped, and so does its band.
+- **The band is sewn to the piece** along the cut, so you can simulate straight away.
+- **Seams carry over.** A seam on a chosen edge moves to the band. A seam on an edge the cut runs into (a side
+  seam, say) is split in two, so the band and the piece both stay sewn: cut the front and back waists together and
+  the side seams continue up the waistband. If the edge it is sewn to was not cut at the same place, a point is
+  added to it there.
+- **Edges next to each other make one band**, turning the corner; edges apart make one band each. Choosing every
+  edge of an outline or of a hole gives a ring.
+- **Curved edges work too.** The band's outer edge is the original curve, unchanged, and the cut follows it at the
+  chosen width, so a band cut from a neckline or a curved waist is contoured to fit it. Where the edge next to a
+  band is curved, it is split where the cut meets it and both parts keep its shape.
+- **Ctrl+Z** undoes the whole cut in one step.
+
+The width has to fit. When it does not, the preview turns red, the panel says why and **Apply** is unavailable:
+the cut would cross another edge or a hole, it would run past the end of the edge beside the band, or a curve
+bulges more tightly than the band is wide.
+
+### Cutting pieces apart
+
+Use **Cut** (**C**) to split one or more pieces with a straight line:
+
+1. Pick **Cut** and drag a line across the pieces you want to divide. Hold **Shift** to keep the line to 15° steps.
+2. Release the mouse button. Every visible piece the line crosses is cut into separate pieces.
+
+![The T-shirt front cut across its middle into two separate pieces](images/cut.png)
+
+The cut keeps curves, holes and the fabric settings. Pieces stay where they were in the pattern and in 3D, and
+draped pieces stay draped. Seams on edges that the cut does not divide stay sewn; a seam on an edge that is
+divided is removed, because that edge is no longer one edge.
+
+A line that does not divide a piece into at least two pieces does nothing; the status bar says why. **Ctrl+Z**
+undoes the cut in one step.
+
 ---
 
 ## Sewing
@@ -321,6 +379,12 @@ right-click and choose **Cut Hole** (also in the **Edit** menu).
 Pick the **Sew** tool (**S**), click one edge, then click the edge to sew it to. The first edge stays
 highlighted until you click the second; **Esc** cancels. Both edges must belong to the same garment. An edge
 may be sewn to an edge of the same piece (the underarm seam of a sleeve, for example).
+
+To sew several edges at once, **drag a box around them** on empty space. The chosen edges stay highlighted;
+press **Enter** and the closest pairs are sewn automatically, trying both directions along each edge so a
+twisted seam is avoided. Hold **Ctrl** while dragging to add another box to the selection. This is handy after a
+cut leaves a row of short edges that need to be sewn back together. Edges that are already sewn, or that are
+left without a partner, are skipped.
 
 ![Seams in the 2D view: matching colours, a dashed connector and dots](images/seams.png)
 
@@ -370,13 +434,14 @@ simulation pulls each stitch shut.
 | 5 | **Checker** | Replace fabric colours with a checker texture, to judge UVs and texel density. |
 | 6 | **Wire** | Draw the outline of every face, to see the topology. (**View ▸ 3D: Normal Direction**, which has no button, colours the front and back of the faces; see [Normal direction](#normal-direction).) |
 | 7 | **Pinch** | Drag the cloth itself to tug it into place (see [Pinching the cloth](#pinching-the-cloth)). |
-| 8 | **Gizmo** | Show or hide the move, rotate and scale handles. **Q / W / E / R** choose which of them are shown. |
-| 9 | **Avatar** | Show or hide the avatar. Hidden, it still collides with the cloth. |
+| 8 | **Rip** | Drag across the cloth to tear it (see [Ripping the cloth](#ripping-the-cloth)). |
+| 9 | **Gizmo** | Show or hide the move, rotate and scale handles. **Q / W / E / R** choose which of them are shown. |
+| 10 | **Avatar** | Show or hide the avatar. Hidden, it still collides with the cloth. |
 
 **Orthographic view.** With **Ortho** on (or **5**, or **View ▸ 3D: Orthographic**) the camera has no
 perspective: things further away are not drawn smaller, so the two sides of a garment, or a sleeve and the
 body, can be compared by eye. Together with **Front** and **Side** it gives flat, technical-drawing views.
-Orbiting, panning, zooming, the handles, Pinch and the Ruler all work the same in both cameras.
+Orbiting, panning, zooming, the handles, Pinch, Rip and the Ruler all work the same in both cameras.
 
 ### Normal direction
 
@@ -457,6 +522,24 @@ body.
 - About 5 cm of cloth around the cursor is held; cloth further away is moved only by the fabric pulling on it.
 - Only garments that are being simulated can be pinched. If another garment is the active one and a simulation
   is already running, stop it first or tick **All garments**.
+
+### Ripping the cloth
+
+**Rip** tears a piece open along a stroke drawn on its surface. Turn it on in the 3D view (or press **X**), press
+on the cloth (or start in empty space) and drag across it. A red line follows the pointer; while a simulation is
+running the cloth is pulled along with it. On release the cloth tears open along the stroke. Start and finish
+outside the garment if you like: the tear still reaches the cloth's edge. Hold **Shift** while starting the drag
+to tear in a straight line instead of following the surface.
+
+- A tear runs out to the piece's outline even when you stop short, so a rip that separates the cloth creates two
+  or more pieces. They are selected, and the same shapes appear in the 2D view. The stroke tears the piece it
+  starts on; it stops at that piece's edge.
+- The pieces keep the fabric, group, UVs and 3D arrangement. A draped piece stays draped, and the new piece is
+  draped from the cloth it was torn from.
+- Seams on edges the tear does not divide stay sewn; a seam on an edge that is divided is removed.
+- A very short drag does nothing. Ctrl+drag orbits the camera, middle/right-drag pans, and the move/rotate
+  handles are hidden while Rip is on. Shift starts a straight rip instead of panning.
+- **Ctrl+Z** undoes the whole rip in one step.
 
 ### Pinning the cloth
 
@@ -565,6 +648,11 @@ Each garment row also shows its face count.
 The panel shows sections for the current selection. Click a section title to fold it. Sliders and number boxes
 apply immediately; dragging a slider counts as a single undo step.
 
+**Number boxes** (here, in Preferences, in Send to MakeHuman and in the Inset Band panel) can be dragged as well as
+typed in: press in the box and drag left or right to change the value, watching the result as you go. Hold
+**Shift** for fine steps or **Ctrl** for coarse ones. A click without dragging selects the number so you can type
+a new one; the arrow keys step it up and down.
+
 ### 3D Arrangement and Fabric Physics
 
 ![3D Arrangement and Fabric Physics sections](images/properties-arrangement-fabric.png)
@@ -590,7 +678,7 @@ apply immediately; dragging a slider counts as a single undo step.
 | **Bend** | Resistance to folding. Low values give many small wrinkles; high values give stiff, smooth cloth. |
 | **Damping** | How quickly motion dies out. |
 | **Friction** | Grip against the avatar and other cloth. |
-| **Thickness** | Collision thickness in millimetres: how far the cloth sits off the body and other layers. The 3D view shows the fabric as a solid shell. A garment-wide thickness overrides it. |
+| **Thickness** | Collision thickness in millimetres: how far the cloth sits off the body and other layers. It only affects the simulation; the 3D view draws the cloth as a flat sheet unless Garment Thickness is enabled. A garment-wide thickness overrides it. |
 
 With several pieces selected, a change applies to all of them.
 
@@ -605,10 +693,12 @@ With several pieces selected, a change applies to all of them.
 - **Faces** chooses **Triangles** (even, near-equilateral) or **Quads** (a grid along the fabric grain).
 - **Piece override** gives the selected piece its own particle distance; 0 means "use the garment's".
 
-**Garment Thickness** — tick **Use one thickness for the whole garment** to give every piece in the active
+**Garment Thickness** — tick **Enable Thickness? (Apply per Garment)** to give every piece in the active
 garment the same collision thickness. The slider is in centimetres. This overrides the per-piece **Thickness**
-under Fabric Physics for that garment only, so a shirt can be 1 cm and a skirt 2 cm. The 3D view extrudes the
-surface into a closed shell at that thickness; the slider updates it immediately.
+under Fabric Physics for that garment only, so a shirt can be 1 cm and a skirt 2 cm. While it is ticked, the 3D
+view extrudes the surface into a closed shell at that thickness, and the slider updates it immediately. Unticked,
+the garment is drawn as a flat two-sided sheet with no extrusion; its pieces still collide at their Fabric Physics
+thickness.
 
 ![Quad topology with the Wire overlay on](images/topology-quads.png)
 
@@ -757,23 +847,59 @@ to the exported file (or embedded, for `.glb`). Hidden garments and pieces are l
 
 ## Send to MakeHuman
 
-Seamstress can write a garment directly into MakeHuman's clothes library, fitted so that it follows the
+Seamstress can write garments directly into MakeHuman's clothes library, fitted so that they follow the
 character when its body shape changes.
 
 1. Link MakeHuman once in [Preferences](#preferences).
 2. Choose **Avatar ▸ MakeHuman Base Mesh**, and optionally set its body with **MakeHuman Body Shape…**.
-3. Build the garment and simulate it on that avatar.
-4. Select the garment and choose **File ▸ Export ▸ Send to MakeHuman**.
-5. Check the **Asset name** (it starts as the garment's name) and press **Send**.
+3. Build the garments and simulate them on that avatar.
+4. Choose **File ▸ Export ▸ Send to MakeHuman**.
+5. Under **Garments**, tick the garments to send and set each one's **z_depth** (see below).
+6. Check the **Asset name** and press **Send**.
 
-![Send to MakeHuman, with the asset name, where it is saved, and its author and license](images/dialog-makehuman.png)
+![Send to MakeHuman, with the garments to send and their z_depth, the asset name, where it is saved, and its author and license](images/dialog-makehuman.png)
+
+### Choosing the garments
+
+The dialog lists every garment in the project. The ones shown in the 3D view start ticked; hidden ones are
+listed as *(hidden)* and start unticked, but can be ticked and sent all the same.
+
+- **One garment ticked:** only that garment is sent. If you have a whole outfit but only changed the
+  trousers, untick the shirt and send the trousers on their own.
+- **Several garments ticked:** they are sent together as **one** asset, which MakeHuman lists and puts on
+  as a single item of clothing.
+
+The asset name starts as the garment's name when one is ticked and the project's name when several are. Ticking
+and unticking updates it until you type a name of your own. **Send** is greyed out while nothing is ticked.
+
+### z_depth
+
+MakeHuman draws clothes in order of their *z_depth*: an item with a higher value is drawn over one with a lower
+value, so it should be the outer layer. Each garment has its own value, from 0 to 100, set in the box next to it.
+New garments start at **50**, MakeHuman's default. A rough guide:
+
+| z_depth | Layer |
+| --- | --- |
+| 10–20 | Underwear, tights |
+| 30–40 | Shirts, trousers, skirts |
+| 50 | Sweaters, dresses |
+| 60–70 | Jackets |
+| 80+ | Coats |
+
+Changing a value is saved with the garment in the project file and can be undone with **Edit ▸ Undo**. When
+several garments are sent as one asset, the asset gets the **highest** of their values, and the dialog shows
+which value that is. To layer garments separately in MakeHuman (a shirt under a jacket, say), send each one as
+its own asset with its own name and z_depth.
+
+### Where the asset goes
 
 The asset name is what MakeHuman lists the garment under. The folder and files are named after it, with
 spaces and other characters that are awkward in file names replaced by `_`, so *Summer Skirt* is written as
 `summer_skirt.mhclo`, `summer_skirt.obj` and `summer_skirt.mhmat` (plus the texture, if any) in
 `<MakeHuman user folder>/data/clothes/summer_skirt/`. The dialog shows that folder as you type, and warns
 when an asset of that name is already there: sending replaces it, while a different name keeps both. In
-MakeHuman the garment appears under **Geometries ▸ Clothes**; restart MakeHuman if it was already running.
+MakeHuman the asset appears under **Geometries ▸ Clothes**; restart MakeHuman if it was already running.
+An asset has one material, so garments sent together all take the first ticked garment's material.
 
 Every asset carries the **author** and **license** set in **Preferences ▸ MakeHuman**, and MakeHuman shows
 them in its clothes library. The files load in MakeHuman 1.2, 1.3 and the current development version, and in
@@ -845,6 +971,16 @@ annotations and the 3D background — and remembers the choice for the next star
   `"#rrggbb"` value per role. **Load Theme…** applies such a file and remembers it as the **Custom**
   theme. The file is plain text, so it is an easy starting point for your own theme: save one, edit the
   colours in any text editor, and load it again. Roles you leave out fall back to the Default colours.
+- Seamstress keeps a **`Themes`** folder next to its `logs` folder, and **Save Theme…** and **Load Theme…**
+  open there. It holds `example-theme.json`, a complete theme that lists every colour role, and a
+  `README.md` saying what each role colours. Copy the example, change the colours, and load it with
+  **Load Theme…**. **Open Themes Folder** on the same page shows it in your file manager.
+  - Windows: `Documents\Seamstress\Themes`
+  - Linux: `~/.config/Seamstress/Themes` (or `$XDG_CONFIG_HOME/Seamstress/Themes`)
+  - Flatpak: `~/.var/app/io.github.mangodragonhub.Seamstress/config/Seamstress/Themes`
+
+  The two files are put there when Seamstress starts if they are missing. Edits to them are kept, and a deleted
+  one comes back at the next start, so save your own themes under other names.
 
 ### Language
 
@@ -901,6 +1037,8 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | Key | Action |
 | --- | --- |
 | V / A / T / S | Select / Edit Points / Transform Points / Sew |
+| I | Inset Band |
+| C | Cut pieces along a drawn line |
 | Q / W / E / R | Handles: all / move only / rotate only / scale only (both views) |
 | P / B / O | Polygon / Rectangle / Ellipse |
 | M | Ruler |
@@ -909,8 +1047,9 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | 1 / 3 / Ctrl+1 | 3D view from the front / side / back (number row or keypad) |
 | 5 | Orthographic 3D view on or off (number row or keypad) |
 | G | Turn Pinch on or off in the 3D view |
+| X | Turn Rip on or off in the 3D view |
 | Space | Start or stop simulation |
-| Enter | Finish the polygon being drawn |
+| Enter | Finish the polygon being drawn; cut the bands previewed with Inset Band; sew the edges chosen with a box |
 | Esc | Cancel the current tool action |
 | Delete / Backspace | Delete the selected pieces, seam or point |
 | Ctrl+Z | Undo |
@@ -927,19 +1066,27 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 
 | | 2D view | 3D view |
 | --- | --- | --- |
-| Left button | The current tool | Click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it |
+| Left button | The current tool | Click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it; with Rip on, drag across the cloth to tear it |
 | Ctrl + drag | — | Orbit around the avatar |
-| Ctrl or Shift + click | Add to the selection | Add to the selection |
-| Shift while drawing | Square, circle, or a snapped polygon side | — |
-| Shift + drag | — | Pan |
+| Ctrl + click | Add to the selection | Add to the selection |
+| Shift + click | — | Add to the selection |
+| Shift while drawing | Square, circle, a snapped polygon side, or a 15° cut line | — |
+| Shift + drag | — | Pan, except while Ripping: then it tears in a straight line |
+| Shift + drag (Rip) | — | Tear in a straight line |
 | Shift + drag a move arrow | — | Snap the piece to the grid along that axis |
 | Shift + drag a point (Edit Points) | Snap the point to the grid | — |
+| Shift + drag a point (Transform Points) | Snap the selected points to the grid | — |
+| Shift + drag a piece (Select) | Snap the piece to the grid | — |
 | Middle or right drag | Pan | Pan |
 | Right-click | Edit menu | Edit menu |
 | Alt + left drag | Pan | — |
 | Scroll | Zoom about the cursor | Zoom |
 | Double-click | Finish a polygon; add a point on an edge (Edit Points); select every point of a piece | — |
 | Drag (Ruler) | Measure; the ends catch on pattern points | Click or drag between two points on the cloth or avatar |
+| Drag (Cut) | Draw a straight line and cut every visible piece it crosses into separate pieces | — |
+| Drag (Rip) | — | Tear the piece under the stroke; if the tear separates it, the new pieces appear in 2D |
+| Drag a box (Sew) | Choose edges to sew, then press Enter to pair the closest ones | — |
+| Click / drag an edge (Inset Band) | Choose the edge, or drop it again; drag inward to set the band's width | — |
 | Drag on empty space (Transform Points) | Box-select points | — |
 
 ---

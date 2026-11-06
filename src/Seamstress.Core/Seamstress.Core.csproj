@@ -9,6 +9,8 @@
   <ItemGroup>
     <!-- Interface translations, read by Lang. -->
     <EmbeddedResource Include="Localization\*.json" />
+    <!-- The example theme and its notes, copied into the user's Themes folder at startup. -->
+    <EmbeddedResource Include="..\..\Themes\*.*" LogicalName="Themes/%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

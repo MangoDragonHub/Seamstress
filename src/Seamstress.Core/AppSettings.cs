@@ -76,6 +76,9 @@ public sealed class AppSettings
         }
     }
 
+    /// <summary>The "Themes" folder next to <see cref="LogsFolder"/>, where the example theme is put for reference.</summary>
+    public static string ThemesFolder => Path.Combine(Path.GetDirectoryName(LogsFolder)!, "Themes");
+
     // Relaxed escaping keeps keys such as "Ctrl+S" readable in the file.
     private static readonly JsonSerializerOptions Options = new()
     {

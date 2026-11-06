@@ -93,6 +93,8 @@ public static class GarmentFile
                 if (g.Thickness is { } thickness)
                     w.WriteNumber("thickness", thickness);
                 w.WriteString("topology", g.Topology == MeshTopology.Quads ? "quads" : "triangles");
+                if (g.MakeHumanZDepth != Garment.DefaultMakeHumanZDepth)
+                    w.WriteNumber("makeHumanZDepth", g.MakeHumanZDepth);
 
                 w.WriteStartArray("groups");
                 foreach (var group in g.Groups)
@@ -292,6 +294,8 @@ public static class GarmentFile
                 garment.Thickness = Math.Clamp(thickness.GetSingle(), 1f, 50f);
             garment.Topology = string.Equals(Str(g, "topology"), "quads", StringComparison.OrdinalIgnoreCase)
                 ? MeshTopology.Quads : MeshTopology.Triangles;
+            garment.MakeHumanZDepth = Math.Clamp((int)MathF.Round(Num(g, "makeHumanZDepth", Garment.DefaultMakeHumanZDepth)),
+                0, Garment.MaxMakeHumanZDepth);
             foreach (var gr in Items(g, "groups"))
             {
                 var group = new LayerGroup();

@@ -50,8 +50,8 @@ AppDialog {
         language.currentIndex = Math.max(0, languages.findIndex(l => l.code === App.settingLanguage))
         units.currentIndex = App.settingUnits === "imperial" ? 1 : 0
         shownImperial = units.currentIndex === 1
-        gridSize.text = shownLength(App.gridSizeCm)
-        snapStep.text = shownLength(App.snapStepCm)
+        showLength(gridSize, App.gridSizeCm)
+        showLength(snapStep, App.snapStepCm)
         themeChoice = App.themeChoice
         syncTheme()
         keyboard.load()
@@ -60,7 +60,10 @@ AppDialog {
     // The grid size and snap step are typed in the units chosen in this dialog and stored in centimetres.
     property bool shownImperial: false
     readonly property real unitCm: shownImperial ? 2.54 : 1
-    function shownLength(cm) { return String(Number((cm / unitCm).toFixed(shownImperial ? 3 : 2))) }
+    function showLength(field, cm) {
+        field.value = Number((cm / unitCm).toFixed(shownImperial ? 3 : 2))
+        field.text = field.shown(field.value)
+    }
     function typedCm(field) { const v = Number(field.text); return isNaN(v) ? 0 : v * unitCm }
     function unitsChosen(imperial) {
         // Keep the lengths the same when the units change, except that the default becomes the new default.
@@ -70,8 +73,8 @@ AppDialog {
         }
         const grid = convert(gridSize), snap = convert(snapStep)
         shownImperial = imperial
-        gridSize.text = shownLength(grid)
-        snapStep.text = shownLength(snap)
+        showLength(gridSize, grid)
+        showLength(snapStep, snap)
     }
 
     onAboutToShow: load()
@@ -257,6 +260,26 @@ AppDialog {
                         Note {
                             text: tr("A theme is a small JSON file of colours: load one to use it, or edit a saved file in a text editor and load it again. The chosen theme is remembered the next time Seamstress is opened.")
                         }
+                        Note {
+                            text: tr("The themes folder holds example-theme.json, which lists every colour, and a README describing each one. Copy the example to start your own.")
+                        }
+                        RowLayout {
+                            spacing: 8
+                            Label { text: tr("Themes folder"); opacity: 0.75 }
+                            Label {
+                                Layout.fillWidth: true
+                                text: App.themesFolder
+                                opacity: 0.75
+                                elide: Text.ElideMiddle
+                                ToolTip.visible: themesHover.hovered
+                                ToolTip.text: text
+                                HoverHandler { id: themesHover }
+                            }
+                            Button {
+                                text: tr("Open Themes Folder")
+                                onClicked: App.openThemesFolder()
+                            }
+                        }
                     }
                 }
                 Item { Layout.fillHeight: true }
@@ -297,31 +320,31 @@ AppDialog {
                         rowSpacing: 8
                         Label { text: tr("Grid size") }
                         RowLayout {
-                            TextField {
+                            NumberField {
                                 id: gridSize
                                 implicitWidth: 90
-                                selectByMouse: true
-                                horizontalAlignment: Text.AlignRight
-                                validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation; locale: "C" }
+                                from: 0
+                                decimals: root.shownImperial ? 3 : 2
+                                step: root.shownImperial ? 0.25 : 0.5
                             }
                             Label { text: root.shownImperial ? "in" : "cm"; opacity: 0.7 }
                             Label { text: tr("One square of the 3D ground grid."); opacity: 0.6; font.pixelSize: 11; Layout.leftMargin: 8 }
                         }
                         Label { text: tr("Snap step") }
                         RowLayout {
-                            TextField {
+                            NumberField {
                                 id: snapStep
                                 implicitWidth: 90
-                                selectByMouse: true
-                                horizontalAlignment: Text.AlignRight
-                                validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation; locale: "C" }
+                                from: 0
+                                decimals: root.shownImperial ? 3 : 2
+                                step: root.shownImperial ? 0.25 : 0.5
                             }
                             Label { text: root.shownImperial ? "in" : "cm"; opacity: 0.7 }
                             Label { text: tr("Hold Shift while dragging a 3D move arrow to snap to this."); opacity: 0.6; font.pixelSize: 11; Layout.leftMargin: 8 }
                         }
                         Note {
                             Layout.columnSpan: 2
-                            text: tr("The 2D grid sizes itself to the zoom; Shift in Edit Points snaps to its smallest squares.")
+                            text: tr("The 2D grid sizes itself to the zoom; Shift snaps points and pieces to its smallest squares.")
                         }
                     }
                 }
@@ -622,7 +645,7 @@ AppDialog {
         title: tr("Save Theme")
         fileMode: FileDialog.SaveFile
         nameFilters: [tr("Seamstress themes") + " (*.json)"]
-        currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
+        currentFolder: App.themesFolderUrl
         currentFile: currentFolder + "/" + (App.customThemeName !== "" ? App.fileName(App.customThemeName) : "seamstress-theme") + ".json"
         onAccepted: App.saveThemeFile(selectedFile.toString())
     }
@@ -631,7 +654,7 @@ AppDialog {
         title: tr("Load Theme")
         fileMode: FileDialog.OpenFile
         nameFilters: [tr("Seamstress themes") + " (*.json)"]
-        currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
+        currentFolder: App.themesFolderUrl
         onAccepted: {
             App.loadThemeFile(selectedFile.toString())
             root.themeChoice = App.themeChoice

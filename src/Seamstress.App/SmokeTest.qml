@@ -194,6 +194,25 @@ QtObject {
         check("a click clears the ruler", scene().ruler === undefined)
         App.tool = "Select"
 
+        // Inset Band: the top of the first rectangle, 5 cm wide. Its right side is sewn to the second rectangle,
+        // so that seam is split and the second rectangle gets a point where the band ends.
+        App.tool = "InsetBand"
+        const piecesBefore = scene().pieces.length, seamsBefore = scene().seams.length
+        App.pointerDown(20, 60, 1, false); App.pointerUp(20, 60)
+        App.insetWidth = 5
+        const inset = scene().inset
+        check("inset band previewed", inset !== undefined && inset.count === 1 && inset.bands.length === 1
+              && inset.cuts.length === 1 && inset.problem === undefined)
+        App.insetWidth = 80
+        check("too wide a band is refused", scene().inset.problem !== undefined)
+        App.insetWidth = 5
+        App.confirmTool()
+        check("inset band cut", scene().pieces.length === piecesBefore + 1 && scene().seams.length === seamsBefore + 2
+              && App.undoText === "Undo Inset band" && scene().inset.count === 0)
+        App.undo()
+        check("inset band undone", scene().pieces.length === piecesBefore && scene().seams.length === seamsBefore)
+        App.tool = "Select"
+
         // Orthographic 3D view and the right-click menu.
         viewport.orthographic = true
         check("orthographic camera", viewport.activeCamera !== null && viewport.magnification > 0)
@@ -280,6 +299,13 @@ QtObject {
         const info = JSON.parse(App.makeHumanAssetInfo("Summer Skirt/v2"))
         check("send dialog names the asset folder", info.folder === "" || /summer_skirt_v2$/.test(info.folder))
         check("licences offered", App.makeHumanLicenses().split("|").indexOf("CC-BY") >= 0 && App.settingMakeHumanLicense !== "")
+        // It lists every garment with its z_depth (50 unless changed), and a change is saved with the garment.
+        const mhGarments = JSON.parse(App.makeHumanGarmentsJson())
+        check("send dialog lists the garments", mhGarments.length > 0 && mhGarments.every(g => g.id !== "" && g.zDepth === 50))
+        App.setMakeHumanZDepth(mhGarments[0].id, 65)
+        check("z_depth is changed per garment", JSON.parse(App.makeHumanGarmentsJson())[0].zDepth === 65)
+        App.undo()
+        check("z_depth change undoes", JSON.parse(App.makeHumanGarmentsJson())[0].zDepth === 50)
 
         // Languages offered in Preferences, and the texts of the one in use.
         const languages = JSON.parse(App.languagesJson())

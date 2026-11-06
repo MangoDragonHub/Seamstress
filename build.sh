@@ -456,14 +456,22 @@ flatpak_bundle() {
         flatpak build-export --arch="$GNU_ARCH" "$work/repo" "$work/build" >/dev/null
     else
         need flatpak-builder "package 'flatpak-builder'"
+        # Needs the Platform and Sdk runtimes the manifest names; say which to install rather than failing inside
+        # flatpak-builder. (Each freedesktop runtime is supported for about two years; when one reaches its end of
+        # life, raise runtime-version in the manifest.)
+        local manifest="packaging/flatpak/$APP_ID.yml" version missing=()
+        version="$(sed -n "s/^runtime-version: *'\{0,1\}\([^']*\)'\{0,1\}$/\1/p" "$manifest")"
+        for ref in "$(sed -n 's/^runtime: *//p' "$manifest")" "$(sed -n 's/^sdk: *//p' "$manifest")"; do
+            flatpak info "$ref//$version" >/dev/null 2>&1 || missing+=("$ref//$version")
+        done
+        [ ${#missing[@]} -eq 0 ] || fail "the Flatpak runtimes are not installed; install them with:
+    flatpak install flathub ${missing[*]}"
         [ "${1:-}" = staged ] || stage
         say "Building the Flatpak"
         rm -rf "$work/build"
         mkdir -p "$work"
         # The manifest names the x86_64 folder; point a copy of it at the one just staged.
         sed "s#path: \.\./\.\./dist/Seamstress-linux-x64#path: $STAGE#" "packaging/flatpak/$APP_ID.yml" > "$work/$APP_ID.yml"
-        # Needs the org.freedesktop.Platform and Sdk runtimes named in the manifest:
-        #   flatpak install flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
         flatpak-builder --user --force-clean --disable-rofiles-fuse --state-dir="$work/state" --repo="$work/repo" \
             "$work/build" "$work/$APP_ID.yml"
     fi

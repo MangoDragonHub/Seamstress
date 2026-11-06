@@ -44,6 +44,8 @@ ApplicationWindow {
     readonly property string userGuideUrl: "https://github.com/MangoDragonHub/Seamstress/blob/main/docs/USER_GUIDE.md"
     // A text box has the keyboard: Enter and Escape belong to it rather than to the tool shortcuts.
     readonly property bool typing: activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined
+    // The toolbar icons are monochrome and take their colour from the palette.
+    readonly property string toolIcons: "qrc:/assemblies/Seamstress/icons/tools/"
     // Interface texts in the language chosen in Preferences; reading the revision redoes the binding when it changes.
     function tr(text) { App.languageRevision; return App.tr(text) }
 
@@ -174,6 +176,8 @@ ApplicationWindow {
         "tool.editPoints": () => App.tool = "EditPoints",
         "tool.transformPoints": () => App.tool = "TransformPoints",
         "tool.sew": () => App.tool = "Sew",
+        "tool.insetBand": () => App.tool = "InsetBand",
+        "tool.cut": () => App.tool = "Cut",
         "tool.polygon": () => App.tool = "Polygon",
         "tool.rectangle": () => App.tool = "Rectangle",
         "tool.ellipse": () => App.tool = "Ellipse",
@@ -197,6 +201,7 @@ ApplicationWindow {
         "edit.invertNormals": () => App.invertNormals(),
         "edit.cutHole": () => App.cutHole(),
         "view.pinch": () => viewport.pinchMode = !viewport.pinchMode,
+        "view.rip": () => viewport.ripMode = !viewport.ripMode,
         "view.pinBrush": () => App.pinBrush = !App.pinBrush,
         "view.handles": () => viewport.showGizmo = !viewport.showGizmo,
         "view.avatar": () => viewport.showAvatar = !viewport.showAvatar,
@@ -342,6 +347,7 @@ ApplicationWindow {
                 KeyMenuItem { text: tr("3D: Wireframe (Topology)"); command: "view.wireframe"; checkable: true; checked: viewport.wireframe; onTriggered: viewport.wireframe = checked }
                 KeyMenuItem { text: tr("3D: Normal Direction"); command: "view.normals"; checkable: true; checked: viewport.showNormals; onTriggered: viewport.showNormals = checked }
                 KeyMenuItem { text: tr("3D: Pinch Cloth"); command: "view.pinch"; checkable: true; checked: viewport.pinchMode; onTriggered: viewport.pinchMode = checked }
+                KeyMenuItem { text: tr("3D: Rip Cloth"); command: "view.rip"; checkable: true; checked: viewport.ripMode; onTriggered: viewport.ripMode = checked }
                 KeyMenuItem { text: tr("3D: Pin Vertices"); command: "view.pinBrush"; checkable: true; checked: App.pinBrush; onTriggered: App.pinBrush = checked }
                 KeyMenuItem { text: tr("3D: Show Handles"); command: "view.handles"; checkable: true; checked: viewport.showGizmo; onTriggered: viewport.showGizmo = checked }
                 Menu {
@@ -373,11 +379,20 @@ ApplicationWindow {
 
                 component ToolChoice: ToolButton {
                     property string tool: ""
+                    property string label: ""
                     property string tip: ""
                     property string command: ""
+                    property string iconFile: ""
                     checkable: true
                     checked: App.tool === tool && !App.uvMode
                     enabled: !App.uvMode || tool === "Select"
+                    display: AbstractButton.IconOnly
+                    icon.source: window.toolIcons + iconFile
+                    icon.width: 22
+                    icon.height: 22
+                    icon.color: enabled ? palette.buttonText : palette.placeholderText
+                    Accessible.name: label
+                    Accessible.description: tip
                     onClicked: App.tool = tool
                     ToolTip.visible: hovered
                     ToolTip.delay: 500
@@ -391,38 +406,73 @@ ApplicationWindow {
                     Layout.leftMargin: 2
                     Layout.rightMargin: 2
                     color: palette.mid
+                    opacity: 0.55
                 }
                 component GroupDivider: Rectangle {
                     implicitWidth: 1
                     implicitHeight: 26
                     Layout.leftMargin: 10
                     Layout.rightMargin: 10
-                    color: palette.light
+                    color: palette.mid
                 }
 
-                ToolChoice { text: tr("Select"); tool: "Select"; command: "tool.select"; tip: tr("Select and move pieces") }
+                ToolChoice { label: tr("Select"); tool: "Select"; command: "tool.select"; iconFile: "select.svg"; tip: tr("Select and move pieces") }
                 ButtonDivider {}
-                ToolChoice { text: tr("Edit Points"); tool: "EditPoints"; command: "tool.editPoints"; tip: tr("Move points, curve edges, add points") }
+                ToolChoice { label: tr("Edit Points"); tool: "EditPoints"; command: "tool.editPoints"; iconFile: "edit-points.svg"; tip: tr("Move points, curve edges, add points") }
                 ButtonDivider {}
-                ToolChoice { text: tr("Transform Points"); tool: "TransformPoints"; command: "tool.transformPoints"; tip: tr("Select points and move, rotate or scale them with handles") }
+                ToolChoice { label: tr("Transform Points"); tool: "TransformPoints"; command: "tool.transformPoints"; iconFile: "transform-points.svg"; tip: tr("Select points and move, rotate or scale them with handles") }
                 ButtonDivider {}
-                ToolChoice { text: tr("Sew"); tool: "Sew"; command: "tool.sew"; tip: tr("Click two edges to sew them together") }
+                ToolChoice { label: tr("Sew"); tool: "Sew"; command: "tool.sew"; iconFile: "sew.svg"; tip: tr("Click two edges to sew them together") }
+                ButtonDivider {}
+                ToolChoice { label: tr("Inset Band"); tool: "InsetBand"; command: "tool.insetBand"; iconFile: "inset-band.svg"; tip: tr("Cut a band (a waistband, collar band or facing) off pieces along the edges you click, already sewn on") }
+                ButtonDivider {}
+                ToolChoice { label: tr("Cut"); tool: "Cut"; command: "tool.cut"; iconFile: "cut.svg"; tip: tr("Draw a line across pieces to cut them into separate pieces") }
                 GroupDivider {}
-                ToolChoice { text: tr("Polygon"); tool: "Polygon"; command: "tool.polygon"; tip: tr("Draw a piece corner by corner") }
+                ToolChoice { label: tr("Polygon"); tool: "Polygon"; command: "tool.polygon"; iconFile: "polygon.svg"; tip: tr("Draw a piece corner by corner") }
                 ButtonDivider {}
-                ToolChoice { text: tr("Rectangle"); tool: "Rectangle"; command: "tool.rectangle"; tip: tr("Drag out a rectangular piece") }
+                ToolChoice { label: tr("Rectangle"); tool: "Rectangle"; command: "tool.rectangle"; iconFile: "rectangle.svg"; tip: tr("Drag out a rectangular piece") }
                 ButtonDivider {}
-                ToolChoice { text: tr("Ellipse"); tool: "Ellipse"; command: "tool.ellipse"; tip: tr("Drag out an elliptical piece") }
+                ToolChoice { label: tr("Ellipse"); tool: "Ellipse"; command: "tool.ellipse"; iconFile: "ellipse.svg"; tip: tr("Drag out an elliptical piece") }
                 GroupDivider {}
-                ToolChoice { text: tr("Ruler"); tool: "Ruler"; command: "tool.ruler"; tip: tr("Measure distances in the 2D view, or between two points on the cloth or avatar in the 3D view") }
-                GroupDivider {}
-                ToolButton { text: "↶"; font.pixelSize: 18; enabled: App.canUndo; onClicked: App.undo(); ToolTip.visible: hovered; ToolTip.text: App.undoText }
-                ToolButton { text: "↷"; font.pixelSize: 18; enabled: App.canRedo; onClicked: App.redo(); ToolTip.visible: hovered; ToolTip.text: App.redoText }
+                ToolChoice { label: tr("Ruler"); tool: "Ruler"; command: "tool.ruler"; iconFile: "ruler.svg"; tip: tr("Measure distances in the 2D view, or between two points on the cloth or avatar in the 3D view") }
                 GroupDivider {}
                 ToolButton {
-                    text: App.uvMode ? tr("UV Layout") : tr("Pattern")
+                    display: AbstractButton.IconOnly
+                    icon.source: window.toolIcons + "undo.svg"
+                    icon.width: 22
+                    icon.height: 22
+                    icon.color: enabled ? palette.buttonText : palette.placeholderText
+                    enabled: App.canUndo
+                    Accessible.name: tr("Undo")
+                    Accessible.description: App.undoText
+                    onClicked: App.undo()
+                    ToolTip.visible: hovered
+                    ToolTip.text: App.undoText
+                }
+                ToolButton {
+                    display: AbstractButton.IconOnly
+                    icon.source: window.toolIcons + "redo.svg"
+                    icon.width: 22
+                    icon.height: 22
+                    icon.color: enabled ? palette.buttonText : palette.placeholderText
+                    enabled: App.canRedo
+                    Accessible.name: tr("Redo")
+                    Accessible.description: App.redoText
+                    onClicked: App.redo()
+                    ToolTip.visible: hovered
+                    ToolTip.text: App.redoText
+                }
+                GroupDivider {}
+                ToolButton {
+                    display: AbstractButton.IconOnly
+                    icon.source: window.toolIcons + (App.uvMode ? "uv-layout.svg" : "pattern.svg")
+                    icon.width: 22
+                    icon.height: 22
+                    icon.color: palette.buttonText
                     checkable: true
                     checked: App.uvMode
+                    Accessible.name: App.uvMode ? tr("UV Layout") : tr("Pattern")
+                    Accessible.description: tr("Switch the 2D view between the pattern and its UV layout")
                     onClicked: App.uvMode = checked
                     ToolTip.visible: hovered
                     ToolTip.text: tr("Switch the 2D view between the pattern and its UV layout") + window.keyHint("view.uv")
@@ -607,9 +657,44 @@ ApplicationWindow {
         standardButtons: Dialog.Ok | Dialog.Cancel
         // Where the asset goes and whether that replaces one already there, for the name being typed.
         property var target: ({ folder: "", exists: false })
+        // Every garment ({id, name, zDepth, visible, active}) and the ids of those ticked for sending.
+        property var garments: []
+        property var ticked: []
+        // z_depth by garment id, kept apart from the list so editing one does not rebuild the rows.
+        property var depths: ({})
+        // The name last suggested; while the field still shows it, ticking garments updates it.
+        property string suggested: ""
+        readonly property var sending: garments.filter(g => ticked.indexOf(g.id) >= 0)
+        readonly property int zDepth: sending.reduce((z, g) => Math.max(z, depths[g.id]), 0)
+        onSendingChanged: if (standardButton(Dialog.Ok)) standardButton(Dialog.Ok).enabled = sending.length > 0 || !App.makeHumanLinked
         function check() { target = JSON.parse(App.makeHumanAssetInfo(assetName.text)) }
+        function suggest() {
+            const name = sending.length === 1 ? sending[0].name : sending.length > 1 ? App.documentName() : App.activeGarmentName()
+            if (assetName.text === suggested)
+                assetName.text = name
+            suggested = name
+        }
+        function tick(id, on) {
+            ticked = on ? ticked.concat([id]) : ticked.filter(t => t !== id)
+            suggest()
+        }
+        function setZDepth(id, value) {
+            App.setMakeHumanZDepth(id, value)
+            const d = Object.assign({}, depths)
+            d[id] = value
+            depths = d
+        }
         onAboutToShow: {
-            assetName.text = App.activeGarmentName()
+            garments = JSON.parse(App.makeHumanGarmentsJson())
+            const d = {}
+            for (const g of garments)
+                d[g.id] = g.zDepth
+            depths = d
+            // Everything shown is sent by default; hidden garments are listed unticked.
+            ticked = garments.filter(g => g.visible).map(g => g.id)
+            assetName.text = ""
+            suggested = ""
+            suggest()
             check()
             if (App.makeHumanLinked)
                 assetName.forceActiveFocus()
@@ -636,6 +721,46 @@ ApplicationWindow {
                     placeholderText: tr("the name MakeHuman lists it under")
                     onTextChanged: makeHumanDialog.check()
                     onAccepted: makeHumanDialog.accept()
+                }
+                Label { text: tr("Garments"); Layout.alignment: Qt.AlignTop; Layout.topMargin: 6 }
+                ColumnLayout {
+                    Layout.preferredWidth: 340
+                    spacing: 2
+                    RowLayout {
+                        Label { text: tr("Send"); opacity: 0.65; font.pixelSize: 11; Layout.fillWidth: true }
+                        Label { text: tr("z_depth"); opacity: 0.65; font.pixelSize: 11; Layout.preferredWidth: 110; horizontalAlignment: Text.AlignHCenter }
+                    }
+                    Repeater {
+                        model: makeHumanDialog.garments
+                        RowLayout {
+                            required property var modelData
+                            CheckBox {
+                                Layout.fillWidth: true
+                                text: modelData.name + (modelData.visible ? "" : " " + tr("(hidden)"))
+                                checked: makeHumanDialog.ticked.indexOf(modelData.id) >= 0
+                                onToggled: makeHumanDialog.tick(modelData.id, checked)
+                            }
+                            NumberField {
+                                Layout.preferredWidth: 110
+                                from: 0
+                                to: App.maxMakeHumanZDepth
+                                decimals: 0
+                                step: 1
+                                value: modelData.zDepth
+                                onEdited: (v) => makeHumanDialog.setZDepth(modelData.id, Math.round(v))
+                                ToolTip.visible: hovered
+                                ToolTip.text: tr("The layer MakeHuman draws this garment in; higher is further out. 50 is the default.")
+                            }
+                        }
+                    }
+                    Label {
+                        visible: makeHumanDialog.sending.length > 1
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        opacity: 0.75
+                        font.pixelSize: 11
+                        text: tr("The ticked garments are sent as one asset with z_depth %1, the highest of theirs.").arg(makeHumanDialog.zDepth)
+                    }
                 }
                 Label { text: tr("Saved in"); opacity: 0.75 }
                 Label {
@@ -665,7 +790,7 @@ ApplicationWindow {
                 wrapMode: Text.WordWrap
                 opacity: 0.65
                 font.pixelSize: 11
-                text: tr("The garment is fitted to the MakeHuman base mesh, so it follows the character when you change body shape. In MakeHuman it appears under Geometries ▸ Clothes. Author and license are set in Preferences ▸ MakeHuman.")
+                text: tr("The garments are fitted to the MakeHuman base mesh, so they follow the character when you change body shape. In MakeHuman the asset appears under Geometries ▸ Clothes. Author and license are set in Preferences ▸ MakeHuman.")
             }
             Label {
                 visible: App.makeHumanLinked && App.avatarType !== "MakeHuman"
@@ -679,7 +804,7 @@ ApplicationWindow {
                 Button { visible: App.makeHumanLinked; text: tr("Change Author or License…"); flat: true; onClicked: { makeHumanDialog.close(); preferences.openPage("MakeHuman") } }
             }
         }
-        onAccepted: if (App.makeHumanLinked) App.sendToMakeHuman(assetName.text)
+        onAccepted: if (App.makeHumanLinked) App.sendToMakeHuman(assetName.text, ticked.join("|"))
     }
 
     AppDialog {

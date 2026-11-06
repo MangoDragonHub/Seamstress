@@ -2,7 +2,7 @@
 # dist/Seamstress-linux-x64 (Qt and the .NET runtime included), so run it through build.sh rather than directly.
 app-id: io.github.mangodragonhub.Seamstress
 runtime: org.freedesktop.Platform
-runtime-version: '24.08'
+runtime-version: '26.08'
 sdk: org.freedesktop.Sdk
 command: seamstress
 finish-args:

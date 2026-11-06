@@ -49,6 +49,7 @@
     <Compile Include="**\*.cs" Exclude="obj\**;bin\**" />
     <None Include="*.qml" />
     <QtResource Include="icons/seamstress.svg" />
+    <QtResource Include="icons/tools/*.svg" />
   </ItemGroup>
 
   <!-- The bridge generates the native host's main.cpp itself, so the two things it does not offer are patched here.

@@ -86,6 +86,15 @@ public sealed class Garment
     /// <summary>Whether the garment is meshed with triangles or mostly with quads.</summary>
     public MeshTopology Topology { get; set; } = MeshTopology.Triangles;
 
+    /// <summary>
+    /// The "z_depth" written when this garment is sent to MakeHuman: the layer it is drawn in, higher being further
+    /// out (roughly 10-20 for underwear, 50 for a sweater, 70 for a jacket).
+    /// </summary>
+    public int MakeHumanZDepth { get; set; } = DefaultMakeHumanZDepth;
+
+    public const int DefaultMakeHumanZDepth = 50;
+    public const int MaxMakeHumanZDepth = 100;
+
     public List<LayerGroup> Groups { get; set; } = new();
     public List<PatternPiece> Pieces { get; set; } = new();
     public List<Seam> Seams { get; set; } = new();
@@ -106,6 +115,7 @@ public sealed class Garment
         ParticleDistance = ParticleDistance,
         Thickness = Thickness,
         Topology = Topology,
+        MakeHumanZDepth = MakeHumanZDepth,
         Groups = Groups.Select(g => g.Clone()).ToList(),
         Pieces = Pieces.Select(p => p.Clone()).ToList(),
         Seams = Seams.Select(s => s.Clone()).ToList(),
@@ -121,6 +131,12 @@ public sealed class Garment
     /// <summary>Collision thickness used by the solver for one of this garment's pieces, in millimetres.</summary>
     public float EffectiveThicknessMm(PatternPiece piece)
         => Math.Clamp(Thickness ?? piece.Physics.Thickness, 0.1f, 50f);
+
+    /// <summary>
+    /// How thick the 3D view draws the garment, in millimetres: the garment thickness when it is enabled, otherwise 0,
+    /// so the cloth is shown as a flat sheet rather than extruded by its fabric's collision thickness.
+    /// </summary>
+    public float ShownThicknessMm => Thickness is { } thickness ? Math.Clamp(thickness, 0.1f, 50f) : 0f;
 
     /// <summary>Every group and piece id in layers-panel order; only the order among siblings is meaningful.</summary>
     public List<string> OrderedLayerIds()

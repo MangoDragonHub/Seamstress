@@ -10,15 +10,19 @@ Marvelous Designer.
 ## What it does
 
 - **2D pattern view** – draw pieces (polygon, rectangle, ellipse), move them, edit points, curve edges, and
-  sew edges together with the Sew tool. Seams are colour-coded, with dots marking the ends that meet. **Cut
-  Hole** (right-click menu) cuts one selected piece in the shape of another lying on it, for pocket openings
-  and the like; the cut-out becomes a new piece, and the hole's edges can be sewn like any other. A faint
+  sew edges together with the Sew tool. Seams are colour-coded, with dots marking the ends that meet. **Cut**
+  (**C**) draws a line across pieces and splits them into separate pieces, keeping curves, holes and fabric
+  settings. **Cut Hole** (right-click menu) cuts one selected piece in the shape of another lying on it, for
+  pocket openings and the like; the cut-out becomes a new piece, and the hole's edges can be sewn like any
+  other. A faint
   front view of the avatar is drawn behind the pieces, so you can see where the garment will fall on the
   body; **View ▸ 2D: Show Avatar** hides it.
 - **3D view** – shows the sewn pieces on an avatar. Orbit, pan, zoom, click to select, and drag the arrows and
   rings on a selected piece to move and rotate it. **Pinch** lets you drag the cloth itself, during or after
-  simulation, to tug bunched-up areas into place. **Pin** freezes chosen vertices so the rest of the cloth
-  settles around them; **Unpin All** (Simulation menu) releases them again. **Ortho** switches to an
+  simulation, to tug bunched-up areas into place. **Rip** tears a piece by dragging across its surface (Shift
+  for a straight tear, and the stroke may start or end outside the garment); when the tear separates the
+  cloth, the new pieces appear in the 2D view. **Pin** freezes chosen vertices so the
+  rest of the cloth settles around them; **Unpin All** (Simulation menu) releases them again. **Ortho** switches to an
   orthographic camera. **View ▸ 3D: Normal Direction** colours the front and back of every face, and **Invert
   Normals** (Properties) turns a piece that faces the wrong way.
 - **Measuring** – click an edge to read its length, or use the **Ruler** to measure between any two points
@@ -83,7 +87,7 @@ Packages, all written to `dist/`:
 - `./build.sh appimage` — `Seamstress-x86_64.AppImage`, a single file to download and run.
 - `./build.sh flatpak` — `Seamstress.flatpak`; install with `flatpak install --user dist/Seamstress.flatpak`.
   Needs `flatpak-builder` and the runtimes
-  `flatpak install flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08`.
+  `flatpak install flathub org.freedesktop.Platform//26.08 org.freedesktop.Sdk//26.08`.
 - `./build.sh --all-x64` (or `--all-arm64`, whose packages are named for the processor) — the three packages
   above for that CPU in one run, all from a single build.
 
@@ -114,7 +118,7 @@ There are two ways to make it:
 The packages are named for the processor: `Seamstress-linux-arm64/` and its `.tar.gz`,
 `Seamstress-aarch64.AppImage` and `Seamstress-aarch64.flatpak`. Cross-building the Flatpak needs no ARM64 runtime
 on the PC; on the board, `flatpak install --user Seamstress-aarch64.flatpak` fetches
-`org.freedesktop.Platform//24.08` from Flathub as usual.
+`org.freedesktop.Platform//26.08` from Flathub as usual.
 
 Seamstress draws with OpenGL, which the Pi's VideoCore GPU and the RK3399's Mali GPU (through Mesa's Panfrost
 driver) provide. If the GPU renderer does not start, Seamstress switches to the CPU renderer on the next launch
@@ -200,11 +204,13 @@ the finished garment stays put and the new one drapes over it.
 | --- | --- | --- | --- |
 | V | Select | Space | Start / stop simulation |
 | A | Edit points | Ctrl+Z / Ctrl+Shift+Z | Undo / redo |
-| S | Sew | Delete | Delete selection |
+| S | Sew (click edges, or box-select and Enter) | Delete | Delete selection |
 | P / B / O | Polygon / Rectangle / Ellipse | Ctrl+D | Duplicate |
 | U | Toggle UV layout | Ctrl+G | Group selected pieces |
 | F | Frame all in 2D | Esc / Enter | Cancel / finish the current tool |
 | T | Transform points | Q / W / E / R | Handles: all / move / rotate / scale |
+| I | Inset Band | C | Cut pieces along a drawn line |
+| X | Rip cloth in 3D | G | Pinch cloth in 3D |
 | M | Ruler (2D and 3D) | 5 | Orthographic 3D view on / off |
 | 1 / 3 / Ctrl+1 | 3D front / side / back | Right-click | Edit menu |
 
@@ -224,8 +230,10 @@ To make clothes for MakeHuman characters:
 3. **File ▸ Export ▸ Send to MakeHuman** writes `<name>.mhclo`, `.obj` and `.mhmat` into
    `<user data>/data/clothes/<name>/`. Every vertex is bound to the base mesh, so the garment follows the
    character when its body shape changes. It appears in MakeHuman under *Geometries ▸ Clothes* (restart
-   MakeHuman if it is running). A dialog lets you choose the asset name first; the author and license written into
-   the asset are set under *Preferences ▸ MakeHuman*.
+   MakeHuman if it is running). The dialog lists every garment with a tickbox and its *z_depth* (MakeHuman's
+   layering order, 50 by default, saved per garment): tick one to send it alone, or several to send them as one
+   asset, which takes the highest of their z_depth values. The asset name is chosen there too; the author and
+   license written into the asset are set under *Preferences ▸ MakeHuman*.
 
 The built-in mannequin has the base mesh's proportions, so the bundled templates fit both.
 

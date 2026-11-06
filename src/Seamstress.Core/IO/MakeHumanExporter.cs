@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Numerics;
 using System.Text;
+using Seamstress.Core.Model;
 using Seamstress.Core.Simulation;
 
 namespace Seamstress.Core.IO;
@@ -28,15 +29,24 @@ public static class MakeHumanExporter
 
     private static string OneLine(string? text) => string.Join(' ', (text ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
+    /// <summary>Writes one garment as a MakeHuman asset.</summary>
+    public static Result Export(ExportMesh mesh, MakeHumanBase baseMesh, string clothesFolder, string? author = null,
+        string? license = null, string? assetName = null, int zDepth = Garment.DefaultMakeHumanZDepth)
+        => Export(new[] { mesh }, baseMesh, clothesFolder, author, license, assetName, zDepth);
+
+    /// <summary>Writes one or more garments as a single MakeHuman asset.</summary>
+    /// <param name="meshes">The garments, merged into one; the asset's material is the first one's.</param>
     /// <param name="clothesFolder">MakeHuman's "data/clothes" folder inside its user data directory.</param>
     /// <param name="assetName">The name MakeHuman lists the asset under; the folder and files are named after it.
-    /// Null uses the garment's name.</param>
-    public static Result Export(ExportMesh mesh, MakeHumanBase baseMesh, string clothesFolder, string? author = null,
-        string? license = null, string? assetName = null)
+    /// Null uses the first garment's name.</param>
+    /// <param name="zDepth">The layer MakeHuman draws the asset in; higher is further out.</param>
+    public static Result Export(IReadOnlyList<ExportMesh> meshes, MakeHumanBase baseMesh, string clothesFolder,
+        string? author = null, string? license = null, string? assetName = null, int zDepth = Garment.DefaultMakeHumanZDepth)
     {
-        if (mesh.Parts.Count == 0 || mesh.Positions.Length == 0)
+        meshes = meshes.Where(m => m.Parts.Count > 0 && m.Positions.Length > 0).ToList();
+        if (meshes.Count == 0)
             throw new InvalidOperationException(Lang.T("The garment has no geometry to send."));
-        string displayName = DisplayName(assetName ?? mesh.Name);
+        string displayName = DisplayName(assetName ?? meshes[0].Name);
         string name = ExportScene.SafeName(displayName);
         string folder = AssetFolder(clothesFolder, displayName);
         Directory.CreateDirectory(folder);
@@ -44,23 +54,27 @@ public static class MakeHumanExporter
         var inv = CultureInfo.InvariantCulture;
 
         // MakeHuman assets carry one UV per vertex, so vertices on UV seams are duplicated.
-        var lookup = new Dictionary<(int, int), int>();
+        var lookup = new Dictionary<(int, int, int), int>();
         var positions = new List<Vector3>();
         var uvs = new List<Vector2>();
         var faces = new List<int>();
-        foreach (var part in mesh.Parts)
+        for (int m = 0; m < meshes.Count; m++)
         {
-            for (int k = 0; k < part.PositionIndices.Length; k++)
+            var mesh = meshes[m];
+            foreach (var part in mesh.Parts)
             {
-                var key = (part.PositionIndices[k], part.UvIndices[k]);
-                if (!lookup.TryGetValue(key, out int index))
+                for (int k = 0; k < part.PositionIndices.Length; k++)
                 {
-                    index = positions.Count;
-                    lookup[key] = index;
-                    positions.Add(baseMesh.ToMakeHuman(mesh.Positions[key.Item1]));
-                    uvs.Add(mesh.Uvs[key.Item2]);
+                    var key = (m, part.PositionIndices[k], part.UvIndices[k]);
+                    if (!lookup.TryGetValue(key, out int index))
+                    {
+                        index = positions.Count;
+                        lookup[key] = index;
+                        positions.Add(baseMesh.ToMakeHuman(mesh.Positions[key.Item2]));
+                        uvs.Add(mesh.Uvs[key.Item3]);
+                    }
+                    faces.Add(index);
                 }
-                faces.Add(index);
             }
         }
 
@@ -99,7 +113,7 @@ public static class MakeHumanExporter
             float distance = MathF.Abs(axis == 0 ? d.X : axis == 1 ? d.Y : d.Z);
             clo.Append(inv, $"{axes[axis]} {a} {b} {distance:0.0000}\n");
         }
-        clo.Append("z_depth 50\n");
+        clo.Append(inv, $"z_depth {Math.Clamp(zDepth, 0, Garment.MaxMakeHumanZDepth)}\n");
         clo.Append("max_pole 8\n");
         clo.Append("material ").Append(fileBase).Append(".mhmat\n");
         clo.Append("verts 0\n");
@@ -113,7 +127,7 @@ public static class MakeHumanExporter
         string mhcloPath = Path.Combine(folder, fileBase + ".mhclo");
         File.WriteAllText(mhcloPath, clo.ToString());
 
-        var material = mesh.Parts[0].Material;
+        var material = meshes[0].Parts[0].Material;
         var (r, g, b2) = ExportScene.ParseColor(material.Color);
         var mat = new StringBuilder();
         mat.Append("# Material for ").Append(displayName).Append(" (exported by Seamstress)\n\n");

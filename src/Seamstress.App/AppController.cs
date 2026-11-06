@@ -56,10 +56,24 @@ public partial class AppController : INotifyPropertyChanged
         AppLog.Write($"Theme: {_settings.Theme}; units: {_settings.Units}");
         _status = Lang.T("Ready");
         _editor = new PatternEditor(_workspace);
+        // Bands start a round width in the units shown: 3 cm or 1¼ in.
+        _editor.InsetWidth = Imperial ? 3.175f : PatternEditor.DefaultInsetWidth;
         _simulation = new SimulationController(_workspace, () => _avatar);
         _workspace.History.Changed += OnDocumentChanged;
         _workspace.SelectionChanged += OnDocumentChanged;
         _editor.Changed += () => SceneRevision++;
+        _editor.CutMade += outcome =>
+        {
+            StatusText = outcome.Problem ?? (outcome.SourcePieces == 1
+                ? Lang.F("Cut the piece into {0} pieces.", outcome.Pieces.Count)
+                : Lang.F("Cut {0} pieces into {1} pieces.", outcome.SourcePieces, outcome.Pieces.Count));
+        };
+        _editor.SewMade += count => StatusText = count switch
+        {
+            0 => Lang.T("Select at least two edges to sew."),
+            1 => Lang.T("Sewed one pair of edges."),
+            _ => Lang.F("Sewed {0} pairs of edges.", count),
+        };
         if (_settings.DetectMakeHuman())
             TrySaveSettings();
         InitTheme();
@@ -343,7 +357,7 @@ public partial class AppController : INotifyPropertyChanged
         return sb.Append(']').ToString();
     }
 
-    /// <summary>Shift is held in the 2D view: the drawing tools keep their proportions (see PatternEditor.Constrain).</summary>
+    /// <summary>Shift is held in the 2D view: the drawing tools keep their proportions and moving points or pieces snaps to the grid (see PatternEditor.Constrain).</summary>
     public bool Constrain
     {
         get => _editor.Constrain;
@@ -411,7 +425,99 @@ public partial class AppController : INotifyPropertyChanged
         StatusText = _editor.Hint;
     }
 
-    public void ConfirmTool() => _editor.Confirm();
+    public void ConfirmTool()
+    {
+        if (_editor.Tool == PatternTool.InsetBand)
+            ApplyInset();
+        else
+            _editor.Confirm();
+    }
+
+    /// <summary>Width of the bands the Inset Band tool cuts, in centimetres.</summary>
+    public double InsetWidth
+    {
+        get => _editor.InsetWidth;
+        set
+        {
+            _editor.InsetWidth = (float)value;
+            Notify();
+        }
+    }
+
+    /// <summary>Inset Band: cuts the bands previewed in the 2D view off their pieces, or says why it cannot.</summary>
+    public void ApplyInset()
+    {
+        var edges = _editor.InsetEdges;
+        if (edges.Count == 0)
+        {
+            StatusText = Lang.T("Click the edges to cut a band from.");
+            return;
+        }
+        if (_editor.InsetProblem is { } problem)
+        {
+            StatusText = problem;
+            return;
+        }
+        string name = _workspace.Document.FindPiece(edges[0].PieceId)?.Name ?? "";
+        var created = _editor.ApplyInset();
+        StatusText = created.Count switch
+        {
+            0 => _editor.Hint,
+            1 => Lang.F("Cut the band “{0}” from “{1}”; it is sewn to it along the cut.", created[0].Name, name),
+            _ => Lang.F("Cut {0} bands; each is sewn to the piece it was cut from.", created.Count),
+        };
+    }
+
+    /// <summary>While a rip stroke is drawn, a running simulation lets the grabbed cloth follow the hand.</summary>
+    public bool RipPullBegin(double x, double y, double z)
+    {
+        if (!_simulation.IsRunning)
+            return false;
+        _simulation.BeginPinch(new Vector3((float)x, (float)y, (float)z));
+        return true;
+    }
+
+    public void RipPullMove(double x, double y, double z)
+    {
+        if (_simulation.IsRunning)
+            _simulation.MovePinch(new Vector3((float)x, (float)y, (float)z));
+    }
+
+    public void RipPullEnd()
+    {
+        if (_simulation.IsRunning)
+            _simulation.EndPinch();
+    }
+
+    /// <summary>Rips a piece along a stroke drawn on its 3D surface; the points are [x, y, z] triples in metres.</summary>
+    public void Rip(string pieceId, string pointsJson)
+    {
+        var points = new List<Vector3>();
+        try
+        {
+            using var json = JsonDocument.Parse(pointsJson);
+            if (json.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var point in json.RootElement.EnumerateArray())
+                {
+                    if (point.ValueKind != JsonValueKind.Array || point.GetArrayLength() < 3)
+                        continue;
+                    points.Add(new Vector3(point[0].GetSingle(), point[1].GetSingle(), point[2].GetSingle()));
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            return;
+        }
+        if (points.Count < 2)
+        {
+            StatusText = Lang.T("Drag across a piece of cloth to rip it.");
+            return;
+        }
+        var outcome = _workspace.RipPiece(pieceId, points);
+        StatusText = outcome.Problem ?? Lang.F("Ripped the piece into {0} pieces.", outcome.Pieces.Count);
+    }
 
     // ---------------------------------------------------------------- 3D viewport
 
@@ -1039,12 +1145,14 @@ public partial class AppController : INotifyPropertyChanged
     }
 
     private ExportScene BuildExport(bool weld, bool activeOnly)
+        => BuildExport(weld, activeOnly && _workspace.ActiveGarment is { } active ? new[] { active.Id } : null);
+
+    /// <param name="garmentIds">The garments to export, hidden or not; null exports the visible ones.</param>
+    private ExportScene BuildExport(bool weld, IReadOnlyCollection<string>? garmentIds)
     {
         if (_simulation.IsRunning)
             StopSimulation();
-        var options = new ExportOptions { WeldSeams = weld };
-        if (activeOnly && _workspace.ActiveGarment is { } active)
-            options.GarmentIds = new[] { active.Id };
+        var options = new ExportOptions { WeldSeams = weld, GarmentIds = garmentIds };
         var scene = ExportScene.Build(_workspace.Document, _workspace.MeshFor, options);
         if (scene.Meshes.Count == 0)
             throw new InvalidOperationException(Lang.T("There is nothing to export: no visible garment has any pieces."));
@@ -1098,6 +1206,23 @@ public partial class AppController : INotifyPropertyChanged
     /// <summary>The name the Send to MakeHuman dialog suggests: the active garment's.</summary>
     public string ActiveGarmentName() => _workspace.ActiveGarment?.Name ?? "";
 
+    /// <summary>The name suggested for an asset made of several garments: the project's.</summary>
+    public string DocumentName() => _workspace.Document.Name;
+
+    /// <summary>The garments the Send to MakeHuman dialog lists ({id, name, zDepth, visible, active}), in layers order.</summary>
+    public string MakeHumanGarmentsJson() => JsonSerializer.Serialize(_workspace.Document.Garments.Select(g => new
+    {
+        id = g.Id,
+        name = g.Name,
+        zDepth = g.MakeHumanZDepth,
+        visible = g.Visible,
+        active = g == _workspace.ActiveGarment,
+    }));
+
+    public int MaxMakeHumanZDepth => Garment.MaxMakeHumanZDepth;
+
+    public void SetMakeHumanZDepth(string garmentId, int value) => _workspace.SetMakeHumanZDepth(garmentId, value);
+
     /// <summary>Where an asset of this name would be written, and whether one is there already ({folder, exists}).</summary>
     public string MakeHumanAssetInfo(string assetName)
     {
@@ -1107,26 +1232,32 @@ public partial class AppController : INotifyPropertyChanged
         return JsonSerializer.Serialize(new { folder, exists = Directory.Exists(folder) });
     }
 
-    /// <summary>Writes the active garment into MakeHuman's clothes library, bound to the base mesh.</summary>
+    /// <summary>Writes the chosen garments into MakeHuman's clothes library as one asset, bound to the base mesh.</summary>
     /// <param name="assetName">The name MakeHuman lists it under; empty uses the garment's name.</param>
-    public bool SendToMakeHuman(string assetName)
+    /// <param name="garmentIds">Ids of the garments to send, separated by "|". The asset takes the highest of their
+    /// z_depth values, so it is drawn over anything the outermost of them would be.</param>
+    public bool SendToMakeHuman(string assetName, string garmentIds)
     {
         try
         {
             if (_settings.MakeHumanClothesFolder is not { } clothes || !Directory.Exists(_settings.MakeHumanUserFolder))
                 throw new InvalidOperationException(Lang.T("MakeHuman is not linked yet. Open File ▸ Preferences and choose MakeHuman's user data folder."));
-            if (_workspace.ActiveGarment is not { } garment)
-                throw new InvalidOperationException(Lang.T("Select the garment to send first."));
+            var ids = garmentIds.Split('|', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+            var garments = _workspace.Document.Garments.Where(g => ids.Contains(g.Id)).ToList();
+            if (garments.Count == 0)
+                throw new InvalidOperationException(Lang.T("Tick at least one garment to send."));
             if (_avatar?.MakeHuman is not { } baseMesh)
                 throw new InvalidOperationException(Lang.T("Garments are fitted to MakeHuman's base mesh.\n\nChoose Avatar ▸ MakeHuman Base Mesh, simulate the garment on it, then send it again."));
-            var scene = BuildExport(weld: true, activeOnly: true);
-            string name = string.IsNullOrWhiteSpace(assetName) ? garment.Name : assetName.Trim();
-            var result = MakeHumanExporter.Export(scene.Meshes[0], baseMesh, clothes, _settings.Author, _settings.MakeHumanLicense, name);
+            var scene = BuildExport(weld: true, garments.Select(g => g.Id).ToArray());
+            string name = !string.IsNullOrWhiteSpace(assetName) ? assetName.Trim()
+                : garments.Count == 1 ? garments[0].Name : _workspace.Document.Name;
+            int zDepth = garments.Max(g => g.MakeHumanZDepth);
+            var result = MakeHumanExporter.Export(scene.Meshes, baseMesh, clothes, _settings.Author, _settings.MakeHumanLicense, name, zDepth);
             string launched = "";
             if (!string.IsNullOrWhiteSpace(_settings.MakeHumanCommand) && Startup.AllowLaunch)
                 launched = LaunchMakeHuman() ? " " + Lang.T("MakeHuman is starting.") : "";
             StatusText = Lang.F("Sent “{0}” to MakeHuman ({1:N0} vertices): {2}.", name, result.VertexCount, result.Folder) + launched;
-            AppLog.Write($"Sent “{name}” to MakeHuman ({result.VertexCount} vertices): {result.Folder}");
+            AppLog.Write($"Sent “{name}” to MakeHuman ({string.Join(", ", garments.Select(g => g.Name))}; z_depth {zDepth}; {result.VertexCount} vertices): {result.Folder}");
             LastMakeHumanFolder = result.Folder;
             return true;
         }

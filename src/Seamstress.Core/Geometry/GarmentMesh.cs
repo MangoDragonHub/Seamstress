@@ -482,11 +482,13 @@ public static class Mesher
 
     /// <summary>
     /// Extrudes a triangle surface by <paramref name="thickness"/> metres (half to each side) and closes it with walls
-    /// along every boundary edge, so the garment renders as a solid shell rather than an infinitely thin sheet.
+    /// along every boundary edge, so the garment renders as a solid shell rather than an infinitely thin sheet. A
+    /// thickness of 0 gives a flat two-sided sheet: both surfaces, a hair apart so they do not flicker, and no walls.
     /// </summary>
     public static SurfaceShell BuildShell(Vector3[] positions, Vector3[] normals, Vector2[] uvs, int[] triangles, float thickness)
     {
         int count = positions.Length;
+        bool flat = thickness <= 0;
         float half = MathF.Max(thickness, 0.0001f) * 0.5f;
 
         // Edges that belong to exactly one triangle are the boundary; remember the third corner so the wall normal
@@ -504,7 +506,8 @@ public static class Mesher
             AddEdge(b, c, a);
             AddEdge(c, a, b);
         }
-        var boundary = edges.Where(e => e.Value.Count == 1).Select(e => (Edge: e.Key, Opposite: e.Value.Opposite)).ToList();
+        var boundary = flat ? new List<(long Edge, int Opposite)>()
+            : edges.Where(e => e.Value.Count == 1).Select(e => (Edge: e.Key, Opposite: e.Value.Opposite)).ToList();
 
         int wallStart = count * 2;
         var shellPositions = new Vector3[wallStart + boundary.Count * 4];
