@@ -68,6 +68,12 @@ public partial class AppController : INotifyPropertyChanged
                 ? Lang.F("Cut the piece into {0} pieces.", outcome.Pieces.Count)
                 : Lang.F("Cut {0} pieces into {1} pieces.", outcome.SourcePieces, outcome.Pieces.Count));
         };
+        _editor.SewMade += count => StatusText = count switch
+        {
+            0 => Lang.T("Select at least two edges to sew."),
+            1 => Lang.T("Sewed one pair of edges."),
+            _ => Lang.F("Sewed {0} pairs of edges.", count),
+        };
         if (_settings.DetectMakeHuman())
             TrySaveSettings();
         InitTheme();

@@ -1993,25 +1993,59 @@ public sealed class Workspace
 
     public Seam? AddSeam(EdgeRef a, EdgeRef b)
     {
-        var garment = Document.GarmentOfPiece(a.PieceId);
-        if (garment == null || garment.FindPiece(b.PieceId) == null)
-            return null; // seams only join pieces of the same garment
-        if (a.PieceId == b.PieceId && a.Edge == b.Edge)
-            return null;
-        bool Exists(Seam s) => (s.A.Matches(a.PieceId, a.Edge) && s.B.Matches(b.PieceId, b.Edge))
-                            || (s.A.Matches(b.PieceId, b.Edge) && s.B.Matches(a.PieceId, a.Edge));
-        if (garment.Seams.Any(Exists))
-            return null;
-        Seam? seam = null;
-        string garmentId = garment.Id;
-        History.Execute(Lang.T("Sew edges"), doc =>
-        {
-            seam = new Seam { A = a.Clone(), B = b.Clone() };
-            doc.FindGarment(garmentId)!.Seams.Add(seam);
-        });
+        var seam = AddSeams(new[] { (a, b, false) }).FirstOrDefault();
         if (seam != null)
             SelectSeam(seam.Id);
         return seam;
+    }
+
+    /// <summary>
+    /// Sews several pairs of edges as one undo step. Pairs that are invalid, already sewn, or repeated are skipped;
+    /// a pair may also sew two edges of the same piece. Returns the seams added.
+    /// </summary>
+    public List<Seam> AddSeams(IReadOnlyList<(EdgeRef A, EdgeRef B, bool Reversed)> pairs)
+    {
+        var valid = new List<(EdgeRef A, EdgeRef B, bool Reversed)>();
+        var seen = new HashSet<(string, int, string, int)>();
+        static (string, int, string, int) Key(EdgeRef a, EdgeRef b)
+            => string.CompareOrdinal(a.PieceId, b.PieceId) <= 0
+                ? (a.PieceId, a.Edge, b.PieceId, b.Edge)
+                : (b.PieceId, b.Edge, a.PieceId, a.Edge);
+        foreach (var pair in pairs)
+        {
+            var a = pair.A;
+            var b = pair.B;
+            var garment = Document.GarmentOfPiece(a.PieceId);
+            var pa = garment?.FindPiece(a.PieceId);
+            var pb = garment?.FindPiece(b.PieceId);
+            if (garment == null || pa == null || pb == null
+                || a.Edge < 0 || a.Edge >= pa.EdgeCount || b.Edge < 0 || b.Edge >= pb.EdgeCount)
+                continue;
+            if (a.PieceId == b.PieceId && a.Edge == b.Edge)
+                continue;
+            var key = Key(a, b);
+            if (!seen.Add(key))
+                continue;
+            bool exists = garment.Seams.Any(s =>
+                (s.A.Matches(a.PieceId, a.Edge) && s.B.Matches(b.PieceId, b.Edge))
+                || (s.A.Matches(b.PieceId, b.Edge) && s.B.Matches(a.PieceId, a.Edge)));
+            if (!exists)
+                valid.Add(pair);
+        }
+        var created = new List<Seam>();
+        if (valid.Count == 0)
+            return created;
+        History.Execute(Lang.T("Sew edges"), doc =>
+        {
+            foreach (var pair in valid)
+            {
+                var garment = doc.GarmentOfPiece(pair.A.PieceId)!;
+                var seam = new Seam { A = pair.A.Clone(), B = pair.B.Clone(), Reversed = pair.Reversed };
+                garment.Seams.Add(seam);
+                created.Add(seam);
+            }
+        });
+        return created;
     }
 
     public void ReverseSeam(string seamId)

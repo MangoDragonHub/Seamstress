@@ -99,7 +99,7 @@ The toolbar shows each tool as an icon. Hover over an icon to see its name, what
 | 1 | **Select** | V | Click a piece to select it, drag to move it in the pattern. Ctrl+click adds to the selection. Click a seam's dashed line to select the seam. Double-click a piece to select all its points. |
 | 2 | **Edit Points** | A | Drag a point to move it. Drag an edge to curve it. Double-click an edge to add a point. |
 | 3 | **Transform Points** | T | Select one point or several, then move or rotate them with handles. Does not bend edges. |
-| 4 | **Sew** | S | Click one edge, then another, to sew them together. |
+| 4 | **Sew** | S | Click one edge, then another, to sew them together, or drag a box around several edges and press Enter. |
 | 5 | **Inset Band** | I | Cut a waistband, collar band or facing off pieces along the edges you click, already sewn on (see [Cutting bands from edges](#cutting-bands-from-edges)). |
 | 6 | **Cut** | C | Drag a line across pieces to cut them into separate pieces (see [Cutting pieces apart](#cutting-pieces-apart)). |
 | 7 | **Polygon** | P | Click to place corners; click the first corner again, double-click, or press Enter to finish. |
@@ -379,6 +379,12 @@ undoes the cut in one step.
 Pick the **Sew** tool (**S**), click one edge, then click the edge to sew it to. The first edge stays
 highlighted until you click the second; **Esc** cancels. Both edges must belong to the same garment. An edge
 may be sewn to an edge of the same piece (the underarm seam of a sleeve, for example).
+
+To sew several edges at once, **drag a box around them** on empty space. The chosen edges stay highlighted;
+press **Enter** and the closest pairs are sewn automatically, trying both directions along each edge so a
+twisted seam is avoided. Hold **Ctrl** while dragging to add another box to the selection. This is handy after a
+cut leaves a row of short edges that need to be sewn back together. Edges that are already sewn, or that are
+left without a partner, are skipped.
 
 ![Seams in the 2D view: matching colours, a dashed connector and dots](images/seams.png)
 
@@ -1041,7 +1047,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | G | Turn Pinch on or off in the 3D view |
 | X | Turn Rip on or off in the 3D view |
 | Space | Start or stop simulation |
-| Enter | Finish the polygon being drawn; cut the bands previewed with Inset Band |
+| Enter | Finish the polygon being drawn; cut the bands previewed with Inset Band; sew the edges chosen with a box |
 | Esc | Cancel the current tool action |
 | Delete / Backspace | Delete the selected pieces, seam or point |
 | Ctrl+Z | Undo |
@@ -1076,6 +1082,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | Drag (Ruler) | Measure; the ends catch on pattern points | Click or drag between two points on the cloth or avatar |
 | Drag (Cut) | Draw a straight line and cut every visible piece it crosses into separate pieces | — |
 | Drag (Rip) | — | Tear the piece under the stroke; if the tear separates it, the new pieces appear in 2D |
+| Drag a box (Sew) | Choose edges to sew, then press Enter to pair the closest ones | — |
 | Click / drag an edge (Inset Band) | Choose the edge, or drop it again; drag inward to set the band's width | — |
 | Drag on empty space (Transform Points) | Box-select points | — |
 

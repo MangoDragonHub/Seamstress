@@ -39,7 +39,7 @@ public enum PatternTool
 /// </summary>
 public sealed class PatternEditor
 {
-    private enum Drag { None, Pieces, Point, Control, Bend, Shape, Uv, PointsMove, PointsRotate, PointsScale, Marquee, Ruler, InsetWidth, Cut }
+    private enum Drag { None, Pieces, Point, Control, Bend, Shape, Uv, PointsMove, PointsRotate, PointsScale, Marquee, Ruler, InsetWidth, Cut, SewBox }
 
     /// <summary>Sizes of the 2D handles in screen pixels: the length of the arrows and the radius of the ring.</summary>
     public const float GizmoArrow = 64, GizmoRing = 88;
@@ -82,6 +82,8 @@ public sealed class PatternEditor
     private bool _onHandle;                 // the last press landed on one of the 2D handles
     private Vector2? _rulerStart, _rulerEnd;
     private Vector2? _cutStart, _cutEnd;
+    private readonly List<EdgeRef> _sewEdges = new();       // edges chosen with a box while sewing
+    private bool _sewBoxAdditive;
     private readonly List<EdgeRef> _insetEdges = new();   // edges chosen with the Inset Band tool
     private float _insetWidth = DefaultInsetWidth;
     private EdgeRef? _insetDrag;                            // the edge a width drag started on
@@ -92,6 +94,9 @@ public sealed class PatternEditor
 
     /// <summary>Raised after a cut line was released, with what it cut or why it did nothing.</summary>
     public event Action<Workspace.CutOutcome>? CutMade;
+
+    /// <summary>Raised after Enter in Sew mode, with how many seams were made.</summary>
+    public event Action<int>? SewMade;
 
     public PatternEditor(Workspace workspace) => _workspace = workspace;
 
@@ -123,6 +128,11 @@ public sealed class PatternEditor
     }
 
     public EdgeRef? PendingEdge => _pendingEdge;
+
+    /// <summary>The edges chosen with a box in Sew mode, ignoring ones that no longer exist.</summary>
+    public IReadOnlyList<EdgeRef> SewSelection
+        => _sewEdges.Where(e => Doc.FindPiece(e.PieceId) is { } piece && e.Edge < piece.EdgeCount
+            && Doc.GarmentOfPiece(e.PieceId) is { } garment && Workspace.IsEffectivelyVisible(garment, piece)).ToList();
 
     /// <summary>Width a band starts out with, in centimetres.</summary>
     public const float DefaultInsetWidth = 3f;
@@ -344,7 +354,11 @@ public sealed class PatternEditor
             PatternTool.Select => Lang.T("Click a piece to select it, drag to move. Use the handles to move, rotate or scale it (Q/W/E/R). Click an edge to see its length. Ctrl+click adds to the selection. Double-click a piece to select all its points. Hold Shift to snap to the grid."),
             PatternTool.EditPoints => Lang.T("Drag a point to move it, drag an edge to curve it, double-click an edge to add a point (or inside the piece to select all its points), Delete removes the selected point. Hold Shift to snap to the grid. Click an edge to see its length."),
             PatternTool.TransformPoints => Lang.T("Click a point to select it, Ctrl+click to add, drag a box around several, or double-click a piece for all of its points. Drag an arrow to move them, the ring to rotate them, a box to scale them (Q/W/E/R choose the handles). Hold Shift to snap the moved points to the grid."),
-            PatternTool.Sew => _pendingEdge == null ? Lang.T("Click the first edge to sew.") : Lang.T("Click the edge to sew it to. Esc cancels."),
+            PatternTool.Sew => _pendingEdge == null
+                ? SewSelection.Count == 0
+                    ? Lang.T("Click the first edge to sew, or drag a box around several edges and press Enter to sew the closest pairs.")
+                    : Lang.F("{0} edges selected; press Enter to sew the closest pairs.", SewSelection.Count)
+                : Lang.T("Click the edge to sew it to. Esc cancels."),
             PatternTool.Polygon => _draft.Count == 0 ? Lang.T("Click to place the first corner.") : Lang.T("Click to add corners; click the first corner, double-click or press Enter to finish. Hold Shift to snap the side's angle and length."),
             PatternTool.Rectangle => Lang.T("Drag to draw a rectangular piece. Hold Shift for a square."),
             PatternTool.Ellipse => Lang.T("Drag to draw an elliptical piece. Hold Shift for a circle."),
@@ -422,6 +436,40 @@ public sealed class PatternEditor
             }
         }
         return best;
+    }
+
+    /// <summary>True when any part of an edge lies inside the axis-aligned box (world coordinates).</summary>
+    private static bool EdgeInRect(PatternPiece piece, int edge, Vector2 lo, Vector2 hi)
+    {
+        var points = Outline.FlattenEdge(piece, edge);
+        static bool Inside(Vector2 p, Vector2 lo, Vector2 hi)
+            => p.X >= lo.X && p.X <= hi.X && p.Y >= lo.Y && p.Y <= hi.Y;
+        for (int i = 1; i < points.Count; i++)
+        {
+            var a = points[i - 1] + piece.Origin;
+            var b = points[i] + piece.Origin;
+            if (Inside(a, lo, hi) || Inside(b, lo, hi)
+                || SegmentsCross(a, b, lo, new Vector2(hi.X, lo.Y))
+                || SegmentsCross(a, b, new Vector2(hi.X, lo.Y), hi)
+                || SegmentsCross(a, b, hi, new Vector2(lo.X, hi.Y))
+                || SegmentsCross(a, b, new Vector2(lo.X, hi.Y), lo))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool SegmentsCross(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
+    {
+        static float Cross(Vector2 u, Vector2 v) => u.X * v.Y - u.Y * v.X;
+        var r = b - a;
+        var s = d - c;
+        float denom = Cross(r, s);
+        if (MathF.Abs(denom) < 1e-9f)
+            return false;
+        var q = c - a;
+        float t = Cross(q, s) / denom;
+        float u = Cross(q, r) / denom;
+        return t >= 0 && t <= 1 && u >= 0 && u <= 1;
     }
 
     private (PatternPiece Piece, int Edge)? HitControl(Vector2 world, float tolerance)
@@ -840,11 +888,20 @@ public sealed class PatternEditor
                     if (edge == null)
                     {
                         if (HitSeam(world, tolerance) is { } seam)
+                        {
                             _workspace.SelectSeam(seam.Id);
-                        else if (_pendingEdge == null)
-                            _workspace.ClearSelection();
+                            break;
+                        }
+                        _pendingEdge = null;
+                        _sewBoxAdditive = additive;
+                        if (!additive)
+                            _sewEdges.Clear();
+                        _marqueeEnd = null;
+                        _drag = Drag.SewBox;
+                        Changed?.Invoke();
                         break;
                     }
+                    _sewEdges.Clear();
                     var hit = new EdgeRef(edge.Value.Piece.Id, edge.Value.Edge);
                     if (_pendingEdge == null)
                     {
@@ -985,6 +1042,10 @@ public sealed class PatternEditor
                 _cutEnd = CutPoint(world, _cutStart);
                 Changed?.Invoke();
                 return;
+            case Drag.SewBox:
+                _marqueeEnd = world;
+                Changed?.Invoke();
+                return;
             case Drag.InsetWidth:
                 if (_insetDrag != null && Doc.FindPiece(_insetDrag.PieceId) is { } inset && _insetDrag.Edge < inset.EdgeCount)
                 {
@@ -1082,6 +1143,33 @@ public sealed class PatternEditor
                     Changed?.Invoke();
                     break;
                 }
+            case Drag.SewBox:
+                {
+                    if (_dragMoved && _marqueeEnd is { } end)
+                    {
+                        var lo = Vector2.Min(_dragStart, end);
+                        var hi = Vector2.Max(_dragStart, end);
+                        if (!_sewBoxAdditive)
+                            _sewEdges.Clear();
+                        foreach (var (_, piece) in VisiblePieces())
+                        {
+                            for (int e = 0; e < piece.EdgeCount; e++)
+                            {
+                                if (!EdgeInRect(piece, e, lo, hi))
+                                    continue;
+                                if (!_sewEdges.Any(s => s.Matches(piece.Id, e)))
+                                    _sewEdges.Add(new EdgeRef(piece.Id, e));
+                            }
+                        }
+                    }
+                    else if (!_sewBoxAdditive)
+                    {
+                        _sewEdges.Clear();
+                    }
+                    _marqueeEnd = null;
+                    Changed?.Invoke();
+                    break;
+                }
             case Drag.InsetWidth:
                 // Clicking an edge that was already picked drops it.
                 if (!_dragMoved && _insetWasChosen && _insetDrag != null)
@@ -1156,6 +1244,86 @@ public sealed class PatternEditor
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// Sews the edges chosen with a box. The closest pairs are matched automatically, trying both directions along
+    /// each edge, so a box around two sides of a cut is all it takes.
+    /// </summary>
+    private void SewSelected()
+    {
+        var edges = SewSelection.ToList();
+        if (edges.Count < 2)
+        {
+            SewMade?.Invoke(0);
+            return;
+        }
+        var pairs = MatchSewEdges(edges);
+        var made = pairs.Count == 0
+            ? new List<Seam>()
+            : _workspace.AddSeams(pairs.Select(p => (p.A, p.B, p.Reversed)).ToList());
+        if (made.Count > 0)
+        {
+            _sewEdges.Clear();
+            _pendingEdge = null;
+        }
+        SewMade?.Invoke(made.Count);
+        Changed?.Invoke();
+    }
+
+    private List<(EdgeRef A, EdgeRef B, bool Reversed)> MatchSewEdges(IReadOnlyList<EdgeRef> edges)
+    {
+        const int steps = 8;
+        var candidates = new List<(float Score, int I, int J, bool Reversed)>();
+        for (int i = 0; i < edges.Count; i++)
+        {
+            var a = edges[i];
+            var pa = Doc.FindPiece(a.PieceId);
+            if (pa == null || a.Edge >= pa.EdgeCount)
+                continue;
+            for (int j = i + 1; j < edges.Count; j++)
+            {
+                var b = edges[j];
+                var pb = Doc.FindPiece(b.PieceId);
+                if (pb == null || b.Edge >= pb.EdgeCount)
+                    continue;
+                if (pa.Id == pb.Id && ShareEndpoint(pa, a.Edge, pb, b.Edge))
+                    continue;
+                var alongA = Outline.SampleEdge(pa, a.Edge, steps);
+                var alongB = Outline.SampleEdge(pb, b.Edge, steps);
+                float same = 0, opposite = 0;
+                for (int k = 0; k <= steps; k++)
+                {
+                    var from = alongA[k] + pa.Origin;
+                    same += Vector2.Distance(from, alongB[k] + pb.Origin);
+                    opposite += Vector2.Distance(from, alongB[steps - k] + pb.Origin);
+                }
+                bool reversed = same <= opposite;
+                candidates.Add((MathF.Min(same, opposite) / (steps + 1), i, j, reversed));
+            }
+        }
+        candidates.Sort((x, y) => x.Score.CompareTo(y.Score));
+        var used = new bool[edges.Count];
+        var pairs = new List<(EdgeRef A, EdgeRef B, bool Reversed)>();
+        foreach (var candidate in candidates)
+        {
+            if (used[candidate.I] || used[candidate.J])
+                continue;
+            used[candidate.I] = used[candidate.J] = true;
+            pairs.Add((edges[candidate.I], edges[candidate.J], candidate.Reversed));
+        }
+        return pairs;
+    }
+
+    private static bool ShareEndpoint(PatternPiece a, int edgeA, PatternPiece b, int edgeB)
+    {
+        var a0 = Outline.EdgeStart(a, edgeA) + a.Origin;
+        var a1 = Outline.EdgeEnd(a, edgeA) + a.Origin;
+        var b0 = Outline.EdgeStart(b, edgeB) + b.Origin;
+        var b1 = Outline.EdgeEnd(b, edgeB) + b.Origin;
+        const float tolerance = 0.001f;
+        return Vector2.Distance(a0, b0) <= tolerance || Vector2.Distance(a0, b1) <= tolerance
+            || Vector2.Distance(a1, b0) <= tolerance || Vector2.Distance(a1, b1) <= tolerance;
+    }
+
     /// <summary>Enter: completes the polygon being drawn.</summary>
     public void Confirm()
     {
@@ -1163,6 +1331,8 @@ public sealed class PatternEditor
             FinishPolygon();
         else if (_tool == PatternTool.InsetBand)
             ApplyInset();
+        else if (_tool == PatternTool.Sew)
+            SewSelected();
     }
 
     /// <summary>Esc: abandons whatever is in progress.</summary>
@@ -1180,6 +1350,8 @@ public sealed class PatternEditor
         _marqueeEnd = null;
         _rulerStart = _rulerEnd = null;
         _cutStart = _cutEnd = null;
+        _sewEdges.Clear();
+        _sewBoxAdditive = false;
         _insetEdges.Clear();
         _insetDrag = null;
         Changed?.Invoke();
@@ -1403,6 +1575,28 @@ public sealed class PatternEditor
         }
         Edge("hover", _hoverEdge);
         Edge("pending", _pendingEdge);
+
+        if (!_uvMode && _tool == PatternTool.Sew)
+        {
+            var chosen = SewSelection;
+            if (chosen.Count > 0)
+            {
+                sb.Append(",\"sewSelection\":[");
+                bool firstEdge = true;
+                foreach (var edge in chosen)
+                {
+                    if (Doc.FindPiece(edge.PieceId) is not { } piece || edge.Edge >= piece.EdgeCount)
+                        continue;
+                    if (!firstEdge)
+                        sb.Append(',');
+                    firstEdge = false;
+                    AppendPoints(sb, Outline.FlattenEdge(piece, edge.Edge).Select(p => p + piece.Origin));
+                }
+                sb.Append(']');
+            }
+            if (_drag == Drag.SewBox && _marqueeEnd is { } corner)
+                sb.Append(inv, $",\"marquee\":[{_dragStart.X:0.###},{_dragStart.Y:0.###},{corner.X:0.###},{corner.Y:0.###}]");
+        }
 
         if (!_uvMode && (_tool == PatternTool.TransformPoints || _tool == PatternTool.Select))
         {

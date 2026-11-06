@@ -261,6 +261,17 @@ Item {
                 }
             }
 
+            if (s.sewSelection) {
+                // Sew box selection: the edges that Enter will pair up, highlighted along their whole length.
+                ctx.strokeStyle = App.themeAnnotation
+                ctx.lineWidth = 4
+                ctx.setLineDash([])
+                for (const edge of s.sewSelection) {
+                    trace(ctx, edge, false)
+                    ctx.stroke()
+                }
+            }
+
             for (const p of s.pieces) {
                 if (showPoints || p.selected) {
                     for (let i = 0; i < p.points.length; i += 2) {

@@ -198,7 +198,7 @@ the finished garment stays put and the new one drapes over it.
 | --- | --- | --- | --- |
 | V | Select | Space | Start / stop simulation |
 | A | Edit points | Ctrl+Z / Ctrl+Shift+Z | Undo / redo |
-| S | Sew | Delete | Delete selection |
+| S | Sew (click edges, or box-select and Enter) | Delete | Delete selection |
 | P / B / O | Polygon / Rectangle / Ellipse | Ctrl+D | Duplicate |
 | U | Toggle UV layout | Ctrl+G | Group selected pieces |
 | F | Frame all in 2D | Esc / Enter | Cancel / finish the current tool |
