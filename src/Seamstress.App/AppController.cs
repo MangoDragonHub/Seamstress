@@ -283,6 +283,9 @@ public partial class AppController : INotifyPropertyChanged
     /// <summary>The first key of a command, for menus and tooltips; empty when it has none.</summary>
     public string KeyText(string id) => KeyBindings.For(_settings, id).FirstOrDefault() ?? "";
 
+    /// <summary>Every key of a command, as a JSON array; the 3D view reads its orbit gesture with it.</summary>
+    public string KeysJson(string id) => JsonSerializer.Serialize(KeyBindings.For(_settings, id));
+
     private static Dictionary<string, string[]> ParseKeys(string json)
     {
         try
@@ -1357,8 +1360,11 @@ public partial class AppController : INotifyPropertyChanged
     /// <summary>Step that Shift-dragging a move handle snaps to, in centimetres.</summary>
     public double SnapStepCm => _settings.SnapStep > 0 ? _settings.SnapStep : AppSettings.DefaultGridStep(Imperial);
 
+    /// <summary>Multiplier on how fast the 3D camera follows the mouse (orbiting and panning); 1 is the usual speed.</summary>
+    public double MouseSensitivity => _settings.MouseSensitivity;
+
     public void SavePreferences(string userFolder, string baseMesh, string command, string renderer, int textureResolution, string author, string license,
-        string units, double gridSizeCm, double snapStepCm, string language)
+        string units, double gridSizeCm, double snapStepCm, string language, double mouseSensitivity)
     {
         bool baseChanged = _settings.MakeHumanBaseMesh != LocalPath(baseMesh.Trim());
         _settings.MakeHumanUserFolder = LocalPath(userFolder.Trim());
@@ -1374,6 +1380,7 @@ public partial class AppController : INotifyPropertyChanged
         double Chosen(double cm) => !(cm > 0) || Math.Abs(cm - standard) < 0.01 ? 0 : Math.Clamp(cm, 0.1, 1000);
         _settings.GridSize = Chosen(gridSizeCm);
         _settings.SnapStep = Chosen(snapStepCm);
+        _settings.MouseSensitivity = Math.Clamp(mouseSensitivity, AppSettings.MinMouseSensitivity, AppSettings.MaxMouseSensitivity);
         Startup.Units = null;
         _settings.Language = Lang.Languages.Any(l => l.Code == language) ? language : Lang.English;
         ShowLanguage(_settings.Language);
@@ -1414,6 +1421,7 @@ public partial class AppController : INotifyPropertyChanged
         Notify(nameof(Imperial));
         Notify(nameof(GridSizeCm));
         Notify(nameof(SnapStepCm));
+        Notify(nameof(MouseSensitivity));
         Notify(nameof(MakeHumanLinked));
     }
 

@@ -926,6 +926,7 @@ MakeHuman's body.
 | Viewport | **Renderer** | *Automatic* uses the GPU and falls back to CPU rendering when no GPU driver is found or the GPU failed to start last time. *GPU* and *CPU* force one or the other. Takes effect on the next start. |
 | Viewport | **Grid size** | The size of one square of the ground grid in the 3D view. 10 cm by default, 4 in with imperial units. |
 | Viewport | **Snap step** | The step a piece snaps to when you hold Shift while dragging a move arrow in the 3D view. Starts the same as the grid size; set it smaller for finer steps. |
+| Viewport | **Mouse Sensitivity** | How fast the 3D camera follows the mouse when you drag to orbit or pan. 100% is the usual speed; lower it for finer control, raise it to cover more ground per swipe. |
 | MakeHuman | **User data folder** | MakeHuman's own data folder, the one containing `data/clothes` (for example `~/makehuman/v1py3`). |
 | MakeHuman | **Base mesh** | MakeHuman's `base.obj`, found in its `data/3dobjs` folder. |
 | MakeHuman | **Launch command** | Optional. If set, MakeHuman is started after *Send to MakeHuman* when it is not already running. |
@@ -1014,7 +1015,9 @@ handles, view and simulation, including commands that have no key to begin with 
 **3D: Wireframe**).
 
 - **To change a key**, click the button showing it, then press the new key with any of Ctrl, Alt, Shift or
-  Meta. **Escape** stops listening without changing anything.
+  Meta — or press a mouse button while listening (middle or right on their own, or the left one with a
+  modifier), which is how the **3D: Orbit** camera gesture is set, for example to orbit with the middle
+  button. **Escape** stops listening without changing anything.
 - **✕** leaves the command without a key. **↺** puts back its default, and **Reset All** puts back every
   default.
 - **Search** finds a command by name or by key: type `ctrl+d` to see what Ctrl+D does.
@@ -1067,7 +1070,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | | 2D view | 3D view |
 | --- | --- | --- |
 | Left button | The current tool | Click to select; drag a handle to move or rotate; with Pinch on, drag the cloth to pull it; with Rip on, drag across the cloth to tear it |
-| Ctrl + drag | — | Orbit around the avatar |
+| Ctrl + drag (or the button set for **3D: Orbit** in Preferences) | — | Orbit around the avatar |
 | Ctrl + click | Add to the selection | Add to the selection |
 | Shift + click | — | Add to the selection |
 | Shift while drawing | Square, circle, a snapped polygon side, or a 15° cut line | — |
@@ -1077,7 +1080,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | Shift + drag a point (Edit Points) | Snap the point to the grid | — |
 | Shift + drag a point (Transform Points) | Snap the selected points to the grid | — |
 | Shift + drag a piece (Select) | Snap the piece to the grid | — |
-| Middle or right drag | Pan | Pan |
+| Middle or right drag | Pan | Pan, unless the **3D: Orbit** gesture uses that button (then it orbits); Shift + drag still pans |
 | Right-click | Edit menu | Edit menu |
 | Alt + left drag | Pan | — |
 | Scroll | Zoom about the cursor | Zoom |

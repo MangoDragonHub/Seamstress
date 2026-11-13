@@ -49,6 +49,7 @@ AppDialog {
         resolution.currentIndex = Math.max(0, resolution.model.indexOf(App.settingTextureResolution))
         language.currentIndex = Math.max(0, languages.findIndex(l => l.code === App.settingLanguage))
         units.currentIndex = App.settingUnits === "imperial" ? 1 : 0
+        sensitivity.value = Math.round(App.mouseSensitivity * 100)
         shownImperial = units.currentIndex === 1
         showLength(gridSize, App.gridSizeCm)
         showLength(snapStep, App.snapStepCm)
@@ -84,7 +85,7 @@ AppDialog {
         App.savePreferences(userFolder.text, baseMesh.text, command.text,
                             ["auto", "gpu", "cpu"][renderer.currentIndex], resolution.model[resolution.currentIndex], author.text,
                             license.editText, units.currentIndex === 1 ? "imperial" : "metric", typedCm(gridSize), typedCm(snapStep),
-                            languages[language.currentIndex].code)
+                            languages[language.currentIndex].code, sensitivity.value / 100)
         App.saveKeyBindings(JSON.stringify(keyboard.chosen()))
         App.saveTheme(themeChoice)
     }
@@ -304,6 +305,27 @@ AppDialog {
                         }
                         Label { text: tr("Currently using") }
                         Label { text: App.renderer; opacity: 0.75 }
+                        Label { text: tr("Mouse Sensitivity") }
+                        RowLayout {
+                            Slider {
+                                id: sensitivity
+                                Layout.fillWidth: true
+                                from: 25
+                                to: 300
+                                stepSize: 5
+                                snapMode: Slider.SnapAlways
+                            }
+                            Label {
+                                text: Math.round(sensitivity.value) + "%"
+                                opacity: 0.7
+                                Layout.preferredWidth: 40
+                                horizontalAlignment: Text.AlignRight
+                            }
+                        }
+                        Note {
+                            Layout.columnSpan: 2
+                            text: tr("How fast the camera follows the mouse in the 3D view when you drag to orbit or pan. 100% is the usual speed.")
+                        }
                         Note {
                             Layout.columnSpan: 2
                             text: tr("A renderer change takes effect the next time Seamstress starts.")
@@ -501,6 +523,23 @@ AppDialog {
                     return parts.join("+")
                 }
 
+                // A mouse button written the way the 3D view reads its orbit gestures: "MouseMiddle", or
+                // "Ctrl+MouseLeft", with the modifiers in the same fixed order as the keys.
+                function gestureName(button, modifiers) {
+                    const buttonName = button === Qt.LeftButton ? "MouseLeft"
+                        : button === Qt.MiddleButton ? "MouseMiddle"
+                        : button === Qt.RightButton ? "MouseRight" : ""
+                    if (buttonName === "")
+                        return ""
+                    const parts = []
+                    if (modifiers & Qt.ControlModifier) parts.push("Ctrl")
+                    if (modifiers & Qt.AltModifier) parts.push("Alt")
+                    if (modifiers & Qt.ShiftModifier) parts.push("Shift")
+                    if (modifiers & Qt.MetaModifier) parts.push("Meta")
+                    parts.push(buttonName)
+                    return parts.join("+")
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     TextField {
@@ -568,7 +607,7 @@ AppDialog {
                             Button {
                                 id: keyButton
                                 Layout.preferredWidth: 210
-                                text: keyRow.listening ? root.tr("Press a key…") : keyRow.keys === "" ? "—" : keyRow.keys.split("\n").join(",  ")
+                                text: keyRow.listening ? root.tr("Press a key or button…") : keyRow.keys === "" ? "—" : keyRow.keys.split("\n").join(",  ")
                                 highlighted: keyRow.listening
                                 palette.buttonText: !keyRow.listening && keyboard.clashes(keyRow.keys) ? App.themeDangerText : root.palette.buttonText
                                 onClicked: {
@@ -590,10 +629,32 @@ AppDialog {
                                     keyboard.setKeys(keyRow.index, name)
                                     keyboard.recordingRow = -1
                                 }
+                                // While listening, a mouse button can be the new binding too, for the 3D orbit's
+                                // gestures: the press is taken here so the button's own click does not stop it.
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onPressed: (e) => {
+                                        if (!keyRow.listening) {
+                                            // The plain click that starts the listening, as the button's click did.
+                                            keyboard.recordingRow = keyRow.index
+                                            keyButton.forceActiveFocus()
+                                            return
+                                        }
+                                        if (e.button === Qt.LeftButton && e.modifiers === Qt.NoModifier) {
+                                            keyboard.recordingRow = -1      // a plain click still cancels the listening
+                                            return
+                                        }
+                                        const name = keyboard.gestureName(e.button, e.modifiers)
+                                        if (name !== "") {
+                                            keyboard.setKeys(keyRow.index, name)
+                                            keyboard.recordingRow = -1
+                                        }
+                                    }
+                                }
                                 onActiveFocusChanged: if (!activeFocus && keyRow.listening) keyboard.recordingRow = -1
                                 ToolTip.visible: hovered && !keyRow.listening
                                 ToolTip.delay: 500
-                                ToolTip.text: tr("Click, then press the new key (Escape cancels)")
+                                ToolTip.text: tr("Click, then press a key or mouse button (Escape cancels)")
                             }
                             ToolButton {
                                 text: "✕"
