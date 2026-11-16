@@ -160,6 +160,62 @@ Item {
         distance = 3.2
     }
 
+    // The orbit gesture set in Preferences ("3D: Orbit"), read again when the keys change. Each key is a mouse
+    // gesture such as "Ctrl+MouseLeft" (the default) or "MouseMiddle"; the left button always needs a modifier,
+    // so it never takes over the tools' ordinary left-drag.
+    readonly property var orbitKeys: { App.keysRevision; return JSON.parse(App.keysJson("view.orbit")) }
+
+    // Whether a mouse press is one of the orbit gestures: the button must match and the modifiers (without Num)
+    // must be exactly the ones the gesture lists.
+    function orbitMatches(button, modifiers) {
+        const mask = Qt.ControlModifier | Qt.AltModifier | Qt.ShiftModifier | Qt.MetaModifier
+        for (const gesture of orbitKeys) {
+            const parts = gesture.split("+")
+            const main = parts[parts.length - 1]
+            const want = main === "MouseLeft" ? Qt.LeftButton : main === "MouseMiddle" ? Qt.MiddleButton : main === "MouseRight" ? Qt.RightButton : 0
+            if (want === 0 || (want === Qt.LeftButton && parts.length === 1))
+                continue
+            let mods = 0
+            for (const part of parts.slice(0, -1))
+                mods |= part === "Ctrl" ? Qt.ControlModifier : part === "Alt" ? Qt.AltModifier
+                    : part === "Shift" ? Qt.ShiftModifier : part === "Meta" ? Qt.MetaModifier : 0
+            if (button === want && (modifiers & mask) === mods)
+                return true
+        }
+        return false
+    }
+
+    // A gesture in words, for the hint line: "Ctrl-drag" for the default, "drag with middle button" for a plain
+    // middle-drag.
+    function dragWords(gesture) {
+        const parts = gesture.split("+")
+        const main = parts.pop()
+        const mods = parts.map(m => m === "Shift" ? tr("Shift") : m)
+        if (main === "MouseLeft")
+            // The left button is the one everything drags with, so the modifiers say it all ("Ctrl-drag").
+            return mods.length > 0 ? tr("%1-drag").arg(mods.join("+")) : tr("drag with %1").arg(tr("3d|left button"))
+        const button = main === "MouseMiddle" ? tr("3d|middle button") : main === "MouseRight" ? tr("3d|right button") : main
+        return tr("drag with %1").arg(mods.length > 0 ? mods.join("+") + "+" + button : button)
+    }
+    function orbitWords() {
+        return orbitKeys.length > 0 ? dragWords(orbitKeys[0]) : "—"
+    }
+
+    // The drags that still pan where this hint is shown; Rip and the pin brush keep Shift+left for themselves.
+    function panWords(withShift) {
+        const taken = name => orbitKeys.some(g => g.indexOf("+") < 0 && g === name)
+        const shiftTaken = orbitKeys.some(g => { const p = g.split("+"); return p.length === 2 && p[0] === "Shift" && p[1] === "MouseLeft" })
+        const groups = []
+        if (withShift && !shiftTaken)
+            groups.push(tr("%1-drag").arg(tr("Shift")))
+        const buttons = []
+        if (!taken("MouseMiddle")) buttons.push(tr("3d|middle button"))
+        if (!taken("MouseRight")) buttons.push(tr("3d|right button"))
+        if (buttons.length > 0)
+            groups.push(tr("drag with %1").arg(buttons.join("/")))
+        return groups.join(" / ")
+    }
+
     Component.onCompleted: {
         if (App.startupView.indexOf("checker") >= 0) displayMode = "checker"
         if (App.startupView.indexOf("wire") >= 0) wireframe = true
@@ -563,8 +619,9 @@ Item {
                     return
                 }
             }
-            if (e.button === Qt.LeftButton && (e.modifiers & Qt.ControlModifier)) {
-                // Rotating around the avatar is always Ctrl+drag, so it never clashes with Pinch or the Ruler.
+            if (root.orbitMatches(e.button, e.modifiers)) {
+                // The orbit gesture set in Preferences (Ctrl-drag by default); it wins over the tools, so the
+                // camera can be turned anywhere, also while Pinch or the Ruler is active.
                 mode = 1
                 return
             }
@@ -598,7 +655,7 @@ Item {
                 return
             }
             if (e.button === Qt.LeftButton && root.pinchMode && !(e.modifiers & Qt.ShiftModifier)) {
-                // Pinch: take hold of the cloth under the cursor. Ctrl-drag anywhere still rotates the camera.
+                // Pinch: take hold of the cloth under the cursor. The orbit gesture still turns the camera.
                 const hit = view.pick(e.x, e.y)
                 if (hit.objectHit && hit.objectHit.pid
                         && App.pinchBegin(hit.objectHit.pid, hit.scenePosition.x, hit.scenePosition.y, hit.scenePosition.z)) {
@@ -611,7 +668,7 @@ Item {
                 }
             }
             if (e.button === Qt.LeftButton && root.measuring && !(e.modifiers & Qt.ShiftModifier)) {
-                // Ruler: press on a surface to place an end. Ctrl-drag anywhere still rotates the camera.
+                // Ruler: press on a surface to place an end. The orbit gesture still turns the camera.
                 const hit = view.pick(e.x, e.y)
                 if (hit.objectHit) {
                     if (root.rulerOpen) {
@@ -673,11 +730,12 @@ Item {
                     App.ripPullMove(pinchStart.x + r.x * mx + u.x * my, pinchStart.y + r.y * mx + u.y * my, pinchStart.z + r.z * mx + u.z * my)
                 }
             } else if (mode === 1) {
-                root.yaw -= dx * 0.4
-                root.pitch = Math.max(-89, Math.min(89, root.pitch - dy * 0.4))
+                const speed = 0.4 * App.mouseSensitivity
+                root.yaw -= dx * speed
+                root.pitch = Math.max(-89, Math.min(89, root.pitch - dy * speed))
             } else if (mode === 2) {
                 // Slide the orbit centre in the camera plane; scale by distance so the scene follows the cursor.
-                const k = root.distance * 0.0016
+                const k = root.distance * 0.0016 * App.mouseSensitivity
                 const r = root.activeCamera.right, u = root.activeCamera.up
                 root.target = Qt.vector3d(root.target.x - (r.x * dx - u.x * dy) * k,
                                           root.target.y - (r.y * dx - u.y * dy) * k,
@@ -886,11 +944,12 @@ Item {
         elide: Text.ElideRight
         opacity: 0.55
         font.pixelSize: 11
-        text: App.pinBrush ? tr("Pin: click vertices or drag a box  ·  Shift: add to the selection  ·  Right-click: Pin menu  ·  Ctrl-drag: orbit")
-            : root.measuring ? tr("Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  Ctrl-drag: orbit")
-            : root.pinchMode ? tr("Pinch: drag the cloth to pull it  ·  Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom")
-            : root.ripMode ? tr("Rip: drag across a piece of cloth to tear it  ·  Shift: straight tear  ·  Ctrl-drag: orbit  ·  Middle/right-drag: pan  ·  Wheel: zoom")
-                            : tr("Ctrl-drag: orbit  ·  Shift-drag: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap")
+        text: App.pinBrush
+            ? tr("Pin: click vertices or drag a box  ·  Shift: add to the selection  ·  Right-click: Pin menu  ·  %1: orbit").arg(orbitWords())
+            : root.measuring ? tr("Ruler: click two points on the cloth or avatar, or drag between them  ·  Click empty space: clear  ·  %1: orbit").arg(orbitWords())
+            : root.pinchMode ? tr("Pinch: drag the cloth to pull it  ·  %1: orbit  ·  %2: pan  ·  Wheel: zoom").arg(orbitWords()).arg(panWords(true))
+            : root.ripMode ? tr("Rip: drag across a piece of cloth to tear it  ·  Shift: straight tear  ·  %1: orbit  ·  %2: pan  ·  Wheel: zoom").arg(orbitWords()).arg(panWords(false))
+                            : tr("%1: orbit  ·  %2: pan  ·  Wheel: zoom  ·  Click: select  ·  Right-click: Edit menu  ·  Handles: move / rotate / scale (Q W E R)  ·  Shift: snap").arg(orbitWords()).arg(panWords(true))
     }
     Label {
         id: rendererLabel

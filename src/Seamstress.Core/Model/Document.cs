@@ -13,6 +13,9 @@ public sealed class Document
     public SimulationSettings Simulation { get; set; } = new();
     public AvatarSettings Avatar { get; set; } = new();
 
+    /// <summary>Pictures shown behind the pattern in the 2D view, for tracing or scale reference.</summary>
+    public List<ReferenceImage> References { get; set; } = new();
+
     public Document Clone() => new()
     {
         Name = Name,
@@ -20,6 +23,7 @@ public sealed class Document
         Materials = Materials.Select(m => m.Clone()).ToList(),
         Simulation = Simulation.Clone(),
         Avatar = Avatar.Clone(),
+        References = References.Select(r => r.Clone()).ToList(),
     };
 
     public Garment? FindGarment(string? id) => Garments.FirstOrDefault(g => g.Id == id);
@@ -469,6 +473,39 @@ public sealed class FabricPhysics
 
     public static FabricPhysics FromPreset(string name)
         => (Presets.FirstOrDefault(p => p.Preset.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? Presets[0]).Clone();
+}
+
+/// <summary>
+/// A picture placed behind the pattern in the 2D view. Its position and size are in pattern centimetres with Y up,
+/// like pattern pieces; the file itself is linked, not embedded in the project.
+/// </summary>
+public sealed class ReferenceImage
+{
+    public const float DefaultOpacity = 0.55f;
+
+    public string Id { get; set; } = Document.NewId();
+    public string Name { get; set; } = "Reference";
+
+    /// <summary>Absolute path in memory; saved relative to the project file when possible.</summary>
+    public string Path { get; set; } = "";
+
+    /// <summary>Centre of the image in pattern space (cm, Y up).</summary>
+    public Vector2 Position { get; set; }
+
+    /// <summary>Displayed width and height in pattern centimetres.</summary>
+    public float Width { get; set; } = 50f;
+    public float Height { get; set; } = 50f;
+
+    /// <summary>Counter-clockwise rotation in degrees.</summary>
+    public float Rotation { get; set; }
+
+    public float Opacity { get; set; } = DefaultOpacity;
+    public bool Visible { get; set; } = true;
+
+    /// <summary>Locked pictures stay in place: they cannot be clicked, moved, resized, turned or deleted in the view.</summary>
+    public bool Locked { get; set; }
+
+    public ReferenceImage Clone() => (ReferenceImage)MemberwiseClone();
 }
 
 public sealed class FabricMaterial

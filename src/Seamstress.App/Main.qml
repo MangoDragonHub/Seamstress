@@ -191,6 +191,8 @@ ApplicationWindow {
         "view.uv": () => App.uvMode = !App.uvMode,
         "view.frame": () => patternView.frameAll(),
         "view.avatar2d": () => App.showBodyOutline = !App.showBodyOutline,
+        // The orbit is a mouse gesture read by the 3D view's mouse area; a key given to it here does nothing.
+        "view.orbit": () => {},
         "view.ortho": () => viewport.orthographic = !viewport.orthographic,
         "view.front": () => viewport.setView(0, -5),
         "view.side": () => viewport.setView(90, -5),
@@ -210,6 +212,8 @@ ApplicationWindow {
     })
     function run(id) { if (commands[id]) commands[id]() }
     readonly property var bindings: { App.keysRevision; return JSON.parse(App.keyBindingsJson()) }
+    // Mouse-button gestures (the 3D orbit) never come from the keyboard; the 3D view's mouse area reads them.
+    function keyboardKeys(keys) { return keys.filter(k => /Mouse(Left|Middle|Right)/.test(k) === false) }
     // The first key of a command, for tooltips: " (V)", or nothing when it has no key.
     function keyHint(id) { App.keysRevision; const k = App.keyText(id); return k === "" ? "" : " (" + k + ")" }
     // Set while Preferences listens for a new key, so pressing it does not also run its command.
@@ -223,7 +227,8 @@ ApplicationWindow {
                 required property var modelData
                 Shortcut {
                     // While typing, keys without Ctrl, Alt or Meta belong to the text box.
-                    sequences: window.typing ? holder.modelData.keys.filter(k => /(^|\+)(Ctrl|Alt|Meta)\+/.test(k)) : holder.modelData.keys
+                    sequences: window.typing ? window.keyboardKeys(holder.modelData.keys).filter(k => /(^|\+)(Ctrl|Alt|Meta)\+/.test(k))
+                                             : window.keyboardKeys(holder.modelData.keys)
                     enabled: !window.recordingKey && sequences.length > 0
                     onActivated: window.run(holder.modelData.id)
                 }
@@ -336,6 +341,32 @@ ApplicationWindow {
                 MenuItem { text: tr("2D: Pattern"); checkable: true; checked: !App.uvMode; onTriggered: App.uvMode = false }
                 KeyMenuItem { text: tr("2D: UV Layout"); command: "view.uv"; checkable: true; checked: App.uvMode; onTriggered: App.uvMode = true }
                 KeyMenuItem { text: tr("2D: Show Avatar"); command: "view.avatar2d"; checkable: true; checked: App.showBodyOutline; onTriggered: App.showBodyOutline = checked }
+                Menu {
+                    id: referencesMenu
+                    title: tr("References")
+                    property var refs: []
+                    onAboutToShow: refs = JSON.parse(App.references())
+                    Component.onCompleted: refs = JSON.parse(App.references())
+                    MenuItem { text: tr("Add Reference Image…"); enabled: !App.uvMode; onTriggered: referenceDialog.open() }
+                    MenuItem { text: tr("Show References"); checkable: true; checked: App.showReferences; onTriggered: App.showReferences = checked }
+                    MenuSeparator {}
+                    Instantiator {
+                        model: referencesMenu.refs
+                        delegate: MenuItem {
+                            required property var modelData
+                            text: (modelData.selected ? "•  " : "   ")
+                                  + (modelData.missing ? "⚠  " : "")
+                                  + modelData.name
+                                  + (modelData.visible ? "" : "  (" + tr("(hidden)") + ")")
+                                  + (modelData.locked ? "  (" + tr("(locked)") + ")" : "")
+                            onTriggered: App.selectReference(modelData.id)
+                        }
+                        onObjectAdded: (index, object) => referencesMenu.insertItem(index + 3, object)
+                        onObjectRemoved: (index, object) => referencesMenu.removeItem(object)
+                    }
+                    MenuSeparator {}
+                    MenuItem { text: tr("Remove All References"); enabled: referencesMenu.refs.some(r => !r.locked); onTriggered: App.removeAllReferences() }
+                }
                 KeyMenuItem { text: tr("Frame All in 2D"); command: "view.frame"; onTriggered: patternView.frameAll() }
                 MenuSeparator {}
                 KeyMenuItem { text: tr("3D: Orthographic"); command: "view.ortho"; checkable: true; checked: viewport.orthographic; onTriggered: viewport.orthographic = checked }
@@ -599,6 +630,13 @@ ApplicationWindow {
         nameFilters: [tr("Images") + " (*.png *.jpg *.jpeg *.webp *.bmp)", tr("All files") + " (*)"]
         currentFolder: StandardPaths.writableLocation(StandardPaths.PicturesLocation)
         onAccepted: App.setMaterialTexture(selectedFile)
+    }
+    FileDialog {
+        id: referenceDialog
+        title: tr("Add Reference Image")
+        nameFilters: [tr("Images") + " (*.png *.jpg *.jpeg *.gif *.webp *.bmp)", tr("All files") + " (*)"]
+        currentFolder: StandardPaths.writableLocation(StandardPaths.PicturesLocation)
+        onAccepted: patternView.addReferenceImage(selectedFile)
     }
     FileDialog {
         id: avatarDialog

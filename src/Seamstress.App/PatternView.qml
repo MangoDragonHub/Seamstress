@@ -10,7 +10,7 @@ Item {
     clip: true
 
     function tr(text) { App.languageRevision; return App.tr(text) }
-    property var scene: ({ mode: "pattern", tool: "Select", pieces: [], seams: [], bounds: [-20, -20, 120, 100] })
+    property var scene: ({ mode: "pattern", tool: "Select", pieces: [], seams: [], references: [], bounds: [-20, -20, 120, 100] })
     // The avatar's front-view outline, in centimetres: the faded body scale reference.
     property var body: []
     property real zoom: 5
@@ -53,6 +53,7 @@ Item {
     function refresh() {
         scene = JSON.parse(App.patternScene())
         refreshBody()
+        loadReferenceImages()
         // Re-frame when switching between pattern and UV space, and the first time there is something to show.
         if (scene.mode !== framedMode || (!framedOnce && scene.pieces.length > 0)) {
             framedMode = scene.mode
@@ -61,6 +62,49 @@ Item {
             frameAll()
         }
         canvas.requestPaint()
+    }
+
+    // Reference images are loaded by the canvas itself; drawImage only paints once a URL has finished loading.
+    property var loadedReferences: ({})
+    function loadReferenceImages() {
+        const wanted = {}
+        if (!uv && App.showReferences) {
+            for (const reference of scene.references || []) {
+                const url = App.referenceUrl(reference.path)
+                reference.url = url
+                if (!reference.visible || url === "")
+                    continue
+                wanted[url] = true
+                if (!canvas.isImageLoaded(url) && !canvas.isImageLoading(url) && !canvas.isImageError(url))
+                    canvas.loadImage(url)
+            }
+        }
+        for (const url in loadedReferences) {
+            if (!wanted[url]) {
+                canvas.unloadImage(url)
+                delete loadedReferences[url]
+            }
+        }
+        for (const url in wanted)
+            loadedReferences[url] = true
+    }
+
+    // Adds a picture centred where the view is looking, sized to a comfortable part of the view.
+    function addReferenceImage(fileUrl) {
+        if (uv)
+            return
+        const maxWidth = Math.min(500, Math.max(10, width / zoom * 0.6))
+        const maxHeight = Math.min(500, Math.max(10, height / zoom * 0.6))
+        App.addReferenceImage(fileUrl, wx(width / 2), wy(height / 2), maxWidth, maxHeight)
+    }
+
+    // The four corners of a reference image in world space, clockwise from the bottom left.
+    function referenceCorners(reference) {
+        const radians = reference.rotation * Math.PI / 180
+        const c = Math.cos(radians), s = Math.sin(radians)
+        const halfWidth = reference.width / 2, halfHeight = reference.height / 2
+        const corners = [[-halfWidth, -halfHeight], [halfWidth, -halfHeight], [halfWidth, halfHeight], [-halfWidth, halfHeight]]
+        return corners.map(p => [reference.x + p[0] * c - p[1] * s, reference.y + p[0] * s + p[1] * c])
     }
 
     // Called again whenever a freshly built avatar arrives.
@@ -92,6 +136,12 @@ Item {
         const shown = !root.uv && App.showBodyOutline ? bodyBounds() : null
         if (shown !== null)
             b = [Math.min(b[0], shown[0]), Math.min(b[1], shown[1]), Math.max(b[2], shown[2]), Math.max(b[3], shown[3])]
+        for (const reference of root.scene.references || []) {
+            if (!reference.visible)
+                continue
+            for (const corner of root.referenceCorners(reference))
+                b = [Math.min(b[0], corner[0]), Math.min(b[1], corner[1]), Math.max(b[2], corner[0]), Math.max(b[3], corner[1])]
+        }
         const w = Math.max(b[2] - b[0], 1e-6), h = Math.max(b[3] - b[1], 1e-6)
         const margin = 48
         zoom = Math.min((width - 2 * margin) / w, (height - 2 * margin) / h)
@@ -117,6 +167,7 @@ Item {
         id: canvas
         anchors.fill: parent
         renderStrategy: Canvas.Cooperative
+        onImageLoaded: requestPaint()
 
         function trace(ctx, pts, close) {
             ctx.beginPath()
@@ -210,6 +261,21 @@ Item {
                     const y = i * step
                     ctx.strokeStyle = i === 0 ? App.themeGridAxis : (i % perMajor === 0 ? App.themeGridMajor : App.themeGridMinor)
                     ctx.beginPath(); ctx.moveTo(0, Math.round(root.sy(y)) + 0.5); ctx.lineTo(width, Math.round(root.sy(y)) + 0.5); ctx.stroke()
+                }
+            }
+
+            // Reference images: on the grid but behind the avatar and the pattern.
+            if (!root.uv && App.showReferences) {
+                for (const reference of s.references || []) {
+                    if (!reference.visible || !reference.url || !canvas.isImageLoaded(reference.url))
+                        continue
+                    const w = reference.width * root.zoom, h = reference.height * root.zoom
+                    ctx.save()
+                    ctx.globalAlpha = reference.opacity
+                    ctx.translate(root.sx(reference.x), root.sy(reference.y))
+                    ctx.rotate(-reference.rotation * Math.PI / 180)
+                    ctx.drawImage(reference.url, -w / 2, -h / 2, w, h)
+                    ctx.restore()
                 }
             }
 
@@ -428,6 +494,56 @@ Item {
                     const angle = Math.atan2(dy, dx) * 180 / Math.PI
                     measure(ctx, (s.ruler[0] + s.ruler[2]) / 2, (s.ruler[1] + s.ruler[3]) / 2,
                             root.lengthText(s.ruler[4]) + "   " + angle.toFixed(0) + "°", -uy, -ux)
+                }
+            }
+
+            // The selected reference image's frame and handles, above the pattern so they stay reachable.
+            if (!root.uv && App.showReferences) {
+                for (const reference of s.references || []) {
+                    if (!reference.selected || !reference.visible)
+                        continue
+                    const corners = root.referenceCorners(reference)
+                    ctx.strokeStyle = reference.locked ? withAlpha(root.accent, 0.45) : root.accent
+                    ctx.lineWidth = 1.5
+                    ctx.setLineDash([5, 4])
+                    ctx.beginPath()
+                    for (let i = 0; i < corners.length; i++) {
+                        const x = root.sx(corners[i][0]), y = root.sy(corners[i][1])
+                        if (i === 0) ctx.moveTo(x, y)
+                        else ctx.lineTo(x, y)
+                    }
+                    ctx.closePath()
+                    ctx.stroke()
+                    ctx.setLineDash([])
+
+                    if (!reference.locked) {
+                        // Rotation handle on a short stalk above the top edge.
+                        const radians = reference.rotation * Math.PI / 180
+                        const c = Math.cos(radians), sn = Math.sin(radians)
+                        const topX = reference.x - reference.height / 2 * sn
+                        const topY = reference.y + reference.height / 2 * c
+                        const handleX = reference.x - (reference.height / 2 + 28 / root.zoom) * sn
+                        const handleY = reference.y + (reference.height / 2 + 28 / root.zoom) * c
+                        ctx.strokeStyle = root.accent
+                        ctx.lineWidth = 1
+                        ctx.beginPath()
+                        ctx.moveTo(root.sx(topX), root.sy(topY))
+                        ctx.lineTo(root.sx(handleX), root.sy(handleY))
+                        ctx.stroke()
+                        ctx.fillStyle = App.themePointFill
+                        ctx.strokeStyle = root.accent
+                        ctx.lineWidth = 1.5
+                        ctx.beginPath(); ctx.arc(root.sx(handleX), root.sy(handleY), 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+
+                        for (const corner of corners) {
+                            const x = root.sx(corner[0]), y = root.sy(corner[1])
+                            ctx.fillStyle = App.themePointFill
+                            ctx.strokeStyle = "#1b1c1f"
+                            ctx.lineWidth = 1
+                            ctx.fillRect(x - 4, y - 4, 8, 8)
+                            ctx.strokeRect(x - 4, y - 4, 8, 8)
+                        }
+                    }
                 }
             }
 

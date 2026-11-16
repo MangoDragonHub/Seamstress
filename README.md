@@ -16,7 +16,9 @@ Marvelous Designer.
   pocket openings and the like; the cut-out becomes a new piece, and the hole's edges can be sewn like any
   other. A faint
   front view of the avatar is drawn behind the pieces, so you can see where the garment will fall on the
-  body; **View ▸ 2D: Show Avatar** hides it.
+  body; **View ▸ 2D: Show Avatar** hides it. **View ▸ References** places pictures behind the pieces and the
+  body outline, for tracing a clothing reference or a pattern guide; drag, scale and rotate them in the view,
+  or lock them in place and set their position, size and opacity in Properties.
 - **3D view** – shows the sewn pieces on an avatar. Orbit, pan, zoom, click to select, and drag the arrows and
   rings on a selected piece to move and rotate it. **Pinch** lets you drag the cloth itself, during or after
   simulation, to tug bunched-up areas into place. **Rip** tears a piece by dragging across its surface (Shift

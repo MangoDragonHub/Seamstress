@@ -39,7 +39,14 @@ public enum PatternTool
 /// </summary>
 public sealed class PatternEditor
 {
-    private enum Drag { None, Pieces, Point, Control, Bend, Shape, Uv, PointsMove, PointsRotate, PointsScale, Marquee, Ruler, InsetWidth, Cut, SewBox }
+    private enum Drag
+    {
+        None, Pieces, Point, Control, Bend, Shape, Uv, PointsMove, PointsRotate, PointsScale, Marquee, Ruler,
+        InsetWidth, Cut, SewBox,
+        ReferenceMove, ReferenceScale, ReferenceRotate,
+    }
+
+    private enum ReferenceHandle { None, TopLeft, TopRight, BottomRight, BottomLeft, Rotate }
 
     /// <summary>Sizes of the 2D handles in screen pixels: the length of the arrows and the radius of the ring.</summary>
     public const float GizmoArrow = 64, GizmoRing = 88;
@@ -51,6 +58,8 @@ public sealed class PatternEditor
     public const float GizmoScaleFull = 112, GizmoScaleAlone = 64, GizmoScaleEven = 40;
 
     private readonly record struct PointStart(string PieceId, int Index, Vector2 World, Vector2? Curve, bool MoveCurve);
+
+    private readonly record struct ReferenceStart(Vector2 Position, float Width, float Height, float Rotation, int CornerX, int CornerY);
 
     private readonly Workspace _workspace;
     private PatternTool _tool = PatternTool.Select;
@@ -88,6 +97,9 @@ public sealed class PatternEditor
     private float _insetWidth = DefaultInsetWidth;
     private EdgeRef? _insetDrag;                            // the edge a width drag started on
     private bool _insetWasChosen;                           // ...and whether it was chosen before the press
+    private string _referenceId = "";
+    private ReferenceStart _referenceStart;
+    private bool _showReferences = true;
 
     /// <summary>Raised when something only the 2D view shows (hover, draft shape, tool) changed.</summary>
     public event Action? Changed;
@@ -123,6 +135,19 @@ public sealed class PatternEditor
                 return;
             Cancel();
             _uvMode = value;
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>Whether reference images are drawn and can be selected in the pattern view.</summary>
+    public bool ShowReferences
+    {
+        get => _showReferences;
+        set
+        {
+            if (_showReferences == value)
+                return;
+            _showReferences = value;
             Changed?.Invoke();
         }
     }
@@ -522,6 +547,136 @@ public sealed class PatternEditor
         return null;
     }
 
+    // ---------------------------------------------------------------- reference images
+
+    private ReferenceImage? SelectedReference
+        => Doc.References.FirstOrDefault(r => r.Id == _workspace.SelectedReferenceId);
+
+    /// <summary>The topmost reference image under a point in pattern space, or null.</summary>
+    public ReferenceImage? HitReference(Vector2 world)
+    {
+        if (_uvMode || !_showReferences)
+            return null;
+        // Later references are drawn on top, so test them first.
+        for (int i = Doc.References.Count - 1; i >= 0; i--)
+        {
+            var reference = Doc.References[i];
+            if (!reference.Visible || reference.Locked || reference.Width <= 0 || reference.Height <= 0)
+                continue;
+            float radians = -reference.Rotation * MathF.PI / 180;
+            float c = MathF.Cos(radians), s = MathF.Sin(radians);
+            var d = world - reference.Position;
+            var local = new Vector2(d.X * c - d.Y * s, d.X * s + d.Y * c);
+            if (MathF.Abs(local.X) <= reference.Width / 2 && MathF.Abs(local.Y) <= reference.Height / 2)
+                return reference;
+        }
+        return null;
+    }
+
+    /// <summary>Selects the reference image under a point; false when there is none.</summary>
+    public bool SelectReferenceAt(Vector2 world)
+    {
+        if (HitReference(world) is not { } reference)
+            return false;
+        _workspace.SelectReference(reference.Id);
+        return true;
+    }
+
+    private static Vector2 ReferencePoint(ReferenceImage reference, float localX, float localY)
+    {
+        float radians = reference.Rotation * MathF.PI / 180;
+        float c = MathF.Cos(radians), s = MathF.Sin(radians);
+        return reference.Position + new Vector2(localX * c - localY * s, localX * s + localY * c);
+    }
+
+    /// <summary>How far beyond the top edge the rotation handle sits, in screen pixels.</summary>
+    private const float ReferenceRotationOffset = 28;
+
+    private ReferenceHandle ReferenceHandleAt(Vector2 world, float tolerance)
+    {
+        if (SelectedReference is not { Visible: true, Locked: false } reference)
+            return ReferenceHandle.None;
+        float pixel = tolerance / 9f;
+        bool On(Vector2 point) => Vector2.Distance(world, point) <= 8 * pixel;
+        float halfWidth = reference.Width / 2, halfHeight = reference.Height / 2;
+        if (On(ReferencePoint(reference, -halfWidth, halfHeight))) return ReferenceHandle.TopLeft;
+        if (On(ReferencePoint(reference, halfWidth, halfHeight))) return ReferenceHandle.TopRight;
+        if (On(ReferencePoint(reference, halfWidth, -halfHeight))) return ReferenceHandle.BottomRight;
+        if (On(ReferencePoint(reference, -halfWidth, -halfHeight))) return ReferenceHandle.BottomLeft;
+        if (On(ReferencePoint(reference, 0, halfHeight + ReferenceRotationOffset * pixel))) return ReferenceHandle.Rotate;
+        return ReferenceHandle.None;
+    }
+
+    private bool ReferenceDown(Vector2 world, float tolerance)
+    {
+        if (SelectedReference is not { Visible: true, Locked: false } reference)
+            return false;
+        var handle = ReferenceHandleAt(world, tolerance);
+        if (handle == ReferenceHandle.None)
+            return false;
+        (int x, int y) = handle switch
+        {
+            ReferenceHandle.TopLeft => (-1, 1),
+            ReferenceHandle.TopRight => (1, 1),
+            ReferenceHandle.BottomRight => (1, -1),
+            ReferenceHandle.BottomLeft => (-1, -1),
+            _ => (0, 0),
+        };
+        _referenceId = reference.Id;
+        _referenceStart = new ReferenceStart(reference.Position, reference.Width, reference.Height, reference.Rotation, x, y);
+        _drag = handle == ReferenceHandle.Rotate ? Drag.ReferenceRotate : Drag.ReferenceScale;
+        return true;
+    }
+
+    private void MoveReference(Vector2 world)
+    {
+        if (Doc.References.FirstOrDefault(r => r.Id == _referenceId) is not { Locked: false } reference)
+            return;
+        var delta = world - _dragStart;
+        if (_constrain)
+            delta = SnapMove(_referenceStart.Position, delta);
+        reference.Position = _referenceStart.Position + delta;
+        _workspace.History.NotifyLiveChange();
+    }
+
+    private void ScaleReference(Vector2 world)
+    {
+        if (Doc.References.FirstOrDefault(r => r.Id == _referenceId) is not { Locked: false } reference)
+            return;
+        float radians = _referenceStart.Rotation * MathF.PI / 180;
+        var alongX = new Vector2(MathF.Cos(radians), MathF.Sin(radians));
+        var alongY = new Vector2(-MathF.Sin(radians), MathF.Cos(radians));
+        int sx = _referenceStart.CornerX, sy = _referenceStart.CornerY;
+        // Keep the opposite corner fixed while the dragged one follows the pointer, preserving the aspect ratio.
+        var anchor = _referenceStart.Position - alongX * (sx * _referenceStart.Width / 2) - alongY * (sy * _referenceStart.Height / 2);
+        var d = world - anchor;
+        float across = Vector2.Dot(d, alongX) * sx;
+        float up = Vector2.Dot(d, alongY) * sy;
+        float scale = MathF.Max(across / _referenceStart.Width, up / _referenceStart.Height);
+        if (_constrain)
+            scale = MathF.Round(scale * 10) / 10;
+        scale = MathF.Max(scale, 0.02f);
+        reference.Width = _referenceStart.Width * scale;
+        reference.Height = _referenceStart.Height * scale;
+        reference.Position = anchor + alongX * (sx * reference.Width / 2) + alongY * (sy * reference.Height / 2);
+        _workspace.History.NotifyLiveChange();
+    }
+
+    private void RotateReference(Vector2 world)
+    {
+        if (Doc.References.FirstOrDefault(r => r.Id == _referenceId) is not { Locked: false } reference)
+            return;
+        var from = _dragStart - _referenceStart.Position;
+        var to = world - _referenceStart.Position;
+        if (from.LengthSquared() < 1e-10f || to.LengthSquared() < 1e-10f)
+            return;
+        float angle = MathF.Atan2(to.Y, to.X) - MathF.Atan2(from.Y, from.X);
+        if (_constrain)
+            angle = MathF.Round(angle / (MathF.PI / 12)) * (MathF.PI / 12);
+        reference.Rotation = _referenceStart.Rotation + angle * 180 / MathF.PI;
+        _workspace.History.NotifyLiveChange();
+    }
+
     // ---------------------------------------------------------------- transform points
 
     /// <summary>The selected points that still exist, in selection order.</summary>
@@ -788,6 +943,11 @@ public sealed class PatternEditor
             case PatternTool.Select:
                 {
                     _pointsAxis = 0;
+                    if (!additive && ReferenceDown(world, tolerance))
+                    {
+                        Measure();
+                        break;
+                    }
                     if (!additive && GizmoDown(world, tolerance))
                     {
                         Measure();
@@ -807,6 +967,13 @@ public sealed class PatternEditor
                             _workspace.SelectPiece(piece.Id, additive);
                         if (_workspace.SelectedPieces.Contains(piece.Id))
                             _drag = Drag.Pieces;
+                    }
+                    else if (HitReference(world) is { } reference)
+                    {
+                        _workspace.SelectReference(reference.Id);
+                        _referenceId = reference.Id;
+                        _referenceStart = new ReferenceStart(reference.Position, reference.Width, reference.Height, reference.Rotation, 0, 0);
+                        _drag = Drag.ReferenceMove;
                     }
                     else
                     {
@@ -966,6 +1133,9 @@ public sealed class PatternEditor
                 case Drag.PointsMove: _workspace.History.Begin(_pointStarts.Count == 1 ? Lang.T("Move point") : Lang.T("Move points")); break;
                 case Drag.PointsRotate: _workspace.History.Begin(_tool == PatternTool.Select ? Lang.T("Rotate pieces") : Lang.T("Rotate points")); break;
                 case Drag.PointsScale: _workspace.History.Begin(_tool == PatternTool.Select ? Lang.T("Scale pieces") : Lang.T("Scale points")); break;
+                case Drag.ReferenceMove: _workspace.History.Begin(Lang.T("Move reference image")); break;
+                case Drag.ReferenceScale: _workspace.History.Begin(Lang.T("Scale reference image")); break;
+                case Drag.ReferenceRotate: _workspace.History.Begin(Lang.T("Rotate reference image")); break;
             }
         }
         _dragLast = world;
@@ -1055,6 +1225,15 @@ public sealed class PatternEditor
                     InsetWidth = width;
                 }
                 return;
+            case Drag.ReferenceMove:
+                MoveReference(world);
+                return;
+            case Drag.ReferenceScale:
+                ScaleReference(world);
+                return;
+            case Drag.ReferenceRotate:
+                RotateReference(world);
+                return;
         }
 
         if (_uvMode)
@@ -1123,6 +1302,9 @@ public sealed class PatternEditor
             case Drag.PointsMove:
             case Drag.PointsRotate:
             case Drag.PointsScale:
+            case Drag.ReferenceMove:
+            case Drag.ReferenceScale:
+            case Drag.ReferenceRotate:
                 if (_dragMoved)
                     _workspace.History.Commit();
                 break;
@@ -1354,6 +1536,7 @@ public sealed class PatternEditor
         _sewBoxAdditive = false;
         _insetEdges.Clear();
         _insetDrag = null;
+        _referenceId = "";
         Changed?.Invoke();
     }
 
@@ -1687,6 +1870,29 @@ public sealed class PatternEditor
                 sb.Append(']');
             }
         }
+        // Pictures drawn behind the pattern: position and size in pattern centimetres, centre and Y up.
+        sb.Append(",\"references\":[");
+        if (!_uvMode && _showReferences)
+        {
+            for (int i = 0; i < Doc.References.Count; i++)
+            {
+                var reference = Doc.References[i];
+                if (i > 0)
+                    sb.Append(',');
+                sb.Append("{\"id\":").Append(Q(reference.Id));
+                sb.Append(",\"name\":").Append(Q(reference.Name));
+                sb.Append(",\"path\":").Append(Q(reference.Path));
+                sb.Append(inv, $",\"x\":{reference.Position.X:0.###},\"y\":{reference.Position.Y:0.###}");
+                sb.Append(inv, $",\"width\":{reference.Width:0.###},\"height\":{reference.Height:0.###}");
+                sb.Append(inv, $",\"rotation\":{reference.Rotation:0.###},\"opacity\":{reference.Opacity:0.###}");
+                sb.Append(",\"visible\":").Append(reference.Visible ? "true" : "false");
+                sb.Append(",\"locked\":").Append(reference.Locked ? "true" : "false");
+                sb.Append(",\"selected\":").Append(reference.Id == _workspace.SelectedReferenceId ? "true" : "false");
+                sb.Append('}');
+            }
+        }
+        sb.Append(']');
+
         if (_uvMode)
         {
             min = Vector2.Zero;

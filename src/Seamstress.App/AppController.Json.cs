@@ -95,6 +95,25 @@ public partial class AppController
         return sb.Append(']').ToString();
     }
 
+    /// <summary>The 2D view's reference images, for the View ▸ References menu.</summary>
+    public string References()
+    {
+        var doc = _workspace.Document;
+        var sb = new StringBuilder("[");
+        for (int i = 0; i < doc.References.Count; i++)
+        {
+            var reference = doc.References[i];
+            if (i > 0)
+                sb.Append(',');
+            sb.Append("{\"id\":").Append(Q(reference.Id)).Append(",\"name\":").Append(Q(reference.Name));
+            sb.Append(",\"visible\":").Append(B(reference.Visible));
+            sb.Append(",\"locked\":").Append(B(reference.Locked));
+            sb.Append(",\"selected\":").Append(B(reference.Id == _workspace.SelectedReferenceId));
+            sb.Append(",\"missing\":").Append(B(!File.Exists(reference.Path))).Append('}');
+        }
+        return sb.Append(']').ToString();
+    }
+
     /// <summary>Everything the properties panel shows for the current selection.</summary>
     public string Selection()
     {
@@ -103,7 +122,8 @@ public partial class AppController
         var pieces = _workspace.SelectedPieceObjects().ToList();
         var garment = _workspace.ActiveGarment;
         var seam = doc.Garments.SelectMany(g => g.Seams).FirstOrDefault(s => s.Id == _workspace.SelectedSeamId);
-        string kind = seam != null ? "seam" : pieces.Count > 0 ? "pieces" : garment != null ? "garment" : "none";
+        var reference = doc.References.FirstOrDefault(r => r.Id == _workspace.SelectedReferenceId);
+        string kind = reference != null ? "reference" : seam != null ? "seam" : pieces.Count > 0 ? "pieces" : garment != null ? "garment" : "none";
         sb.Append("\"kind\":\"").Append(kind).Append("\",\"count\":").Append(pieces.Count);
 
         if (garment != null)
@@ -119,6 +139,18 @@ public partial class AppController
             sb.Append(",\"quads\":").Append(mesh?.QuadCount ?? 0).Append(",\"topology\":\"").Append(garment.Topology).Append('"');
             sb.Append(",\"pieces\":").Append(garment.Pieces.Count).Append(",\"seams\":").Append(garment.Seams.Count);
             sb.Append(",\"simulateWithOthers\":").Append(B(garment.SimulateWithOthers)).Append('}');
+        }
+
+        if (reference != null)
+        {
+            sb.Append(",\"reference\":{\"id\":").Append(Q(reference.Id)).Append(",\"name\":").Append(Q(reference.Name));
+            sb.Append(",\"path\":").Append(Q(reference.Path));
+            sb.Append(",\"file\":").Append(Q(Path.GetFileName(reference.Path)));
+            sb.Append(",\"missing\":").Append(B(!File.Exists(reference.Path)));
+            sb.Append(",\"x\":").Append(N(reference.Position.X)).Append(",\"y\":").Append(N(reference.Position.Y));
+            sb.Append(",\"width\":").Append(N(reference.Width)).Append(",\"height\":").Append(N(reference.Height));
+            sb.Append(",\"rotation\":").Append(N(reference.Rotation)).Append(",\"opacity\":").Append(N(reference.Opacity));
+            sb.Append(",\"visible\":").Append(B(reference.Visible)).Append(",\"locked\":").Append(B(reference.Locked)).Append('}');
         }
 
         if (pieces.Count > 0)
@@ -236,6 +268,8 @@ public partial class AppController
         _editor.UvMode = options.UvMode;
         if (options.SelectFirst && _workspace.Document.AllPieces().FirstOrDefault() is { } firstPiece)
             _workspace.SelectPiece(firstPiece.Id);
+        if (options.View.Contains("references") && _workspace.Document.References.FirstOrDefault() is { } firstReference)
+            _workspace.SelectReference(firstReference.Id);
         if (options.View.Contains("measure") && _workspace.Document.AllPieces().FirstOrDefault() is { } measured)
         {
             // For documentation screenshots: click the middle of the first piece's first edge.

@@ -679,6 +679,10 @@ public class DocumentTests
         Assert.Equal("Num+5", KeyBindings.Normalize("keypad+5"));
         Assert.Equal("Escape", KeyBindings.Normalize("esc"));
         Assert.Equal("", KeyBindings.Normalize("Hyper+X"));
+        // The 3D orbit's mouse gestures are written like keys, with "MouseLeft", "MouseMiddle" or "MouseRight".
+        Assert.Equal("Ctrl+MouseLeft", KeyBindings.Normalize("ctrl+mouseleft"));
+        Assert.Equal("MouseMiddle", KeyBindings.Normalize("MOUSEMIDDLE"));
+        Assert.Equal("Shift+MouseRight", KeyBindings.Normalize("shift+mouseright"));
 
         // Every command has a unique id, and the defaults never clash with each other.
         var commands = KeyBindings.Commands;
@@ -710,6 +714,24 @@ public class DocumentTests
             var loaded = AppSettings.Load(path);
             Assert.Empty(KeyBindings.For(loaded, "tool.select"));
             Assert.Equal(new[] { "Ctrl+M" }, KeyBindings.For(loaded, "edit.mirror"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void SettingsKeepTheMouseSensitivity()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "seamstress-sensitivity-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            Assert.Equal(1, new AppSettings().MouseSensitivity);
+            new AppSettings { MouseSensitivity = 2.5 }.Save(path);
+            Assert.Equal(2.5, AppSettings.Load(path).MouseSensitivity);
+            // A settings file from an earlier version has none; the camera keeps its usual speed.
+            Assert.Equal(1, AppSettings.Load(Path.Combine(Path.GetTempPath(), "seamstress-missing-" + Guid.NewGuid().ToString("N") + ".json")).MouseSensitivity);
         }
         finally
         {

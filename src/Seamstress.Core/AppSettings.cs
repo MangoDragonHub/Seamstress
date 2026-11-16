@@ -44,6 +44,12 @@ public sealed class AppSettings
     /// <summary>The grid size and snap step used until the user chooses their own.</summary>
     public static double DefaultGridStep(bool imperial) => imperial ? 10.16 : 10;
 
+    /// <summary>Multiplier on how fast the 3D camera follows the mouse (orbiting and panning); 1 is the usual speed.</summary>
+    public double MouseSensitivity { get; set; } = 1;
+
+    /// <summary>The range the Preferences dialog lets the mouse sensitivity be set to, as a multiplier.</summary>
+    public const double MinMouseSensitivity = 0.25, MaxMouseSensitivity = 3;
+
     /// <summary>Keyboard shortcuts the user changed, by command id (see <see cref="KeyBindings"/>); the rest keep their defaults.</summary>
     public Dictionary<string, string[]> Shortcuts { get; set; } = new();
 

@@ -53,6 +53,9 @@ public static class KeyBindings
         new("view.uv", "View", "Pattern / UV Layout", new[] { "U" }),
         new("view.frame", "View", "Frame All in 2D", new[] { "F" }),
         new("view.avatar2d", "View", "2D: Show Avatar", Array.Empty<string>()),
+        // The 3D orbit is a mouse gesture: the button is written "MouseLeft", "MouseMiddle" or "MouseRight", with
+        // any of the modifiers in front, and the 3D view's mouse area reads it.
+        new("view.orbit", "View", "3D: Orbit", new[] { "Ctrl+MouseLeft" }),
         new("view.ortho", "View", "3D: Orthographic", new[] { "5", "Num+5" }),
         new("view.front", "View", "3D: Front", new[] { "1", "Num+1" }),
         new("view.side", "View", "3D: Side", new[] { "3", "Num+3" }),
@@ -131,6 +134,9 @@ public static class KeyBindings
             "Del" => "Delete",
             "Pgup" => "PgUp",
             "Pgdown" => "PgDown",
+            "Mouseleft" => "MouseLeft",
+            "Mousemiddle" => "MouseMiddle",
+            "Mouseright" => "MouseRight",
             _ => main,
         };
         var ordered = ModifierOrder.Where(modifiers.Contains).Append(main);
