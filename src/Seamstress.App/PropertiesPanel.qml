@@ -143,6 +143,7 @@ Pane {
                 font.bold: true
                 elide: Text.ElideRight
                 text: root.sel.kind === "seam" ? tr("Seam")
+                    : root.sel.kind === "reference" ? root.sel.reference.name
                     : root.sel.kind === "pieces" ? root.sel.piece.name
                     : root.sel.kind === "garment" ? root.sel.garment.name
                     : tr("Properties")
@@ -157,10 +158,91 @@ Pane {
                 text: tr("Nothing selected. Add a garment from the Garment menu or draw a piece in the 2D view.")
             }
 
+            // ---- Reference image -----------------------------------------------------
+            Section {
+                title: tr("Reference Image")
+                visible: root.sel.kind === "reference"
+                InfoRow {
+                    label: tr("File")
+                    value: root.sel.reference ? (root.sel.reference.missing ? "⚠ " + tr("missing:") + " " : "") + root.sel.reference.file : ""
+                }
+                Label {
+                    visible: root.sel.reference ? root.sel.reference.missing : false
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    color: App.themeWarningText
+                    font.pixelSize: 11
+                    text: root.sel.reference ? root.sel.reference.path : ""
+                }
+                CheckBox {
+                    text: tr("Lock Reference")
+                    checked: root.sel.reference ? root.sel.reference.locked : false
+                    onToggled: if (root.sel.reference) App.setReferenceLocked(root.sel.reference.id, checked)
+                }
+                Label {
+                    visible: root.sel.reference ? root.sel.reference.locked : false
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.6
+                    font.pixelSize: 11
+                    text: tr("Locked references stay in place. Unlock to move or resize them.")
+                }
+                NumberRow {
+                    label: tr("Position X"); suffix: root.lengthName
+                    enabled: root.sel.reference ? !root.sel.reference.locked : false
+                    decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.5 : 1
+                    value: (root.sel.reference ? root.sel.reference.x : 0) / root.cmUnit
+                    onEdited: (v) => App.setReferenceValue("x", v * root.cmUnit)
+                }
+                NumberRow {
+                    label: tr("Position Y"); suffix: root.lengthName
+                    enabled: root.sel.reference ? !root.sel.reference.locked : false
+                    decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.5 : 1
+                    value: (root.sel.reference ? root.sel.reference.y : 0) / root.cmUnit
+                    onEdited: (v) => App.setReferenceValue("y", v * root.cmUnit)
+                }
+                NumberRow {
+                    label: tr("Width"); suffix: root.lengthName
+                    enabled: root.sel.reference ? !root.sel.reference.locked : false
+                    decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.5 : 1; from: 0.1
+                    value: (root.sel.reference ? root.sel.reference.width : 0) / root.cmUnit
+                    onEdited: (v) => App.setReferenceValue("width", v * root.cmUnit)
+                }
+                NumberRow {
+                    label: tr("Height"); suffix: root.lengthName
+                    enabled: root.sel.reference ? !root.sel.reference.locked : false
+                    decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.5 : 1; from: 0.1
+                    value: (root.sel.reference ? root.sel.reference.height : 0) / root.cmUnit
+                    onEdited: (v) => App.setReferenceValue("height", v * root.cmUnit)
+                }
+                NumberRow {
+                    label: tr("Rotation"); suffix: "°"; decimals: 1; step: 5
+                    enabled: root.sel.reference ? !root.sel.reference.locked : false
+                    value: root.sel.reference ? root.sel.reference.rotation : 0
+                    onEdited: (v) => App.setReferenceValue("rotation", v)
+                }
+                SliderRow {
+                    label: tr("Opacity"); from: 0; to: 1; stepSize: 0.05; decimals: 2
+                    value: root.sel.reference ? root.sel.reference.opacity : 0
+                    onEdited: (v) => App.setReferenceValue("opacity", v)
+                }
+                CheckBox {
+                    text: tr("Show Reference")
+                    checked: root.sel.reference ? root.sel.reference.visible : false
+                    onToggled: if (root.sel.reference) App.setReferenceVisible(root.sel.reference.id, checked)
+                }
+                Button {
+                    Layout.fillWidth: true
+                    text: tr("Remove Reference")
+                    enabled: root.sel.reference ? !root.sel.reference.locked : false
+                    onClicked: App.deleteSelection()
+                }
+            }
+
             // ---- Topology ------------------------------------------------------------
             Section {
                 title: tr("Topology")
-                visible: !!root.sel.garment
+                visible: !!root.sel.garment && root.sel.kind !== "reference"
                 SliderRow {
                     label: tr("Particle distance")
                     from: root.imperial ? 0.2 : 0.5; to: root.imperial ? 2.4 : 6
@@ -222,7 +304,7 @@ Pane {
             // ---- Garment thickness ---------------------------------------------------
             Section {
                 title: tr("Garment Thickness")
-                visible: !!root.sel.garment
+                visible: !!root.sel.garment && root.sel.kind !== "reference"
                 CheckBox {
                     Layout.fillWidth: true
                     text: tr("Enable Thickness? (Apply per Garment)")
@@ -455,6 +537,7 @@ Pane {
             // ---- Simulation ----------------------------------------------------------
             Section {
                 title: tr("Simulation")
+                visible: root.sel.kind !== "reference"
                 open: root.sel.kind !== "pieces"
                 CheckBox {
                     visible: !!root.sel.garment

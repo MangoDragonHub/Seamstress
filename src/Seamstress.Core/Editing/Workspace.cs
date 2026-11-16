@@ -32,6 +32,9 @@ public sealed class Workspace
     /// <summary>The garment or group row highlighted in the layers panel, if any.</summary>
     public string? SelectedLayerId { get; private set; }
 
+    /// <summary>The 2D reference image selected in the pattern view, if any.</summary>
+    public string? SelectedReferenceId { get; private set; }
+
     public string? ActiveGarmentId { get; private set; }
 
     public event Action? SelectionChanged;
@@ -171,6 +174,7 @@ public sealed class Workspace
         SelectedSeamId = null;
         SelectedPoint = null;
         SelectedLayerId = null;
+        SelectedReferenceId = null;
         PinSelection.Clear();
         _pinSelectionKeys.Clear();
     }
@@ -188,6 +192,7 @@ public sealed class Workspace
         SelectedSeamId = null;
         SelectedPoint = null;
         SelectedLayerId = null;
+        SelectedReferenceId = null;
         if (additive)
         {
             if (!SelectedPieces.Remove(pieceId))
@@ -226,6 +231,16 @@ public sealed class Workspace
         SelectedPieces.Add(pieceId);
         SelectedPoint = (pieceId, index);
         ActiveGarmentId = Document.GarmentOfPiece(pieceId)?.Id ?? ActiveGarmentId;
+        SelectionChanged?.Invoke();
+    }
+
+    /// <summary>Selects a reference image in the 2D view, clearing any piece or seam selection.</summary>
+    public void SelectReference(string referenceId)
+    {
+        if (!Document.References.Any(r => r.Id == referenceId))
+            return;
+        ClearSelectionState();
+        SelectedReferenceId = referenceId;
         SelectionChanged?.Invoke();
     }
 
@@ -481,6 +496,11 @@ public sealed class Workspace
             SelectedLayerId = null;
             changed = true;
         }
+        if (SelectedReferenceId != null && !Document.References.Any(r => r.Id == SelectedReferenceId))
+        {
+            SelectedReferenceId = null;
+            changed = true;
+        }
         if (Document.FindGarment(ActiveGarmentId) == null)
         {
             ActiveGarmentId = Document.Garments.FirstOrDefault()?.Id;
@@ -566,6 +586,15 @@ public sealed class Workspace
 
     public void DeleteSelection()
     {
+        if (SelectedReferenceId != null)
+        {
+            string id = SelectedReferenceId;
+            // Locked pictures must be unlocked before they can be removed.
+            if (Document.References.FirstOrDefault(r => r.Id == id) is { Locked: true })
+                return;
+            History.Execute(Lang.T("Delete reference image"), doc => doc.References.RemoveAll(r => r.Id == id));
+            return;
+        }
         if (SelectedSeamId != null)
         {
             string id = SelectedSeamId;
@@ -2571,5 +2600,102 @@ public sealed class Workspace
             foreach (var piece in doc.AllPieces().Where(p => ids.Contains(p.Id)))
                 piece.MaterialId = materialId;
         });
+    }
+
+    // ---------------------------------------------------------------- 2D reference images
+
+    /// <summary>Adds a picture behind the pattern and selects it. Width and height are in pattern centimetres.</summary>
+    public ReferenceImage AddReference(string path, string name, Vector2 position, float width, float height)
+    {
+        var reference = new ReferenceImage
+        {
+            Path = path,
+            Name = string.IsNullOrWhiteSpace(name) ? Path.GetFileNameWithoutExtension(path) : name.Trim(),
+            Position = position,
+            Width = Math.Clamp(width, 0.1f, 100000f),
+            Height = Math.Clamp(height, 0.1f, 100000f),
+        };
+        History.Execute(Lang.T("Add reference image"), doc => doc.References.Add(reference));
+        SelectReference(reference.Id);
+        return reference;
+    }
+
+    public void RemoveReference(string referenceId)
+    {
+        var reference = Document.References.FirstOrDefault(r => r.Id == referenceId);
+        if (reference == null || reference.Locked)
+            return;
+        History.Execute(Lang.T("Delete reference image"), doc => doc.References.RemoveAll(r => r.Id == referenceId));
+    }
+
+    public void RemoveAllReferences()
+    {
+        if (!Document.References.Any(r => !r.Locked))
+            return;
+        History.Execute(Lang.T("Remove reference images"), doc => doc.References.RemoveAll(r => !r.Locked));
+    }
+
+    /// <summary>Changes a value of the selected reference image: x, y, width, height, rotation or opacity.</summary>
+    public void SetReferenceValue(string key, float value)
+    {
+        if (SelectedReferenceId is not { } id || !float.IsFinite(value))
+            return;
+        // A lock holds the picture in place; its opacity can still be changed for tracing.
+        if (key != "opacity" && Document.References.FirstOrDefault(r => r.Id == id) is { Locked: true })
+            return;
+        History.Execute(ReferenceValueName(key), doc =>
+        {
+            var reference = doc.References.FirstOrDefault(r => r.Id == id);
+            if (reference != null)
+                ApplyReferenceValue(reference, key, value);
+        }, "reference:" + id + ":" + key);
+    }
+
+    public void SetReferenceLocked(string referenceId, bool locked)
+    {
+        var reference = Document.References.FirstOrDefault(r => r.Id == referenceId);
+        if (reference == null || reference.Locked == locked)
+            return;
+        History.Execute(locked ? Lang.T("Lock reference") : Lang.T("Unlock reference"), doc =>
+        {
+            var target = doc.References.FirstOrDefault(r => r.Id == referenceId);
+            if (target != null)
+                target.Locked = locked;
+        });
+    }
+
+    public void SetReferenceVisible(string referenceId, bool visible)
+    {
+        var reference = Document.References.FirstOrDefault(r => r.Id == referenceId);
+        if (reference == null || reference.Visible == visible)
+            return;
+        History.Execute(visible ? Lang.T("Show") : Lang.T("Hide"), doc =>
+        {
+            var target = doc.References.FirstOrDefault(r => r.Id == referenceId);
+            if (target != null)
+                target.Visible = visible;
+        });
+    }
+
+    private static string ReferenceValueName(string key) => key switch
+    {
+        "x" or "y" => Lang.T("Change position"),
+        "width" or "height" => Lang.T("Change reference size"),
+        "rotation" => Lang.T("Change rotation"),
+        "opacity" => Lang.T("Change reference opacity"),
+        _ => Lang.T("Change reference image"),
+    };
+
+    private static void ApplyReferenceValue(ReferenceImage reference, string key, float value)
+    {
+        switch (key)
+        {
+            case "x": reference.Position = reference.Position with { X = value }; break;
+            case "y": reference.Position = reference.Position with { Y = value }; break;
+            case "width": reference.Width = Math.Clamp(value, 0.1f, 100000f); break;
+            case "height": reference.Height = Math.Clamp(value, 0.1f, 100000f); break;
+            case "rotation": reference.Rotation = value; break;
+            case "opacity": reference.Opacity = Math.Clamp(value, 0, 1); break;
+        }
     }
 }

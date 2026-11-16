@@ -187,6 +187,30 @@ changing the body shape redraws it. **View ▸ 2D: Show Avatar** turns it off an
 
 ![The avatar's front view drawn faintly behind the T-shirt pieces](images/avatar-2d.png)
 
+### Reference images
+
+**View ▸ References ▸ Add Reference Image…** places a photo or a scanned pattern guide behind the pattern.
+PNG, JPEG, GIF, BMP and WebP images can be used. References are drawn under the avatar outline and the
+pieces, so they never hide the garment; lower their **Opacity** in Properties to trace over them more easily.
+
+- With the **Select** tool, click a reference where no piece is in the way to select it, then drag the picture
+  to move it. **View ▸ References** selects one from the list too, whatever the current tool.
+- Drag a corner handle to resize it evenly; the round handle above the top edge turns it. Hold **Shift** while
+  moving to snap its centre to the grid, while resizing for steps of a tenth, or while turning for 15° steps.
+- The Properties panel shows its file, position, width, height, rotation and opacity, and has a **Remove
+  Reference** button. **Delete** removes the selected reference too.
+- **Lock Reference** in Properties holds a picture in place: it can no longer be clicked, moved, resized,
+  turned or deleted in the view. Choose it from **View ▸ References** to reach it, then untick **Lock
+  Reference** to edit or remove it. Opacity and visibility can still be changed while it is locked.
+- **View ▸ References** lists every picture, marks hidden and missing ones, and has **Remove All References**.
+  Untick **Show References** there to hide all of them while working on the pattern.
+- The image file is linked, not copied into the project. Saving keeps a path relative to the project file when
+  the picture is in the same folder or below it; moving or deleting the file later leaves the reference in the
+  project with a warning in Properties.
+
+References are only part of the 2D pattern view: they are not shown in the UV layout or the 3D view, and they
+are not exported.
+
 ### Drawing pieces
 
 New pieces go into the active garment. If there is none, one is created.

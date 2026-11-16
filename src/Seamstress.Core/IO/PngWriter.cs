@@ -32,6 +32,34 @@ public static class PngWriter
         WriteChunk(file, "IEND", Array.Empty<byte>());
     }
 
+    /// <summary>Writes straight-alpha RGBA pixels as an 8-bit RGBA PNG.</summary>
+    public static void WriteRgba(string path, int width, int height, byte[] rgba)
+    {
+        if (rgba.Length != width * height * 4)
+            throw new ArgumentException("Pixel buffer does not match the image size.");
+        using var file = File.Create(path);
+        file.Write(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+
+        var header = new byte[13];
+        WriteBigEndian(header, 0, (uint)width);
+        WriteBigEndian(header, 4, (uint)height);
+        header[8] = 8;  // bits per channel
+        header[9] = 6;  // colour type: RGBA
+        WriteChunk(file, "IHDR", header);
+
+        using var data = new MemoryStream();
+        using (var zlib = new ZLibStream(data, CompressionLevel.Fastest, leaveOpen: true))
+        {
+            for (int y = 0; y < height; y++)
+            {
+                zlib.WriteByte(0); // filter type: none
+                zlib.Write(rgba, y * width * 4, width * 4);
+            }
+        }
+        WriteChunk(file, "IDAT", data.ToArray());
+        WriteChunk(file, "IEND", Array.Empty<byte>());
+    }
+
     /// <summary>
     /// Writes a checkerboard with numbered-looking contrast cells, used to judge texel density and distortion.
     /// </summary>

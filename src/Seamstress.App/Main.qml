@@ -339,6 +339,32 @@ ApplicationWindow {
                 MenuItem { text: tr("2D: Pattern"); checkable: true; checked: !App.uvMode; onTriggered: App.uvMode = false }
                 KeyMenuItem { text: tr("2D: UV Layout"); command: "view.uv"; checkable: true; checked: App.uvMode; onTriggered: App.uvMode = true }
                 KeyMenuItem { text: tr("2D: Show Avatar"); command: "view.avatar2d"; checkable: true; checked: App.showBodyOutline; onTriggered: App.showBodyOutline = checked }
+                Menu {
+                    id: referencesMenu
+                    title: tr("References")
+                    property var refs: []
+                    onAboutToShow: refs = JSON.parse(App.references())
+                    Component.onCompleted: refs = JSON.parse(App.references())
+                    MenuItem { text: tr("Add Reference Image…"); enabled: !App.uvMode; onTriggered: referenceDialog.open() }
+                    MenuItem { text: tr("Show References"); checkable: true; checked: App.showReferences; onTriggered: App.showReferences = checked }
+                    MenuSeparator {}
+                    Instantiator {
+                        model: referencesMenu.refs
+                        delegate: MenuItem {
+                            required property var modelData
+                            text: (modelData.selected ? "•  " : "   ")
+                                  + (modelData.missing ? "⚠  " : "")
+                                  + modelData.name
+                                  + (modelData.visible ? "" : "  (" + tr("(hidden)") + ")")
+                                  + (modelData.locked ? "  (" + tr("(locked)") + ")" : "")
+                            onTriggered: App.selectReference(modelData.id)
+                        }
+                        onObjectAdded: (index, object) => referencesMenu.insertItem(index + 3, object)
+                        onObjectRemoved: (index, object) => referencesMenu.removeItem(object)
+                    }
+                    MenuSeparator {}
+                    MenuItem { text: tr("Remove All References"); enabled: referencesMenu.refs.some(r => !r.locked); onTriggered: App.removeAllReferences() }
+                }
                 KeyMenuItem { text: tr("Frame All in 2D"); command: "view.frame"; onTriggered: patternView.frameAll() }
                 MenuSeparator {}
                 KeyMenuItem { text: tr("3D: Orthographic"); command: "view.ortho"; checkable: true; checked: viewport.orthographic; onTriggered: viewport.orthographic = checked }
@@ -600,6 +626,13 @@ ApplicationWindow {
         nameFilters: [tr("Images") + " (*.png *.jpg *.jpeg *.webp *.bmp)", tr("All files") + " (*)"]
         currentFolder: StandardPaths.writableLocation(StandardPaths.PicturesLocation)
         onAccepted: App.setMaterialTexture(selectedFile)
+    }
+    FileDialog {
+        id: referenceDialog
+        title: tr("Add Reference Image")
+        nameFilters: [tr("Images") + " (*.png *.jpg *.jpeg *.gif *.webp *.bmp)", tr("All files") + " (*)"]
+        currentFolder: StandardPaths.writableLocation(StandardPaths.PicturesLocation)
+        onAccepted: patternView.addReferenceImage(selectedFile)
     }
     FileDialog {
         id: avatarDialog

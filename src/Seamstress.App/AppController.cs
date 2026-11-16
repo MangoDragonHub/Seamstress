@@ -27,6 +27,7 @@ public partial class AppController : INotifyPropertyChanged
     private readonly PatternEditor _editor;
     private readonly SimulationController _simulation;
     private readonly ViewportSync _viewport = new();
+    private readonly ReferenceImageCache _referenceImages = new();
     private readonly AppSettings _settings = AppSettings.Load();
 
     private Avatar? _avatar;
@@ -327,6 +328,74 @@ public partial class AppController : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Whether reference images are drawn behind the pattern.</summary>
+    public bool ShowReferences
+    {
+        get => _editor.ShowReferences;
+        set
+        {
+            if (_editor.ShowReferences == value)
+                return;
+            _editor.ShowReferences = value;
+            Notify();
+        }
+    }
+
+    /// <summary>Adds a picture behind the pattern, centred where the 2D view is looking; sizes are in pattern centimetres.</summary>
+    public void AddReferenceImage(string fileUrl, double centreX, double centreY, double maxWidth, double maxHeight)
+    {
+        string path = LocalPath(fileUrl);
+        string name = Path.GetFileName(path);
+        if (!File.Exists(path) || ImageSize.TryRead(path) is not { } pixels)
+        {
+            Fail(Lang.F("Could not read the image {0}.", name));
+            return;
+        }
+        float fitWidth = float.IsFinite((float)maxWidth) ? Math.Clamp((float)maxWidth, 1, 500) : 60;
+        float fitHeight = float.IsFinite((float)maxHeight) ? Math.Clamp((float)maxHeight, 1, 500) : 60;
+        float scale = MathF.Min(fitWidth / pixels.Width, fitHeight / pixels.Height);
+        // The window is already showing the pattern, so make sure the new reference can be positioned right away.
+        if (_editor.UvMode)
+            UvMode = false;
+        if (_editor.Tool != PatternTool.Select)
+            Tool = "Select";
+        _referenceImages.Url(path); // WebP pictures are decoded to a PNG cache before the view first asks for them.
+        _workspace.AddReference(path, Path.GetFileNameWithoutExtension(path),
+            new Vector2((float)centreX, (float)centreY), pixels.Width * scale, pixels.Height * scale);
+        StatusText = Lang.T("Reference image added.");
+    }
+
+    public void SelectReference(string referenceId)
+    {
+        // The handles only appear with the Select tool; choosing a reference from the menu should show them.
+        if (_editor.Tool != PatternTool.Select)
+            Tool = "Select";
+        _workspace.SelectReference(referenceId);
+    }
+
+    public void RemoveAllReferences() => _workspace.RemoveAllReferences();
+
+    public void SetReferenceValue(string key, double value) => _workspace.SetReferenceValue(key, (float)value);
+
+    public void SetReferenceVisible(string referenceId, bool visible) => _workspace.SetReferenceVisible(referenceId, visible);
+
+    public void SetReferenceLocked(string referenceId, bool locked) => _workspace.SetReferenceLocked(referenceId, locked);
+
+    /// <summary>URL the 2D canvas loads a reference image from.</summary>
+    public string ReferenceUrl(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return "";
+        try
+        {
+            return _referenceImages.Url(Path.GetFullPath(LocalPath(path)));
+        }
+        catch (Exception e) when (e is UriFormatException or ArgumentException or NotSupportedException)
+        {
+            return "";
+        }
+    }
+
     /// <summary>
     /// The current avatar's outline as seen from the front, in pattern centimetres: a list of loops
     /// ([[x,y,…],…]), the first one outermost. The outline is traced once per avatar.
@@ -408,11 +477,20 @@ public partial class AppController : INotifyPropertyChanged
         }
     }
 
-    /// <summary>Right-click in the 2D view: the piece under the pointer becomes the selection unless it already belongs to it.</summary>
+    /// <summary>
+    /// Right-click in the 2D view: the piece under the pointer becomes the selection unless it already belongs to
+    /// it; with no piece there, a reference image behind the pattern is selected instead.
+    /// </summary>
     public void ContextSelect(double x, double y)
     {
-        if (_editor.HitPiece(new Vector2((float)x, (float)y)) is { } piece && !_workspace.SelectedPieces.Contains(piece.Id))
-            _workspace.SelectPiece(piece.Id);
+        var point = new Vector2((float)x, (float)y);
+        if (_editor.HitPiece(point) is { } piece)
+        {
+            if (!_workspace.SelectedPieces.Contains(piece.Id))
+                _workspace.SelectPiece(piece.Id);
+            return;
+        }
+        _editor.SelectReferenceAt(point);
     }
 
     /// <summary>Right-click in the 3D view, as <see cref="ContextSelect"/>.</summary>
@@ -1461,6 +1539,7 @@ public partial class AppController : INotifyPropertyChanged
         AppLog.Write("Seamstress closed.");
         _simulation.Dispose();
         _viewport.Dispose();
+        _referenceImages.Dispose();
         AppLog.Stop();
     }
 

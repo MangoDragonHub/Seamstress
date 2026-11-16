@@ -64,6 +64,30 @@ public static class GarmentFile
             }
             w.WriteEndObject();
 
+            // Pictures shown behind the pattern in the 2D view. Their paths are stored like texture paths.
+            w.WriteStartArray("references");
+            foreach (var r in doc.References)
+            {
+                w.WriteStartObject();
+                w.WriteString("id", r.Id);
+                w.WriteString("name", r.Name);
+                w.WriteString("path", Relativize(r.Path, baseFolder));
+                w.WritePropertyName("position");
+                w.WriteRawValue(V(r.Position));
+                w.WriteNumber("width", r.Width);
+                w.WriteNumber("height", r.Height);
+                if (MathF.Abs(r.Rotation) > 1e-6f)
+                    w.WriteNumber("rotation", r.Rotation);
+                if (MathF.Abs(r.Opacity - ReferenceImage.DefaultOpacity) > 1e-6f)
+                    w.WriteNumber("opacity", r.Opacity);
+                if (!r.Visible)
+                    w.WriteBoolean("visible", false);
+                if (r.Locked)
+                    w.WriteBoolean("locked", true);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+
             w.WriteStartArray("materials");
             foreach (var m in doc.Materials)
             {
@@ -268,6 +292,24 @@ public static class GarmentFile
                 doc.Avatar.Height = Math.Clamp(Num(shape, "height", 0.5f), 0, 1);
                 doc.Avatar.Proportions = Math.Clamp(Num(shape, "proportions", 0.5f), 0, 1);
             }
+        }
+        foreach (var r in Items(root, "references"))
+        {
+            string? path = Resolve(Str(r, "path"), baseFolder);
+            if (string.IsNullOrEmpty(path))
+                continue;
+            var reference = new ReferenceImage();
+            reference.Id = Str(r, "id") ?? reference.Id;
+            reference.Path = path;
+            reference.Name = Str(r, "name") ?? System.IO.Path.GetFileNameWithoutExtension(path);
+            reference.Position = Vec2(r, "position", Vector2.Zero);
+            reference.Width = Math.Clamp(Finite(Num(r, "width", reference.Width), reference.Width), 0.1f, 100000f);
+            reference.Height = Math.Clamp(Finite(Num(r, "height", reference.Height), reference.Height), 0.1f, 100000f);
+            reference.Rotation = Finite(Num(r, "rotation", 0), 0);
+            reference.Opacity = Math.Clamp(Finite(Num(r, "opacity", ReferenceImage.DefaultOpacity), ReferenceImage.DefaultOpacity), 0, 1);
+            reference.Visible = Bool(r, "visible", true);
+            reference.Locked = Bool(r, "locked", false);
+            doc.References.Add(reference);
         }
         foreach (var m in Items(root, "materials"))
         {
@@ -474,6 +516,8 @@ public static class GarmentFile
 
     private static float Num(JsonElement parent, string name, float fallback)
         => parent.ValueKind == JsonValueKind.Object && parent.TryGetProperty(name, out var e) && e.ValueKind == JsonValueKind.Number ? e.GetSingle() : fallback;
+
+    private static float Finite(float value, float fallback) => float.IsFinite(value) ? value : fallback;
 
     private static bool Bool(JsonElement parent, string name, bool fallback)
         => parent.ValueKind == JsonValueKind.Object && parent.TryGetProperty(name, out var e) && e.ValueKind is JsonValueKind.True or JsonValueKind.False
