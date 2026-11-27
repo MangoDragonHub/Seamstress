@@ -49,7 +49,7 @@ internal static class GodotExporter
         string glb = bundleName + ".glb";
         string tscn = bundleName + ".tscn";
         var sb = new StringBuilder();
-        sb.Append("# ").Append(EngineBundle.DisplayName(CollateNames(scene))).Append(" — Godot 4 garment\n\n");
+        sb.Append("# ").Append(EngineBundle.DisplayName(EngineBundle.SceneName(scene))).Append(" — Godot 4 garment\n\n");
         sb.Append("Exported from Seamstress. This is a static draped garment; it has no skeleton or animation.\n\n");
         sb.Append("## Files\n\n");
         sb.Append("- `").Append(glb).Append("` — mesh, UVs, normals and PBR materials. Textures are embedded.\n");
@@ -62,9 +62,6 @@ internal static class GodotExporter
         sb.Append("metallic, roughness, texture repeat and double-sided rendering.\n");
         return sb.ToString();
     }
-
-    private static string CollateNames(ExportScene scene)
-        => scene.Meshes.Count == 1 ? scene.Meshes[0].Name : "Garments";
 
     private static string GodotString(string text)
         => text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n");

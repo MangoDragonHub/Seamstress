@@ -24,6 +24,10 @@ internal static class EngineBundle
         return path;
     }
 
+    /// <summary>The display name for a bundle's contents: one garment's name, or "Garments".</summary>
+    public static string SceneName(ExportScene scene)
+        => scene.Meshes.Count == 1 ? scene.Meshes[0].Name : "Garments";
+
     public static int TriangleCount(ExportScene scene) => scene.Meshes.Sum(m => m.TriangleCount);
 
     public static int FaceCount(ExportScene scene) => scene.Meshes.Sum(m => m.FaceCount);

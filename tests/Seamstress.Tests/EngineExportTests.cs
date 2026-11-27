@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Seamstress.Core;
 using Seamstress.Core.Editing;
 using Seamstress.Core.IO;
@@ -125,12 +126,123 @@ public class EngineExportTests : IDisposable
     }
 
     [Fact]
+    public void O3deBundleContainsPortableFbxTexturesAndMaterials()
+    {
+        _ws.Document.Materials[1].Opacity = 0.5f;
+        var result = EngineExport.Export(_ws.Document, _ws.MeshFor, EngineTarget.O3de, _folder,
+            new EngineExportOptions { BundleName = "Summer Outfit" });
+
+        Assert.Equal(EngineTarget.O3de, result.Target);
+        Assert.Equal(Path.Combine(_folder, "Summer_Outfit"), result.OutputPath);
+        var files = Directory.GetFiles(result.OutputPath, "*", SearchOption.AllDirectories)
+            .Select(p => Path.GetRelativePath(result.OutputPath, p).Replace('\\', '/'))
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("Summer_Outfit.fbx", files);
+        Assert.Contains("README.md", files);
+        Assert.Contains("Textures/checker.png", files);
+        Assert.Contains("Materials/Shirt_fabric.material", files);
+        Assert.Contains("Materials/Skirt_fabric.material", files);
+
+        string fbx = Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(result.OutputPath, "Summer_Outfit.fbx")));
+        Assert.Contains("Textures/checker.png", fbx);
+        Assert.Contains("Shirt_fabric", fbx);
+        Assert.DoesNotContain(_folder, fbx);
+
+        string shirtPath = Path.Combine(result.OutputPath, "Materials", "Shirt_fabric.material");
+        using var shirt = JsonDocument.Parse(File.ReadAllText(shirtPath));
+        var shirtRoot = shirt.RootElement;
+        Assert.Equal("Materials/Types/StandardPBR.materialtype", shirtRoot.GetProperty("materialType").GetString());
+        Assert.Equal(5, shirtRoot.GetProperty("materialTypeVersion").GetInt32());
+        var shirtProps = shirtRoot.GetProperty("propertyValues");
+        Assert.True(shirtProps.GetProperty("baseColor.useTexture").GetBoolean());
+        Assert.Equal("../Textures/checker.png", shirtProps.GetProperty("baseColor.textureMap").GetString());
+        Assert.Equal(4, shirtProps.GetProperty("baseColor.color").GetArrayLength());
+        Assert.Equal(1f, shirtProps.GetProperty("baseColor.color")[3].GetSingle());
+        Assert.Equal(2f, shirtProps.GetProperty("uv.tileU").GetSingle());
+        Assert.Equal(2f, shirtProps.GetProperty("uv.tileV").GetSingle());
+        Assert.Equal("Opaque", shirtProps.GetProperty("opacity.mode").GetString());
+        Assert.True(shirtProps.GetProperty("general.doubleSided").GetBoolean());
+        Assert.False(shirtProps.GetProperty("metallic.useTexture").GetBoolean());
+        Assert.False(shirtProps.GetProperty("roughness.useTexture").GetBoolean());
+
+        string skirtPath = Path.Combine(result.OutputPath, "Materials", "Skirt_fabric.material");
+        using var skirt = JsonDocument.Parse(File.ReadAllText(skirtPath));
+        var skirtProps = skirt.RootElement.GetProperty("propertyValues");
+        Assert.False(skirtProps.GetProperty("baseColor.useTexture").GetBoolean());
+        Assert.False(skirtProps.TryGetProperty("baseColor.textureMap", out _));
+        Assert.False(skirtProps.TryGetProperty("uv.tileU", out _));
+        Assert.Equal("Blended", skirtProps.GetProperty("opacity.mode").GetString());
+        Assert.Equal("None", skirtProps.GetProperty("opacity.alphaSource").GetString());
+        Assert.Equal(0.5, skirtProps.GetProperty("opacity.factor").GetDouble(), 3);
+
+        string texturePath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(shirtPath)!,
+            shirtProps.GetProperty("baseColor.textureMap").GetString()!.Replace('/', Path.DirectorySeparatorChar)));
+        Assert.True(File.Exists(texturePath));
+        Assert.Equal(File.ReadAllBytes(_texture), File.ReadAllBytes(texturePath));
+
+        string readme = File.ReadAllText(Path.Combine(result.OutputPath, "README.md"));
+        Assert.Contains("O3DE", readme);
+        Assert.Contains("Assets/Seamstress/Summer_Outfit/", readme);
+    }
+
+    [Fact]
+    public void O3deMaterialPropertiesMatchInstalledStandardPbr()
+    {
+        string? assets = O3deAssetsRoot();
+        if (assets == null)
+            return;
+        string materialTypePath = Path.Combine(assets, "Materials", "Types", "StandardPBR.materialtype");
+        if (!File.Exists(materialTypePath))
+            return;
+        var (version, allowed) = StandardPbrProperties(materialTypePath);
+
+        var result = EngineExport.Export(_ws.Document, _ws.MeshFor, EngineTarget.O3de, _folder,
+            new EngineExportOptions { BundleName = "checked" });
+        foreach (string path in Directory.GetFiles(Path.Combine(result.OutputPath, "Materials"), "*.material"))
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            Assert.Equal(version, doc.RootElement.GetProperty("materialTypeVersion").GetInt32());
+            foreach (var property in doc.RootElement.GetProperty("propertyValues").EnumerateObject())
+                Assert.True(allowed.Contains(property.Name),
+                    $"{Path.GetFileName(path)}: '{property.Name}' is not a StandardPBR property");
+        }
+    }
+
+    private static string? O3deAssetsRoot()
+    {
+        string root = Environment.GetEnvironmentVariable("SEAMSTRESS_O3DE") ?? "/opt/O3DE/26.10";
+        string assets = Path.Combine(root, "Gems", "Atom", "Feature", "Common", "Assets");
+        return Directory.Exists(assets) ? assets : null;
+    }
+
+    /// <summary>The installed StandardPBR material type's version and every property id it defines.</summary>
+    private static (int Version, HashSet<string> Properties) StandardPbrProperties(string materialTypePath)
+    {
+        var options = new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
+        using var materialType = JsonDocument.Parse(File.ReadAllText(materialTypePath), options);
+        int version = materialType.RootElement.GetProperty("version").GetInt32();
+        var properties = new HashSet<string>(StringComparer.Ordinal);
+        string folder = Path.GetDirectoryName(materialTypePath)!;
+        foreach (var group in materialType.RootElement.GetProperty("propertyLayout").GetProperty("propertyGroups").EnumerateArray())
+        {
+            if (!group.TryGetProperty("$import", out var import))
+                continue;
+            string path = Path.Combine(folder, import.GetString()!.Replace('/', Path.DirectorySeparatorChar));
+            using var groupFile = JsonDocument.Parse(File.ReadAllText(path), options);
+            string name = groupFile.RootElement.GetProperty("name").GetString()!;
+            foreach (var property in groupFile.RootElement.GetProperty("properties").EnumerateArray())
+                properties.Add(name + "." + property.GetProperty("name").GetString());
+        }
+        return (version, properties);
+    }
+
+    [Fact]
     public void UnimplementedEngineTargetsFailClearly()
     {
         var scene = Scene();
         var options = new EngineExportOptions { BundleName = "outfit" };
-        var error = Assert.Throws<NotSupportedException>(() => EngineExport.Export(scene, EngineTarget.Unity, _folder, options));
-        Assert.Contains("Unity", error.Message);
+        var error = Assert.Throws<NotSupportedException>(() => EngineExport.Export(scene, EngineTarget.Unreal, _folder, options));
+        Assert.Contains("Unreal", error.Message);
         Assert.Contains("not available yet", error.Message);
     }
 }
