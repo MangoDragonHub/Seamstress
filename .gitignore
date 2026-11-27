@@ -64,3 +64,6 @@ TestResults/
 dist/
 .tools/
 .flatpak-builder/
+
+# Local planning notes; intentionally not shared through the repository
+ROADMAP.local.txt

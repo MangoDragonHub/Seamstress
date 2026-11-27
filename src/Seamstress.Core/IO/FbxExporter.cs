@@ -52,14 +52,26 @@ public static class FbxExporter
     internal sealed record Raw(byte[] Data);
 
     public static void Export(ExportScene scene, string path)
+        => Export(scene, path, textureRelativePaths: null, portableTexturePaths: false);
+
+    /// <summary>
+    /// Writes the scene, optionally using textures that the caller has already placed beside the file.
+    /// With <paramref name="portableTexturePaths"/>, the FBX stores only bundle-relative paths instead of paths
+    /// from this machine.
+    /// </summary>
+    /// <param name="textureRelativePaths">Texture paths relative to the FBX file; when given, no textures are copied.</param>
+    /// <param name="portableTexturePaths">Write only relative texture paths into the FBX.</param>
+    public static void Export(ExportScene scene, string path,
+        IReadOnlyDictionary<FabricMaterial, string>? textureRelativePaths, bool portableTexturePaths)
     {
         string folder = Path.GetDirectoryName(Path.GetFullPath(path))!;
-        var root = BuildDocument(scene, folder);
+        var root = BuildDocument(scene, folder, textureRelativePaths, portableTexturePaths);
         using var file = File.Create(path);
         Write(root, file);
     }
 
-    internal static List<Node> BuildDocument(ExportScene scene, string? textureFolder)
+    internal static List<Node> BuildDocument(ExportScene scene, string? textureFolder,
+        IReadOnlyDictionary<FabricMaterial, string>? textureRelativePaths = null, bool portableTexturePaths = false)
     {
         long nextId = 1_000_000;
         long NewId() => nextId++;
@@ -193,8 +205,21 @@ public static class FbxExporter
             if (textured.Contains(material))
             {
                 string source = material.Texture!;
-                string relative = textureFolder != null ? TextureFiles.CopyNextTo(source, textureFolder) ?? Path.GetFileName(source) : Path.GetFileName(source);
-                string absolute = textureFolder != null ? Path.Combine(textureFolder, relative) : source;
+                string relative;
+                if (textureRelativePaths != null && textureRelativePaths.TryGetValue(material, out string? mapped))
+                {
+                    relative = mapped.Replace('\\', '/');
+                }
+                else
+                {
+                    relative = textureFolder != null
+                        ? TextureFiles.CopyNextTo(source, textureFolder) ?? Path.GetFileName(source)
+                        : Path.GetFileName(source);
+                }
+                // Engine bundles must not contain paths from the machine that made them.
+                string absolute = portableTexturePaths
+                    ? relative
+                    : textureFolder != null ? Path.Combine(textureFolder, relative) : source;
                 string textureName = materialNames[material] + "_diffuse";
                 long videoId = NewId(), textureId = NewId();
 
