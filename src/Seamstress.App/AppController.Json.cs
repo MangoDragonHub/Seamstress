@@ -130,6 +130,7 @@ public partial class AppController
             sb.Append(",\"x\":").Append(N(form.Position.X)).Append(",\"y\":").Append(N(form.Position.Y)).Append(",\"z\":").Append(N(form.Position.Z));
             sb.Append(",\"rx\":").Append(N(form.Rotation.X)).Append(",\"ry\":").Append(N(form.Rotation.Y)).Append(",\"rz\":").Append(N(form.Rotation.Z));
             sb.Append(",\"sx\":").Append(N(form.Size.X)).Append(",\"sy\":").Append(N(form.Size.Y)).Append(",\"sz\":").Append(N(form.Size.Z));
+            sb.Append(",\"friction\":").Append(N(form.Friction));
             sb.Append(",\"garmentId\":").Append(Q(form.GarmentId ?? "")).Append('}');
         }
         return sb.Append(']').ToString();
@@ -182,6 +183,7 @@ public partial class AppController
             sb.Append(",\"x\":").Append(N(collider.Position.X)).Append(",\"y\":").Append(N(collider.Position.Y)).Append(",\"z\":").Append(N(collider.Position.Z));
             sb.Append(",\"rx\":").Append(N(collider.Rotation.X)).Append(",\"ry\":").Append(N(collider.Rotation.Y)).Append(",\"rz\":").Append(N(collider.Rotation.Z));
             sb.Append(",\"sx\":").Append(N(collider.Size.X)).Append(",\"sy\":").Append(N(collider.Size.Y)).Append(",\"sz\":").Append(N(collider.Size.Z));
+            sb.Append(",\"friction\":").Append(N(collider.Friction));
             sb.Append(",\"garmentId\":").Append(Q(collider.GarmentId ?? ""));
             sb.Append(",\"visible\":").Append(B(collider.Visible)).Append(",\"collides\":").Append(B(collider.Collides)).Append('}');
         }

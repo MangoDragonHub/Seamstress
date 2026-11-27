@@ -21,6 +21,7 @@ Item {
     // Distance of the scale boxes from the handle centre, in handle units (an arrow is 1 long).
     readonly property real scaleReach: App.gizmoMode === "Full" ? 1.2 : 0.85
     property bool pinchMode: false
+    readonly property bool colliderPicking: !App.simulating && !root.pinchMode && !root.ripMode && !App.pinBrush && !root.measuring
     readonly property real pinchRadiusCm: App.pinchRadiusCm
     onPinchModeChanged: {
         if (pinchMode) {
@@ -371,6 +372,7 @@ Item {
         Repeater3D {
             model: colliderModel
             delegate: Node {
+                id: colliderItem
                 required property string cid
                 required property string shape
                 required property bool ghostVisible
@@ -399,13 +401,17 @@ Item {
                     emissiveFactor: selected ? Qt.vector3d(0.35, 0.25, 0.05) : Qt.vector3d(0.02, 0.08, 0.1)
                 }
                 Model {
+                    property string colliderId: colliderItem.cid
                     visible: shape === "Sphere"
+                    pickable: root.colliderPicking && ghostVisible
                     source: "#Sphere"
                     scale: Qt.vector3d(sx / 100, sx / 100, sx / 100)
                     materials: ghostMaterial
                 }
                 Model {
+                    property string colliderId: colliderItem.cid
                     visible: shape === "Box"
+                    pickable: root.colliderPicking && ghostVisible
                     source: "#Cube"
                     scale: Qt.vector3d(sx / 100, sy / 100, sz / 100)
                     materials: ghostMaterial
@@ -413,17 +419,23 @@ Item {
                 Node {
                     visible: shape === "Capsule"
                     Model {
+                        property string colliderId: colliderItem.cid
+                        pickable: root.colliderPicking && ghostVisible
                         source: "#Cylinder"
                         scale: Qt.vector3d(sx / 100, capsuleLength / 100, sx / 100)
                         materials: ghostMaterial
                     }
                     Model {
+                        property string colliderId: colliderItem.cid
+                        pickable: root.colliderPicking && ghostVisible
                         source: "#Sphere"
                         y: capsuleLength / 2
                         scale: Qt.vector3d(sx / 100, sx / 100, sx / 100)
                         materials: ghostMaterial
                     }
                     Model {
+                        property string colliderId: colliderItem.cid
+                        pickable: root.colliderPicking && ghostVisible
                         source: "#Sphere"
                         y: -capsuleLength / 2
                         scale: Qt.vector3d(sx / 100, sx / 100, sx / 100)
@@ -922,7 +934,9 @@ Item {
                     root.rulerOpen = false
             } else if (travelled < 4 && e.button === Qt.RightButton) {
                 const hit = view.pick(e.x, e.y)
-                if (App.pinBrush) {
+                if (hit.objectHit && hit.objectHit.colliderId) {
+                    App.selectCollider(hit.objectHit.colliderId)
+                } else if (App.pinBrush) {
                     App.activate3D(hit.objectHit && hit.objectHit.pid ? hit.objectHit.pid : "")
                     root.pinMenuRequested()
                 } else {
@@ -940,10 +954,14 @@ Item {
             } else if (travelled < 4 && e.button === Qt.LeftButton && root.measuring) {
                 root.clearRuler()      // a click on empty space
             } else if (travelled < 4 && e.button === Qt.LeftButton && !root.ripMode) {
-                // A click without dragging selects the piece under the cursor.
+                // A click without dragging selects the collider or piece under the cursor.
                 const hit = view.pick(e.x, e.y)
-                const additive = (e.modifiers & Qt.ControlModifier) !== 0 || (e.modifiers & Qt.ShiftModifier) !== 0
-                App.selectIn3D(hit.objectHit && hit.objectHit.pid ? hit.objectHit.pid : "", additive)
+                if (hit.objectHit && hit.objectHit.colliderId) {
+                    App.selectCollider(hit.objectHit.colliderId)
+                } else {
+                    const additive = (e.modifiers & Qt.ControlModifier) !== 0 || (e.modifiers & Qt.ShiftModifier) !== 0
+                    App.selectIn3D(hit.objectHit && hit.objectHit.pid ? hit.objectHit.pid : "", additive)
+                }
             }
             mode = 0
         }

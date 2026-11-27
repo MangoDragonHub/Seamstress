@@ -416,7 +416,7 @@ Pane {
                         opacity: formRow.modelData.visible ? 0.9 : 0.4
                         onClicked: App.updateCollisionForm(formRow.modelData.id, formRow.modelData.name, formRow.modelData.x, formRow.modelData.y, formRow.modelData.z,
                                                            formRow.modelData.rx, formRow.modelData.ry, formRow.modelData.rz, formRow.modelData.sx, formRow.modelData.sy, formRow.modelData.sz,
-                                                           formRow.modelData.garmentId, !formRow.modelData.visible, formRow.modelData.collides)
+                                                           formRow.modelData.friction, formRow.modelData.garmentId, !formRow.modelData.visible, formRow.modelData.collides)
                         ToolTip.visible: hovered
                         ToolTip.delay: 400
                         ToolTip.text: formRow.modelData.visible ? tr("Hide") : tr("Show")

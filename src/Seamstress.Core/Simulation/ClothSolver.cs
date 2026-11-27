@@ -526,7 +526,7 @@ public sealed partial class ClothSolver
         }
     }
 
-    private void ApplyFriction(int i, Vector3 normal, float depth)
+    private void ApplyFriction(int i, Vector3 normal, float depth, float friction = -1f)
     {
         // A stitch that is still open slides freely: thread tension beats friction, and otherwise two stitched
         // points resting on opposite sides of a ridge (a shoulder) would never meet.
@@ -537,7 +537,7 @@ public sealed partial class ClothSolver
         float slide = tangent.Length();
         if (slide < 1e-9f)
             return;
-        float grip = _friction[i] * depth;
+        float grip = (friction >= 0 ? friction : _friction[i]) * depth;
         Positions[i] -= slide <= grip ? tangent : tangent * (grip / slide);
     }
 

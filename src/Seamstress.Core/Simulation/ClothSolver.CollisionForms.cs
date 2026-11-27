@@ -12,6 +12,7 @@ public sealed partial class ClothSolver
         public required Matrix4x4 Rotation { get; init; }
         public required Matrix4x4 InverseRotation { get; init; }
         public required Vector3 Axis { get; init; }
+        public required float Friction { get; init; }
     }
 
     private readonly List<CollisionFormState> _collisionForms = new();
@@ -39,6 +40,7 @@ public sealed partial class ClothSolver
                 Rotation = rotation,
                 InverseRotation = Matrix4x4.Transpose(rotation),
                 Axis = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitY, rotation)),
+                Friction = Math.Clamp(form.Friction, 0, 100) / 100f * 1.5f,
             });
         }
     }
@@ -60,7 +62,7 @@ public sealed partial class ClothSolver
                     continue;
                 if (!PushOut(form, ref x[i], _thickness[i], out var normal, out float depth))
                     continue;
-                ApplyFriction(i, normal, depth);
+                ApplyFriction(i, normal, depth, form.Friction);
                 moved = true;
             }
         }

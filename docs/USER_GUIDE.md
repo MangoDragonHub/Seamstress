@@ -632,6 +632,9 @@ mould: wrap a garment around it, then hide the ghost and keep the form colliding
   **All garments** to use it as a shared dress form.
 - A form is drawn as a translucent ghost. **Visible** hides the ghost; it still collides. Turn **Collides** off
   to stop the collision itself.
+- Click a form's ghost in the 3D view or its row in Layers to select it. The normal 3D handles move (arrows),
+  rotate (rings) and scale (boxes) it; the same values are in Properties.
+- **Friction** controls how strongly the form grips the cloth, from 0% (slippery) to 100% (grippy).
 - Forms are saved with the project and are not included in OBJ, glTF, FBX or MakeHuman exports.
 
 To make a stuffed puff ball stay round:

@@ -653,7 +653,7 @@ public sealed class Workspace
     }
 
     public void UpdateCollisionForm(string id, string name, Vector3 position, Vector3 rotation, Vector3 size,
-        string? garmentId, bool visible, bool collides)
+        float friction, string? garmentId, bool visible, bool collides)
     {
         History.Execute(Lang.T("Edit collision form"), doc =>
         {
@@ -669,6 +669,7 @@ public sealed class Workspace
                 Math.Clamp(size.X, 0.001f, 20f),
                 Math.Clamp(size.Y, 0.001f, 20f),
                 Math.Clamp(size.Z, 0.001f, 20f));
+            form.Friction = Math.Clamp(friction, 0, 100);
             form.GarmentId = string.IsNullOrEmpty(garmentId) || doc.FindGarment(garmentId) == null ? null : garmentId;
             form.Visible = visible;
             form.Collides = collides;
@@ -2514,6 +2515,10 @@ public sealed class Workspace
     private sealed record PlacementStart(Vector3 Position, Vector3 Rotation, float[]? Drape, Vector2 Centre, (Vector2 Position, Vector2? Curve)[] Points);
     private Dictionary<string, PlacementStart>? _placementStart;
     private Vector3 _placementPivot;
+    private bool _colliderEditing;
+    private Vector3 _colliderStartPosition;
+    private Vector3 _colliderStartRotation;
+    private Vector3 _colliderStartSize;
     private Vector3 _placementSnapOrigin;
     private bool _placementMoved;
 
@@ -2531,6 +2536,8 @@ public sealed class Workspace
     /// <summary>Where the 3D move/rotate handles sit: the middle of the selected pieces, or null with no selection.</summary>
     public Vector3? SelectionCentre()
     {
+        if (SelectedColliderId is { } id && Document.FindCollider(id) is { } form)
+            return form.Position;
         var pieces = SelectedPieceObjects().ToList();
         if (pieces.Count == 0)
             return null;
@@ -2540,6 +2547,20 @@ public sealed class Workspace
     /// <summary>Starts dragging the selected pieces in the 3D view.</summary>
     public bool BeginPlacementEdit(string? name = null)
     {
+        if (SelectedColliderId is { } colliderId && Document.FindCollider(colliderId) is { } form)
+        {
+            History.Begin(name ?? Lang.T("Edit collision form"));
+            _placementPivot = form.Position;
+            _placementSnapOrigin = form.Position;
+            _placementMoved = false;
+            _placementStart = null;
+            _colliderEditing = true;
+            _colliderStartPosition = form.Position;
+            _colliderStartRotation = form.Rotation;
+            _colliderStartSize = form.Size;
+            return true;
+        }
+        _colliderEditing = false;
         if (SelectionCentre() is not { } pivot)
             return false;
         History.Begin(name ?? (SelectedPieces.Count == 1 ? Lang.T("Move piece in 3D") : Lang.T("Move pieces in 3D")));
@@ -2564,6 +2585,24 @@ public sealed class Workspace
     /// </summary>
     public void ApplyPlacementEdit(Vector3 translation, Quaternion rotation, float snapStep = 0)
     {
+        if (_colliderEditing)
+        {
+            if (SelectedColliderId is not { } colliderId || Document.FindCollider(colliderId) is not { } form)
+                return;
+            if (snapStep > 0)
+            {
+                float Snap(float origin, float offset)
+                    => offset == 0 ? 0 : MathF.Round((origin + offset) / snapStep) * snapStep - origin;
+                translation = new Vector3(Snap(_placementSnapOrigin.X, translation.X), Snap(_placementSnapOrigin.Y, translation.Y),
+                    Snap(_placementSnapOrigin.Z, translation.Z));
+            }
+            _placementMoved |= translation != Vector3.Zero || !rotation.IsIdentity;
+            form.Position = _placementPivot + Vector3.Transform(_colliderStartPosition - _placementPivot, rotation) + translation;
+            if (!rotation.IsIdentity)
+                form.Rotation = ToEuler(EulerMatrix(_colliderStartRotation) * Matrix4x4.CreateFromQuaternion(rotation));
+            History.NotifyLiveChange();
+            return;
+        }
         if (_placementStart == null)
             return;
         if (snapStep > 0)
@@ -2607,6 +2646,43 @@ public sealed class Workspace
     /// </summary>
     public void ApplyPlacementScale(Vector3 axis, float factor)
     {
+        if (_colliderEditing)
+        {
+            if (SelectedColliderId is not { } colliderId || Document.FindCollider(colliderId) is not { } form)
+                return;
+            factor = MathF.Max(factor, 0.05f);
+            _placementMoved |= factor != 1;
+            var start = _colliderStartSize;
+            if (axis == Vector3.Zero || form.Shape == CollisionShape.Sphere)
+            {
+                form.Size = new Vector3(
+                    Math.Clamp(start.X * factor, 0.001f, 20f),
+                    Math.Clamp(start.Y * factor, 0.001f, 20f),
+                    Math.Clamp(start.Z * factor, 0.001f, 20f));
+            }
+            else
+            {
+                var local = Vector3.TransformNormal(axis, Matrix4x4.Transpose(CollisionForm.RotationMatrix(_colliderStartRotation)));
+                if (form.Shape == CollisionShape.Capsule)
+                {
+                    float radial = 1 + (factor - 1) * MathF.Max(MathF.Abs(local.X), MathF.Abs(local.Z));
+                    float axial = 1 + (factor - 1) * MathF.Abs(local.Y);
+                    form.Size = new Vector3(
+                        Math.Clamp(start.X * radial, 0.001f, 20f),
+                        Math.Clamp(start.Y * axial, 0.001f, 20f),
+                        Math.Clamp(start.Z * radial, 0.001f, 20f));
+                }
+                else
+                {
+                    form.Size = new Vector3(
+                        Math.Clamp(start.X * (1 + (factor - 1) * MathF.Abs(local.X)), 0.001f, 20f),
+                        Math.Clamp(start.Y * (1 + (factor - 1) * MathF.Abs(local.Y)), 0.001f, 20f),
+                        Math.Clamp(start.Z * (1 + (factor - 1) * MathF.Abs(local.Z)), 0.001f, 20f));
+                }
+            }
+            History.NotifyLiveChange();
+            return;
+        }
         if (_placementStart == null)
             return;
         factor = MathF.Max(factor, 0.05f);
@@ -2636,6 +2712,15 @@ public sealed class Workspace
 
     public void EndPlacementEdit()
     {
+        if (_colliderEditing)
+        {
+            _colliderEditing = false;
+            if (_placementMoved)
+                History.Commit();
+            else
+                History.Cancel();
+            return;
+        }
         if (_placementStart == null)
             return;
         _placementStart = null;

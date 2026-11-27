@@ -103,6 +103,7 @@ public static class GarmentFile
                 w.WriteRawValue(V(c.Rotation));
                 w.WritePropertyName("size");
                 w.WriteRawValue(V(c.Size));
+                w.WriteNumber("friction", c.Friction);
                 if (!string.IsNullOrEmpty(c.GarmentId))
                     w.WriteString("garment", c.GarmentId);
                 w.WriteEndObject();
@@ -420,6 +421,7 @@ public static class GarmentFile
                 Math.Clamp(Finite(form.Size.X, CollisionForm.DefaultSize), 0.001f, 20f),
                 Math.Clamp(Finite(form.Size.Y, CollisionForm.DefaultSize), 0.001f, 20f),
                 Math.Clamp(Finite(form.Size.Z, CollisionForm.DefaultSize), 0.001f, 20f));
+            form.Friction = Math.Clamp(Finite(Num(c, "friction", CollisionForm.DefaultFriction), CollisionForm.DefaultFriction), 0, 100);
             string? garmentId = Str(c, "garment");
             form.GarmentId = string.IsNullOrEmpty(garmentId) ? null : doc.FindGarment(garmentId)?.Id;
             doc.Colliders.Add(form);

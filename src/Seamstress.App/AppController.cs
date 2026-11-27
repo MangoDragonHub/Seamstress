@@ -756,7 +756,8 @@ public partial class AppController : INotifyPropertyChanged
     {
         if (_simulation.IsRunning)
             StopSimulation();
-        return _workspace.BeginPlacementEdit(_workspace.SelectedPieces.Count == 1 ? Lang.T("Scale piece") : Lang.T("Scale pieces"));
+        return _workspace.BeginPlacementEdit(_workspace.SelectedColliderId != null ? null
+            : _workspace.SelectedPieces.Count == 1 ? Lang.T("Scale piece") : Lang.T("Scale pieces"));
     }
 
     /// <summary>Scale handles: <paramref name="axis"/> is "x", "y" or "z", or anything else to scale evenly.</summary>
@@ -1038,10 +1039,10 @@ public partial class AppController : INotifyPropertyChanged
     public void SelectCollider(string id) => _workspace.SelectCollider(id);
 
     public void UpdateCollisionForm(string id, string name, double x, double y, double z,
-        double rx, double ry, double rz, double sx, double sy, double sz, string garmentId, bool visible, bool collides)
+        double rx, double ry, double rz, double sx, double sy, double sz, double friction, string garmentId, bool visible, bool collides)
         => _workspace.UpdateCollisionForm(id, name, new Vector3((float)x, (float)y, (float)z),
             new Vector3((float)rx, (float)ry, (float)rz), new Vector3((float)sx, (float)sy, (float)sz),
-            string.IsNullOrEmpty(garmentId) ? null : garmentId, visible, collides);
+            (float)friction, string.IsNullOrEmpty(garmentId) ? null : garmentId, visible, collides);
 
     public void FitCollisionForm(string id) => _workspace.FitCollisionForm(id);
 

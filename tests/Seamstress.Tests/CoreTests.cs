@@ -772,6 +772,7 @@ public class DocumentTests
                 Position = new Vector3(1, 2, 3),
                 Rotation = new Vector3(10, 20, 30),
                 Size = new Vector3(0.2f, 0.4f, 0.2f),
+                Friction = 65,
                 GarmentId = garment.Id,
                 Visible = false,
                 Collides = false,
@@ -784,6 +785,7 @@ public class DocumentTests
             Assert.Equal(new Vector3(1, 2, 3), form.Position);
             Assert.Equal(new Vector3(10, 20, 30), form.Rotation);
             Assert.Equal(new Vector3(0.2f, 0.4f, 0.2f), form.Size);
+            Assert.Equal(65, form.Friction);
             Assert.Equal(garment.Id, form.GarmentId);
             Assert.False(form.Visible);
             Assert.False(form.Collides);
@@ -826,6 +828,46 @@ public class DocumentTests
         Assert.Equal(garment.Id, form.GarmentId);
         Assert.InRange(form.Size.X, 0.3f, 0.5f);
         Assert.True(form.Position.Y > 0.8f);
+    }
+
+    [Fact]
+    public void CollisionFormUsesThe3DGizmo()
+    {
+        var ws = new Workspace();
+        ws.AddGarment("Ball");
+        ws.AddPiece(new[]
+        {
+            new Vector2(0, 0), new Vector2(40, 0), new Vector2(40, 40), new Vector2(0, 40),
+        }, "Rectangle");
+        var form = ws.AddCollisionForm(CollisionShape.Box);
+        var startPosition = form.Position;
+        var startSize = form.Size;
+
+        Assert.True(ws.BeginPlacementEdit());
+        ws.ApplyPlacementEdit(new Vector3(0.1f, 0, 0), Quaternion.Identity);
+        ws.EndPlacementEdit();
+        Assert.Equal(startPosition + new Vector3(0.1f, 0, 0), form.Position);
+        Assert.Equal("Edit collision form", ws.History.UndoName);
+
+        ws.History.Undo();
+        var restored = ws.Document.FindCollider(form.Id)!;
+        Assert.Equal(startPosition, restored.Position);
+
+        ws.SelectCollider(restored.Id);
+        Assert.True(ws.BeginPlacementEdit());
+        ws.ApplyPlacementEdit(Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2));
+        ws.EndPlacementEdit();
+        var turned = ws.Document.FindCollider(form.Id)!;
+        Assert.True(MathF.Abs(turned.Rotation.Y) > 1, $"rotation {turned.Rotation}");
+
+        ws.SelectCollider(turned.Id);
+        Assert.True(ws.BeginPlacementEdit());
+        ws.ApplyPlacementScale(Vector3.Zero, 2);
+        ws.EndPlacementEdit();
+        var scaled = ws.Document.FindCollider(form.Id)!;
+        Assert.Equal(startSize * 2, scaled.Size);
+        ws.History.Undo();
+        Assert.Equal(startSize, ws.Document.FindCollider(form.Id)!.Size);
     }
 
     [Fact]

@@ -385,7 +385,19 @@ QtObject {
         let forms = JSON.parse(App.collisionForms())
         check("collision form added", forms.length === 1 && forms[0].selected && forms[0].shape === "Sphere")
         const formId = forms[0].id
-        App.updateCollisionForm(formId, "Test form", 0, 1, 0, 0, 0, 0, 0.2, 0.2, 0.2, "", true, false)
+        const startX = forms[0].x
+        const startSize = forms[0].sx
+        check("collision form gizmo begins", App.gizmoBegin())
+        App.gizmoMove(0.1, 0, 0, false)
+        App.gizmoEnd()
+        forms = JSON.parse(App.collisionForms())
+        check("collision form moved with gizmo", Math.abs(forms[0].x - (startX + 0.1)) < 1e-4)
+        check("collision form scale begins", App.gizmoBeginScale())
+        App.gizmoScale("u", 2, false)
+        App.gizmoEnd()
+        forms = JSON.parse(App.collisionForms())
+        check("collision form scaled with gizmo", Math.abs(forms[0].sx - startSize * 2) < 1e-4)
+        App.updateCollisionForm(formId, "Test form", 0, 1, 0, 0, 0, 0, 0.2, 0.2, 0.2, 40, "", true, false)
         forms = JSON.parse(App.collisionForms())
         check("collision form edited", forms[0].name === "Test form" && Math.abs(forms[0].sx - 0.2) < 1e-6 && !forms[0].collides)
         App.selectCollider(formId)

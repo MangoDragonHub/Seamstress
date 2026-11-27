@@ -84,6 +84,7 @@ public enum CollisionShape
 public sealed class CollisionForm
 {
     public const float DefaultSize = 0.1f;
+    public const float DefaultFriction = 40f;
 
     public string Id { get; set; } = Document.NewId();
     public string Name { get; set; } = "Collision Form";
@@ -93,6 +94,7 @@ public sealed class CollisionForm
     public Vector3 Position { get; set; }
     public Vector3 Rotation { get; set; }
     public Vector3 Size { get; set; } = new(DefaultSize);
+    public float Friction { get; set; } = DefaultFriction;
     public string? GarmentId { get; set; }
 
     public static Matrix4x4 RotationMatrix(Vector3 degrees)

@@ -28,7 +28,7 @@ Pane {
             return
         const form = Object.assign({}, c, changes)
         App.updateCollisionForm(form.id, form.name, form.x, form.y, form.z, form.rx, form.ry, form.rz,
-                                form.sx, form.sy, form.sz, form.garmentId, form.visible, form.collides)
+                                form.sx, form.sy, form.sz, form.friction, form.garmentId, form.visible, form.collides)
     }
     readonly property var garmentOptions: {
         root.sel
@@ -308,7 +308,7 @@ Pane {
                         if (root.sel.collider.shape === "Sphere")
                             root.saveCollider({ sx: metres, sy: metres, sz: metres })
                         else
-                            root.saveCollider({ sx: metres })
+                            root.saveCollider({ sx: metres, sz: metres })
                     }
                 }
                 NumberRow {
@@ -331,6 +331,12 @@ Pane {
                     decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.25 : 0.5; from: 0.1
                     value: (root.sel.collider ? root.sel.collider.sz : 0) * 100 / root.cmUnit
                     onEdited: (v) => root.saveCollider({ sz: v * root.cmUnit / 100 })
+                }
+                SliderRow {
+                    label: tr("Friction")
+                    from: 0; to: 100; stepSize: 1; suffix: "%"
+                    value: root.sel.collider ? root.sel.collider.friction : 40
+                    onEdited: (v) => root.saveCollider({ friction: v })
                 }
                 CheckBox {
                     Layout.fillWidth: true
