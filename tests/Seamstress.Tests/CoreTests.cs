@@ -757,6 +757,78 @@ public class DocumentTests
     }
 
     [Fact]
+    public void CollisionFormsSurviveSaveAndLoad()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "seamstress-collider-" + Guid.NewGuid().ToString("N") + ".garment.json");
+        try
+        {
+            var document = new Document { Name = "Puff" };
+            var garment = new Garment { Name = "Ball" };
+            document.Garments.Add(garment);
+            document.Colliders.Add(new CollisionForm
+            {
+                Name = "Stuffing",
+                Shape = CollisionShape.Capsule,
+                Position = new Vector3(1, 2, 3),
+                Rotation = new Vector3(10, 20, 30),
+                Size = new Vector3(0.2f, 0.4f, 0.2f),
+                GarmentId = garment.Id,
+                Visible = false,
+                Collides = false,
+            });
+            GarmentFile.Save(document, path);
+            var loaded = GarmentFile.Load(path);
+            var form = Assert.Single(loaded.Colliders);
+            Assert.Equal("Stuffing", form.Name);
+            Assert.Equal(CollisionShape.Capsule, form.Shape);
+            Assert.Equal(new Vector3(1, 2, 3), form.Position);
+            Assert.Equal(new Vector3(10, 20, 30), form.Rotation);
+            Assert.Equal(new Vector3(0.2f, 0.4f, 0.2f), form.Size);
+            Assert.Equal(garment.Id, form.GarmentId);
+            Assert.False(form.Visible);
+            Assert.False(form.Collides);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+
+        var old = GarmentFile.Deserialize("{\"format\":\"seamstress-garment\",\"version\":1,\"name\":\"Old\"}");
+        Assert.Empty(old.Colliders);
+    }
+
+    [Fact]
+    public void CollisionFormsAreUndoable()
+    {
+        var ws = new Workspace();
+        ws.AddGarment("Ball");
+        var form = ws.AddCollisionForm(CollisionShape.Sphere);
+        Assert.Single(ws.Document.Colliders);
+        Assert.Equal(form.Id, ws.SelectedColliderId);
+        ws.History.Undo();
+        Assert.Empty(ws.Document.Colliders);
+        Assert.Null(ws.SelectedColliderId);
+        ws.History.Redo();
+        var restored = Assert.Single(ws.Document.Colliders);
+        Assert.Equal(form.Id, restored.Id);
+    }
+
+    [Fact]
+    public void CollisionFormFitsTheActiveGarment()
+    {
+        var ws = new Workspace();
+        var garment = ws.AddGarment("Ball");
+        ws.AddPiece(new[]
+        {
+            new Vector2(0, 0), new Vector2(40, 0), new Vector2(40, 40), new Vector2(0, 40),
+        }, "Rectangle");
+        var form = ws.AddCollisionForm(CollisionShape.Sphere);
+        Assert.Equal(garment.Id, form.GarmentId);
+        Assert.InRange(form.Size.X, 0.3f, 0.5f);
+        Assert.True(form.Position.Y > 0.8f);
+    }
+
+    [Fact]
     public void TransformPointsMovesAndRotatesASelectionOfPoints()
     {
         var ws = new Workspace();

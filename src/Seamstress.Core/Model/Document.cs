@@ -16,6 +16,8 @@ public sealed class Document
     /// <summary>Pictures shown behind the pattern in the 2D view, for tracing or scale reference.</summary>
     public List<ReferenceImage> References { get; set; } = new();
 
+    public List<CollisionForm> Colliders { get; set; } = new();
+
     public Document Clone() => new()
     {
         Name = Name,
@@ -24,9 +26,12 @@ public sealed class Document
         Simulation = Simulation.Clone(),
         Avatar = Avatar.Clone(),
         References = References.Select(r => r.Clone()).ToList(),
+        Colliders = Colliders.Select(c => c.Clone()).ToList(),
     };
 
     public Garment? FindGarment(string? id) => Garments.FirstOrDefault(g => g.Id == id);
+
+    public CollisionForm? FindCollider(string? id) => Colliders.FirstOrDefault(c => c.Id == id);
 
     public PatternPiece? FindPiece(string? id)
     {
@@ -54,6 +59,8 @@ public sealed class Document
             foreach (var gr in g.Groups) used.Add(gr.Name);
             foreach (var p in g.Pieces) used.Add(p.Name);
         }
+        foreach (var c in Colliders)
+            used.Add(c.Name);
         if (!used.Contains(baseName))
             return baseName;
         for (int i = 2; ; i++)
@@ -65,6 +72,39 @@ public sealed class Document
     }
 
     public static string NewId() => Guid.NewGuid().ToString("N")[..10];
+}
+
+public enum CollisionShape
+{
+    Sphere,
+    Capsule,
+    Box,
+}
+
+public sealed class CollisionForm
+{
+    public const float DefaultSize = 0.1f;
+
+    public string Id { get; set; } = Document.NewId();
+    public string Name { get; set; } = "Collision Form";
+    public CollisionShape Shape { get; set; } = CollisionShape.Sphere;
+    public bool Visible { get; set; } = true;
+    public bool Collides { get; set; } = true;
+    public Vector3 Position { get; set; }
+    public Vector3 Rotation { get; set; }
+    public Vector3 Size { get; set; } = new(DefaultSize);
+    public string? GarmentId { get; set; }
+
+    public static Matrix4x4 RotationMatrix(Vector3 degrees)
+        => Matrix4x4.CreateRotationX(degrees.X * MathF.PI / 180f)
+         * Matrix4x4.CreateRotationY(degrees.Y * MathF.PI / 180f)
+         * Matrix4x4.CreateRotationZ(degrees.Z * MathF.PI / 180f);
+
+    public Matrix4x4 RotationMatrix() => RotationMatrix(Rotation);
+
+    public Quaternion RotationQuaternion => Quaternion.CreateFromRotationMatrix(RotationMatrix());
+
+    public CollisionForm Clone() => (CollisionForm)MemberwiseClone();
 }
 
 /// <summary>A garment is an independent set of pattern pieces and seams that is simulated as one unit.</summary>

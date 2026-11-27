@@ -22,7 +22,9 @@ Marvelous Designer.
 - **3D view** – shows the sewn pieces on an avatar. Orbit, pan, zoom, click to select, and drag the arrows and
   rings on a selected piece to move and rotate it. **Pinch** lets you drag the cloth itself, during or after
   simulation, to tug bunched-up areas into place; the ring under the cursor shows the held area, whose size can
-  be changed in Preferences or with **[** / **]**. **Rip** tears a piece by dragging across its surface (Shift
+  be changed in Preferences or with **[** / **]**. **Collision forms** are saved, ghosted spheres, capsules and
+  boxes that push the cloth; use one as a rigid mould to wrap a garment around, such as a stuffing sphere for
+  a puff ball. **Rip** tears a piece by dragging across its surface (Shift
   for a straight tear, and the stroke may start or end outside the garment); when the tear separates the
   cloth, the new pieces appear in the 2D view. **Pin** freezes chosen vertices so the
   rest of the cloth settles around them; **Unpin All** (Simulation menu) releases them again. **Ortho** switches to an

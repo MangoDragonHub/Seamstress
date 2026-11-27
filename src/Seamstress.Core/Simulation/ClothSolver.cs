@@ -92,14 +92,16 @@ public sealed partial class ClothSolver
     /// stay frozen but that the simulated cloth may collide with.
     /// </summary>
     public static ClothSolver Create(IReadOnlyList<GarmentMesh> simulated, IReadOnlyList<GarmentMesh> obstacles,
-        SdfGrid? collider, SimulationSettings settings)
+        SdfGrid? collider, SimulationSettings settings, IReadOnlyList<CollisionForm>? colliders = null)
     {
         var pieces = new List<ClothPiece>();
         int count = 0;
         var offsets = new Dictionary<PieceMesh, int>();
+        var garmentIds = new Dictionary<string, int>();
         int garmentCount = 0;
         void Register(GarmentMesh garmentMesh, bool isSimulated)
         {
+            garmentIds[garmentMesh.Garment.Id] = garmentCount;
             foreach (var mesh in garmentMesh.Pieces)
             {
                 var piece = garmentMesh.Garment.FindPiece(mesh.PieceId)!;
@@ -290,6 +292,7 @@ public sealed partial class ClothSolver
         }
 
         solver._garmentOfPiece = pieces.Select(p => p.Garment).ToArray();
+        solver.SetCollisionForms(colliders, garmentIds);
         solver._sewing = new float[garmentCount];
         solver._gap = new float[garmentCount];
         solver._bestGap = Enumerable.Repeat(float.MaxValue, garmentCount).ToArray();
@@ -386,6 +389,8 @@ public sealed partial class ClothSolver
             if (Settings.SelfCollision)
                 SolveContacts();
             SolveBody();
+            if (SolveCollisionForms())
+                SolveBody();
 
             float invH = 1f / h;
             for (int i = 0; i < n; i++)

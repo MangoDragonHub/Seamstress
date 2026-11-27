@@ -13,7 +13,7 @@ namespace Seamstress.Core.IO;
 public static class GarmentFile
 {
     public const string FormatName = "seamstress-garment";
-    public const int FormatVersion = 1;
+    public const int FormatVersion = 2;
     public const string Extension = ".garment.json";
 
     public static void Save(Document document, string path)
@@ -84,6 +84,27 @@ public static class GarmentFile
                     w.WriteBoolean("visible", false);
                 if (r.Locked)
                     w.WriteBoolean("locked", true);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+
+            w.WriteStartArray("colliders");
+            foreach (var c in doc.Colliders)
+            {
+                w.WriteStartObject();
+                w.WriteString("id", c.Id);
+                w.WriteString("name", c.Name);
+                w.WriteString("shape", c.Shape.ToString().ToLowerInvariant());
+                w.WriteBoolean("visible", c.Visible);
+                w.WriteBoolean("collides", c.Collides);
+                w.WritePropertyName("position");
+                w.WriteRawValue(V(c.Position));
+                w.WritePropertyName("rotation");
+                w.WriteRawValue(V(c.Rotation));
+                w.WritePropertyName("size");
+                w.WriteRawValue(V(c.Size));
+                if (!string.IsNullOrEmpty(c.GarmentId))
+                    w.WriteString("garment", c.GarmentId);
                 w.WriteEndObject();
             }
             w.WriteEndArray();
@@ -383,6 +404,25 @@ public static class GarmentFile
                     piece.MaterialId = null;
             }
             doc.Garments.Add(garment);
+        }
+        foreach (var c in Items(root, "colliders"))
+        {
+            var form = new CollisionForm();
+            form.Id = Str(c, "id") ?? form.Id;
+            form.Name = Str(c, "name") ?? form.Name;
+            form.Shape = Enum.TryParse<CollisionShape>(Str(c, "shape"), true, out var shape) ? shape : CollisionShape.Sphere;
+            form.Visible = Bool(c, "visible", true);
+            form.Collides = Bool(c, "collides", true);
+            form.Position = Vec3(c, "position", Vector3.Zero);
+            form.Rotation = Vec3(c, "rotation", Vector3.Zero);
+            form.Size = Vec3(c, "size", new Vector3(CollisionForm.DefaultSize));
+            form.Size = new Vector3(
+                Math.Clamp(Finite(form.Size.X, CollisionForm.DefaultSize), 0.001f, 20f),
+                Math.Clamp(Finite(form.Size.Y, CollisionForm.DefaultSize), 0.001f, 20f),
+                Math.Clamp(Finite(form.Size.Z, CollisionForm.DefaultSize), 0.001f, 20f));
+            string? garmentId = Str(c, "garment");
+            form.GarmentId = string.IsNullOrEmpty(garmentId) ? null : doc.FindGarment(garmentId)?.Id;
+            doc.Colliders.Add(form);
         }
         return doc;
     }

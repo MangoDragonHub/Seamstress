@@ -370,6 +370,25 @@ internal sealed class ViewportSync : IDisposable
         sb.Append(",\"wire\":\"").Append(_wireUrl).Append('"');
         sb.Append(",\"pins\":\"").Append(_pinUrl).Append('"');
         sb.Append(",\"pinSelection\":\"").Append(_pinSelectionUrl).Append('"');
+        sb.Append(",\"colliders\":[");
+        for (int i = 0; i < doc.Colliders.Count; i++)
+        {
+            var form = doc.Colliders[i];
+            if (i > 0)
+                sb.Append(',');
+            sb.Append("{\"id\":").Append(System.Text.Json.JsonSerializer.Serialize(form.Id));
+            sb.Append(",\"name\":").Append(System.Text.Json.JsonSerializer.Serialize(form.Name));
+            sb.Append(",\"shape\":").Append(System.Text.Json.JsonSerializer.Serialize(form.Shape.ToString()));
+            sb.Append(",\"visible\":").Append(form.Visible ? "true" : "false");
+            sb.Append(",\"collides\":").Append(form.Collides ? "true" : "false");
+            sb.Append(",\"selected\":").Append(form.Id == workspace.SelectedColliderId ? "true" : "false");
+            sb.Append(inv, $",\"x\":{form.Position.X:0.#####},\"y\":{form.Position.Y:0.#####},\"z\":{form.Position.Z:0.#####}");
+            var q = form.RotationQuaternion;
+            sb.Append(inv, $",\"qw\":{q.W:0.#####},\"qx\":{q.X:0.#####},\"qy\":{q.Y:0.#####},\"qz\":{q.Z:0.#####}");
+            sb.Append(inv, $",\"sx\":{form.Size.X:0.#####},\"sy\":{form.Size.Y:0.#####},\"sz\":{form.Size.Z:0.#####}");
+            sb.Append('}');
+        }
+        sb.Append(']');
         if (workspace.SelectionCentre() is { } centre)
             sb.Append(inv, $",\"gizmo\":[{centre.X:0.#####},{centre.Y:0.#####},{centre.Z:0.#####}]");
         sb.Append(",\"avatar\":\"").Append(AvatarUrl(avatar)).Append('"');

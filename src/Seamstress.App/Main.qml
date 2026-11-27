@@ -326,6 +326,13 @@ ApplicationWindow {
                 MenuSeparator {}
                 KeyMenuItem { text: tr("Reset Arrangement"); command: "sim.reset"; onTriggered: App.resetArrangement() }
                 MenuSeparator {}
+                Menu {
+                    title: tr("Collision Forms")
+                    MenuItem { text: tr("Add %1").arg(tr("Sphere")); onTriggered: App.addCollisionForm("Sphere") }
+                    MenuItem { text: tr("Add %1").arg(tr("Capsule")); onTriggered: App.addCollisionForm("Capsule") }
+                    MenuItem { text: tr("Add %1").arg(tr("Box")); onTriggered: App.addCollisionForm("Box") }
+                }
+                MenuSeparator {}
                 MenuItem { text: tr("Unpin All on Selected Garments"); onTriggered: App.unpinAll() }
             }
             Menu {

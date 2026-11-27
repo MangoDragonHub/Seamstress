@@ -114,6 +114,27 @@ public partial class AppController
         return sb.Append(']').ToString();
     }
 
+    public string CollisionForms()
+    {
+        var doc = _workspace.Document;
+        var sb = new StringBuilder("[");
+        for (int i = 0; i < doc.Colliders.Count; i++)
+        {
+            var form = doc.Colliders[i];
+            if (i > 0)
+                sb.Append(',');
+            sb.Append("{\"id\":").Append(Q(form.Id)).Append(",\"name\":").Append(Q(form.Name));
+            sb.Append(",\"shape\":").Append(Q(form.Shape.ToString()));
+            sb.Append(",\"visible\":").Append(B(form.Visible)).Append(",\"collides\":").Append(B(form.Collides));
+            sb.Append(",\"selected\":").Append(B(form.Id == _workspace.SelectedColliderId));
+            sb.Append(",\"x\":").Append(N(form.Position.X)).Append(",\"y\":").Append(N(form.Position.Y)).Append(",\"z\":").Append(N(form.Position.Z));
+            sb.Append(",\"rx\":").Append(N(form.Rotation.X)).Append(",\"ry\":").Append(N(form.Rotation.Y)).Append(",\"rz\":").Append(N(form.Rotation.Z));
+            sb.Append(",\"sx\":").Append(N(form.Size.X)).Append(",\"sy\":").Append(N(form.Size.Y)).Append(",\"sz\":").Append(N(form.Size.Z));
+            sb.Append(",\"garmentId\":").Append(Q(form.GarmentId ?? "")).Append('}');
+        }
+        return sb.Append(']').ToString();
+    }
+
     /// <summary>Everything the properties panel shows for the current selection.</summary>
     public string Selection()
     {
@@ -123,7 +144,8 @@ public partial class AppController
         var garment = _workspace.ActiveGarment;
         var seam = doc.Garments.SelectMany(g => g.Seams).FirstOrDefault(s => s.Id == _workspace.SelectedSeamId);
         var reference = doc.References.FirstOrDefault(r => r.Id == _workspace.SelectedReferenceId);
-        string kind = reference != null ? "reference" : seam != null ? "seam" : pieces.Count > 0 ? "pieces" : garment != null ? "garment" : "none";
+        var collider = doc.FindCollider(_workspace.SelectedColliderId);
+        string kind = collider != null ? "collider" : reference != null ? "reference" : seam != null ? "seam" : pieces.Count > 0 ? "pieces" : garment != null ? "garment" : "none";
         sb.Append("\"kind\":\"").Append(kind).Append("\",\"count\":").Append(pieces.Count);
 
         if (garment != null)
@@ -151,6 +173,17 @@ public partial class AppController
             sb.Append(",\"width\":").Append(N(reference.Width)).Append(",\"height\":").Append(N(reference.Height));
             sb.Append(",\"rotation\":").Append(N(reference.Rotation)).Append(",\"opacity\":").Append(N(reference.Opacity));
             sb.Append(",\"visible\":").Append(B(reference.Visible)).Append(",\"locked\":").Append(B(reference.Locked)).Append('}');
+        }
+
+        if (collider != null)
+        {
+            sb.Append(",\"collider\":{\"id\":").Append(Q(collider.Id)).Append(",\"name\":").Append(Q(collider.Name));
+            sb.Append(",\"shape\":").Append(Q(collider.Shape.ToString()));
+            sb.Append(",\"x\":").Append(N(collider.Position.X)).Append(",\"y\":").Append(N(collider.Position.Y)).Append(",\"z\":").Append(N(collider.Position.Z));
+            sb.Append(",\"rx\":").Append(N(collider.Rotation.X)).Append(",\"ry\":").Append(N(collider.Rotation.Y)).Append(",\"rz\":").Append(N(collider.Rotation.Z));
+            sb.Append(",\"sx\":").Append(N(collider.Size.X)).Append(",\"sy\":").Append(N(collider.Size.Y)).Append(",\"sz\":").Append(N(collider.Size.Z));
+            sb.Append(",\"garmentId\":").Append(Q(collider.GarmentId ?? ""));
+            sb.Append(",\"visible\":").Append(B(collider.Visible)).Append(",\"collides\":").Append(B(collider.Collides)).Append('}');
         }
 
         if (pieces.Count > 0)
@@ -317,6 +350,8 @@ public partial class AppController
                 _workspace.SelectPiece(named.Id);
             else if (doc.Garments.FirstOrDefault(g => g.Name == options.SelectPiece) is { } garment)
                 _workspace.SelectLayer(garment.Id);
+            else if (doc.Colliders.FirstOrDefault(c => c.Name == options.SelectPiece) is { } form)
+                _workspace.SelectCollider(form.Id);
         }
         // For documentation screenshots: "--view invert" turns the selected pieces' normals the other way.
         if (options.View.Contains("invert"))

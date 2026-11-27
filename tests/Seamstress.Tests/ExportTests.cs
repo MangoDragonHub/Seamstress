@@ -64,6 +64,25 @@ public class ExportTests : IDisposable
     }
 
     [Fact]
+    public void CollisionFormsAreNotExported()
+    {
+        _ws.Document.Colliders.Add(new CollisionForm
+        {
+            Name = "Mould",
+            Shape = CollisionShape.Box,
+            Position = new Vector3(0, 1, 0),
+            Size = new Vector3(0.5f),
+        });
+        var scene = Scene();
+        Assert.Equal(2, scene.Meshes.Count);
+        string path = Path.Combine(_folder, "no-mould.obj");
+        ObjExporter.Export(scene, path);
+        var lines = File.ReadAllLines(path);
+        Assert.Equal(2, lines.Count(l => l.StartsWith("o ")));
+        Assert.DoesNotContain(lines, l => l.Contains("Mould", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ObjContainsAllGeometryAndMaterials()
     {
         var scene = Scene();

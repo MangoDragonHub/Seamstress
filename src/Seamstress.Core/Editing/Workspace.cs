@@ -35,6 +35,8 @@ public sealed class Workspace
     /// <summary>The 2D reference image selected in the pattern view, if any.</summary>
     public string? SelectedReferenceId { get; private set; }
 
+    public string? SelectedColliderId { get; private set; }
+
     public string? ActiveGarmentId { get; private set; }
 
     public event Action? SelectionChanged;
@@ -175,6 +177,7 @@ public sealed class Workspace
         SelectedPoint = null;
         SelectedLayerId = null;
         SelectedReferenceId = null;
+        SelectedColliderId = null;
         PinSelection.Clear();
         _pinSelectionKeys.Clear();
     }
@@ -193,6 +196,7 @@ public sealed class Workspace
         SelectedPoint = null;
         SelectedLayerId = null;
         SelectedReferenceId = null;
+        SelectedColliderId = null;
         if (additive)
         {
             if (!SelectedPieces.Remove(pieceId))
@@ -241,6 +245,15 @@ public sealed class Workspace
             return;
         ClearSelectionState();
         SelectedReferenceId = referenceId;
+        SelectionChanged?.Invoke();
+    }
+
+    public void SelectCollider(string colliderId)
+    {
+        if (Document.FindCollider(colliderId) == null)
+            return;
+        ClearSelectionState();
+        SelectedColliderId = colliderId;
         SelectionChanged?.Invoke();
     }
 
@@ -442,6 +455,11 @@ public sealed class Workspace
     /// <summary>Selects a row of the layers panel: a garment, a group (with everything inside) or a piece.</summary>
     public void SelectLayer(string id, bool additive = false)
     {
+        if (Document.FindCollider(id) != null)
+        {
+            SelectCollider(id);
+            return;
+        }
         if (Document.FindPiece(id) != null)
         {
             SelectPiece(id, additive);
@@ -501,6 +519,19 @@ public sealed class Workspace
             SelectedReferenceId = null;
             changed = true;
         }
+        if (SelectedColliderId != null && Document.FindCollider(SelectedColliderId) == null)
+        {
+            SelectedColliderId = null;
+            changed = true;
+        }
+        foreach (var form in Document.Colliders)
+        {
+            if (form.GarmentId != null && Document.FindGarment(form.GarmentId) == null)
+            {
+                form.GarmentId = null;
+                changed = true;
+            }
+        }
         if (Document.FindGarment(ActiveGarmentId) == null)
         {
             ActiveGarmentId = Document.Garments.FirstOrDefault()?.Id;
@@ -531,6 +562,121 @@ public sealed class Workspace
         SelectLayer(added!.Id);
         return added;
     }
+
+    private static string CollisionShapeName(CollisionShape shape) => shape switch
+    {
+        CollisionShape.Capsule => Lang.T("Capsule"),
+        CollisionShape.Box => Lang.T("Box"),
+        _ => Lang.T("Sphere"),
+    };
+
+    private bool TryCollisionBounds(Garment garment, out Vector3 min, out Vector3 max)
+    {
+        min = new Vector3(float.MaxValue);
+        max = new Vector3(float.MinValue);
+        bool any = false;
+        var mesh = MeshFor(garment);
+        foreach (var pieceMesh in mesh.Pieces)
+        {
+            var piece = garment.FindPiece(pieceMesh.PieceId);
+            if (piece == null)
+                continue;
+            foreach (var point in Mesher.CurrentPositions(piece, pieceMesh))
+            {
+                min = Vector3.Min(min, point);
+                max = Vector3.Max(max, point);
+                any = true;
+            }
+        }
+        return any;
+    }
+
+    private static void FitCollisionForm(CollisionForm form, Vector3 min, Vector3 max, string garmentId)
+    {
+        const float clearance = 0.005f;
+        var extent = max - min;
+        form.Position = (min + max) * 0.5f;
+        form.Rotation = Vector3.Zero;
+        form.GarmentId = garmentId;
+        switch (form.Shape)
+        {
+            case CollisionShape.Sphere:
+                form.Size = new Vector3(MathF.Max(0.01f, MathF.Max(extent.X, MathF.Max(extent.Y, extent.Z)) - 2 * clearance));
+                break;
+            case CollisionShape.Capsule:
+                {
+                    float diameter = MathF.Max(0.01f, MathF.Min(extent.X, extent.Z) - 2 * clearance);
+                    float height = MathF.Max(diameter, extent.Y - 2 * clearance);
+                    form.Size = new Vector3(diameter, height, diameter);
+                    break;
+                }
+            default:
+                form.Size = new Vector3(
+                    MathF.Max(0.01f, extent.X - 2 * clearance),
+                    MathF.Max(0.01f, extent.Y - 2 * clearance),
+                    MathF.Max(0.01f, extent.Z - 2 * clearance));
+                break;
+        }
+    }
+
+    public CollisionForm AddCollisionForm(CollisionShape shape)
+    {
+        CollisionForm? added = null;
+        var garment = ActiveGarment;
+        Vector3 min = default, max = default;
+        bool fitted = garment != null && TryCollisionBounds(garment, out min, out max);
+        History.Execute(Lang.T("Add collision form"), doc =>
+        {
+            var form = new CollisionForm { Shape = shape, Name = doc.UniqueName(CollisionShapeName(shape)) };
+            if (fitted)
+                FitCollisionForm(form, min, max, garment!.Id);
+            doc.Colliders.Add(form);
+            added = form;
+        });
+        SelectCollider(added!.Id);
+        return added;
+    }
+
+    public bool FitCollisionForm(string id)
+    {
+        var form = Document.FindCollider(id);
+        var garment = ActiveGarment;
+        if (form == null || garment == null || !TryCollisionBounds(garment, out var min, out var max))
+            return false;
+        History.Execute(Lang.T("Fit collision form"), doc =>
+        {
+            var target = doc.FindCollider(id);
+            if (target != null)
+                FitCollisionForm(target, min, max, garment.Id);
+        });
+        return true;
+    }
+
+    public void UpdateCollisionForm(string id, string name, Vector3 position, Vector3 rotation, Vector3 size,
+        string? garmentId, bool visible, bool collides)
+    {
+        History.Execute(Lang.T("Edit collision form"), doc =>
+        {
+            var form = doc.FindCollider(id);
+            if (form == null)
+                return;
+            string trimmed = name.Trim();
+            if (trimmed.Length > 0)
+                form.Name = trimmed;
+            form.Position = position;
+            form.Rotation = rotation;
+            form.Size = new Vector3(
+                Math.Clamp(size.X, 0.001f, 20f),
+                Math.Clamp(size.Y, 0.001f, 20f),
+                Math.Clamp(size.Z, 0.001f, 20f));
+            form.GarmentId = string.IsNullOrEmpty(garmentId) || doc.FindGarment(garmentId) == null ? null : garmentId;
+            form.Visible = visible;
+            form.Collides = collides;
+        });
+    }
+
+    public void DeleteCollisionForm(string id)
+        => History.Execute(Lang.T("Delete collision form"), doc => doc.Colliders.RemoveAll(c => c.Id == id));
 
     /// <param name="bodyHeight">Height of the current avatar in metres, so the pieces start at the right level.</param>
     public Garment AddTemplate(string template, float bodyHeight = Templates.ReferenceBodyHeight)
@@ -586,6 +732,11 @@ public sealed class Workspace
 
     public void DeleteSelection()
     {
+        if (SelectedColliderId is { } colliderId)
+        {
+            DeleteCollisionForm(colliderId);
+            return;
+        }
         if (SelectedReferenceId != null)
         {
             string id = SelectedReferenceId;

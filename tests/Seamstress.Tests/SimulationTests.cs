@@ -620,6 +620,104 @@ public class SimulationTests : IClassFixture<AvatarFixture>
         Assert.Equal("Simulate " + garment.Name, ws.History.UndoName);
     }
 
+    private static (Workspace Workspace, Garment Garment, GarmentMesh Mesh) CollisionTestGarment()
+    {
+        var ws = new Workspace();
+        var garment = ws.AddGarment("Collision test");
+        ws.AddPiece(new[]
+        {
+            new Vector2(0, 0), new Vector2(40, 0), new Vector2(40, 40), new Vector2(0, 40),
+        }, "Rectangle");
+        return (ws, garment, ws.MeshFor(garment));
+    }
+
+    private static ClothSolver CollisionSolver(GarmentMesh mesh, CollisionForm form)
+    {
+        var settings = new SimulationSettings { Gravity = 0, Substeps = 1, SelfCollision = false, GroundPlane = false };
+        return ClothSolver.Create(new[] { mesh }, Array.Empty<GarmentMesh>(), null, settings, new[] { form });
+    }
+
+    private static (Vector3 Min, Vector3 Max, Vector3 Centre) MeshBounds(Garment garment, GarmentMesh mesh)
+    {
+        var min = new Vector3(float.MaxValue);
+        var max = new Vector3(float.MinValue);
+        foreach (var pieceMesh in mesh.Pieces)
+        {
+            foreach (var p in Mesher.CurrentPositions(garment.FindPiece(pieceMesh.PieceId)!, pieceMesh))
+            {
+                min = Vector3.Min(min, p);
+                max = Vector3.Max(max, p);
+            }
+        }
+        return (min, max, (min + max) * 0.5f);
+    }
+
+    private static bool Inside(CollisionForm form, Vector3 point)
+    {
+        if (form.Shape == CollisionShape.Sphere)
+            return Vector3.Distance(point, form.Position) < form.Size.X * 0.5f;
+        if (form.Shape == CollisionShape.Capsule)
+        {
+            var axis = Vector3.UnitY;
+            float half = MathF.Max(0, form.Size.Y * 0.5f - form.Size.X * 0.5f);
+            var a = form.Position - axis * half;
+            var b = form.Position + axis * half;
+            var ab = b - a;
+            float lengthSquared = ab.LengthSquared();
+            var closest = lengthSquared < 1e-12f ? a
+                : a + ab * Math.Clamp(Vector3.Dot(point - a, ab) / lengthSquared, 0, 1);
+            return Vector3.Distance(point, closest) < form.Size.X * 0.5f;
+        }
+        var local = point - form.Position;
+        var halfSize = form.Size * 0.5f;
+        return MathF.Abs(local.X) < halfSize.X && MathF.Abs(local.Y) < halfSize.Y && MathF.Abs(local.Z) < halfSize.Z;
+    }
+
+    [Theory]
+    [InlineData(CollisionShape.Sphere)]
+    [InlineData(CollisionShape.Capsule)]
+    [InlineData(CollisionShape.Box)]
+    public void CollisionFormPushesClothOut(CollisionShape shape)
+    {
+        var (_, garment, mesh) = CollisionTestGarment();
+        var (_, _, centre) = MeshBounds(garment, mesh);
+        var form = new CollisionForm
+        {
+            Shape = shape,
+            Position = centre,
+            Size = new Vector3(0.8f),
+            GarmentId = garment.Id,
+        };
+        var solver = CollisionSolver(mesh, form);
+        Assert.All(solver.Positions, p => Assert.True(Inside(form, p), "cloth starts inside the form"));
+        solver.Step();
+        Assert.All(solver.Positions, p => Assert.False(Inside(form, p), "cloth should be pushed outside the form"));
+    }
+
+    [Fact]
+    public void CollisionFormCanBeDisabledOrLimitedToAnotherGarment()
+    {
+        var (_, garment, mesh) = CollisionTestGarment();
+        var (_, _, centre) = MeshBounds(garment, mesh);
+        var form = new CollisionForm
+        {
+            Shape = CollisionShape.Sphere,
+            Position = centre,
+            Size = new Vector3(0.8f),
+            GarmentId = garment.Id,
+            Collides = false,
+        };
+        var solver = CollisionSolver(mesh, form);
+        solver.Step();
+        Assert.Contains(solver.Positions, p => Inside(form, p));
+
+        form.Collides = true;
+        form.GarmentId = "another garment";
+        solver = CollisionSolver(mesh, form);
+        solver.Step();
+        Assert.Contains(solver.Positions, p => Inside(form, p));
+    }
+
     [Fact]
     public void PinchRadiusSetsTheHeldArea()
     {

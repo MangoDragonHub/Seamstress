@@ -59,7 +59,8 @@ public sealed class SimulationController : IDisposable
 
         var active = simulated.Select(g => _workspace.MeshFor(g)).ToList();
         var obstacles = doc.Garments.Where(g => g.Visible && !simulated.Contains(g)).Select(g => _workspace.MeshFor(g)).ToList();
-        var solver = ClothSolver.Create(active, obstacles, _avatar()?.Sdf, doc.Simulation.Clone());
+        var colliders = doc.Colliders.Select(c => c.Clone()).ToList();
+        var solver = ClothSolver.Create(active, obstacles, _avatar()?.Sdf, doc.Simulation.Clone(), colliders);
         _garments.Clear();
         foreach (var g in simulated)
             _garments.Add(g.Id);

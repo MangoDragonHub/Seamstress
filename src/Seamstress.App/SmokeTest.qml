@@ -381,6 +381,17 @@ QtObject {
         check("avatar body setting stored", Math.abs(JSON.parse(App.avatarShape()).gender - 0.9) < 1e-6)
         App.resetAvatarShape()
         check("avatar body reset", JSON.parse(App.avatarShape()).gender === 0.5)
+        App.addCollisionForm("Sphere")
+        let forms = JSON.parse(App.collisionForms())
+        check("collision form added", forms.length === 1 && forms[0].selected && forms[0].shape === "Sphere")
+        const formId = forms[0].id
+        App.updateCollisionForm(formId, "Test form", 0, 1, 0, 0, 0, 0, 0.2, 0.2, 0.2, "", true, false)
+        forms = JSON.parse(App.collisionForms())
+        check("collision form edited", forms[0].name === "Test form" && Math.abs(forms[0].sx - 0.2) < 1e-6 && !forms[0].collides)
+        App.selectCollider(formId)
+        check("collision form selected", JSON.parse(App.selection()).kind === "collider")
+        App.deleteCollisionForm(formId)
+        check("collision form deleted", JSON.parse(App.collisionForms()).length === 0)
         App.log(failures === 0 ? "smoke test passed" : "smoke test FAILED: " + failures)
     }
 }

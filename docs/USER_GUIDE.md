@@ -621,6 +621,31 @@ the inner one first (the skirt), then select the outer one (the shirt) and simul
 the shirt drapes over it. Simulating both together also works when the outer garment starts further from the
 body, as the built-in garments do.
 
+### Collision forms
+
+A collision form is a rigid shape that pushes cloth away from itself while a simulation runs. Use one as a
+mould: wrap a garment around it, then hide the ghost and keep the form colliding to hold the shape.
+
+- Add a **Sphere**, **Capsule** or **Box** from **Simulation ▸ Collision Forms**, or from the
+  **Collision Forms** section at the bottom of Layers.
+- A new form is fitted to the active garment and set to affect that garment. Change **Affects** to
+  **All garments** to use it as a shared dress form.
+- A form is drawn as a translucent ghost. **Visible** hides the ghost; it still collides. Turn **Collides** off
+  to stop the collision itself.
+- Forms are saved with the project and are not included in OBJ, glTF, FBX or MakeHuman exports.
+
+To make a stuffed puff ball stay round:
+
+1. Select the ball garment and add a sphere collision form. It is centred and sized to the garment; use
+   **Fit to Active Garment** or adjust the position and diameter if needed.
+2. Simulate the ball. The seams close and the cloth wraps around the sphere.
+3. Hide the form's ghost, leave **Collides** on, and simulate the rest of the outfit or export it. The ball
+   keeps its shape, but the form is not exported.
+
+The form is a rigid mould, not soft stuffing: the ball will not squash unless you move or resize the form.
+The garment must be closed enough around it; an open stuffing hole may let the form show through in the 3D
+view.
+
 ### Simulation settings
 
 At the bottom of the Properties panel, under **Simulation**:
@@ -665,6 +690,10 @@ colour).
 | Link for simulation | The **⇄** button on a garment row (see [Simulation](#which-garments-are-simulated)) |
 | Add | **+ Garment** and **+ Group** at the bottom |
 | Delete | **Delete** at the bottom, the Delete key, or right-click ▸ **Delete** |
+
+The **Collision Forms** section below the layer list holds the scene's collision forms. Add one with the
+**+ Collision Form** button; click a form's row to select it and edit it in Properties. The eye hides its ghost
+without turning off collision, and **✕** deletes it. See [Collision forms](#collision-forms).
 
 Each garment row also shows its face count.
 

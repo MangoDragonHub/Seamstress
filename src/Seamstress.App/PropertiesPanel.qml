@@ -22,6 +22,23 @@ Pane {
     readonly property string lengthName: imperial ? "in" : "cm"
 
     function refresh() { sel = JSON.parse(App.selection()) }
+    function saveCollider(changes) {
+        const c = root.sel.collider
+        if (!c)
+            return
+        const form = Object.assign({}, c, changes)
+        App.updateCollisionForm(form.id, form.name, form.x, form.y, form.z, form.rx, form.ry, form.rz,
+                                form.sx, form.sy, form.sz, form.garmentId, form.visible, form.collides)
+    }
+    readonly property var garmentOptions: {
+        root.sel
+        App.layersRevision
+        const options = [{ id: "", name: root.tr("All garments") }]
+        for (const row of JSON.parse(App.layers()))
+            if (row.kind === "garment")
+                options.push({ id: row.id, name: row.name })
+        return options
+    }
     Component.onCompleted: refresh()
     Connections {
         target: App
@@ -144,6 +161,7 @@ Pane {
                 elide: Text.ElideRight
                 text: root.sel.kind === "seam" ? tr("Seam")
                     : root.sel.kind === "reference" ? root.sel.reference.name
+                    : root.sel.kind === "collider" ? root.sel.collider.name
                     : root.sel.kind === "pieces" ? root.sel.piece.name
                     : root.sel.kind === "garment" ? root.sel.garment.name
                     : tr("Properties")
@@ -239,10 +257,130 @@ Pane {
                 }
             }
 
+            Section {
+                title: tr("Collision Form")
+                visible: root.sel.kind === "collider"
+                InfoRow { label: tr("Shape"); value: root.sel.collider ? tr(root.sel.collider.shape) : "" }
+                InfoRow { label: tr("Name"); value: root.sel.collider ? root.sel.collider.name : "" }
+                NumberRow {
+                    label: tr("Position X"); suffix: root.imperial ? "in" : "m"
+                    decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01
+                    value: (root.sel.collider ? root.sel.collider.x : 0) / root.mUnit
+                    onEdited: (v) => root.saveCollider({ x: v * root.mUnit })
+                }
+                NumberRow {
+                    label: tr("Position Y"); suffix: root.imperial ? "in" : "m"
+                    decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01
+                    value: (root.sel.collider ? root.sel.collider.y : 0) / root.mUnit
+                    onEdited: (v) => root.saveCollider({ y: v * root.mUnit })
+                }
+                NumberRow {
+                    label: tr("Position Z"); suffix: root.imperial ? "in" : "m"
+                    decimals: root.imperial ? 1 : 2; step: root.imperial ? 0.5 : 0.01
+                    value: (root.sel.collider ? root.sel.collider.z : 0) / root.mUnit
+                    onEdited: (v) => root.saveCollider({ z: v * root.mUnit })
+                }
+                NumberRow {
+                    label: tr("Rotation X"); suffix: "°"; decimals: 1; step: 5
+                    enabled: root.sel.collider ? root.sel.collider.shape !== "Sphere" : false
+                    value: root.sel.collider ? root.sel.collider.rx : 0
+                    onEdited: (v) => root.saveCollider({ rx: v })
+                }
+                NumberRow {
+                    label: tr("Rotation Y"); suffix: "°"; decimals: 1; step: 5
+                    enabled: root.sel.collider ? root.sel.collider.shape !== "Sphere" : false
+                    value: root.sel.collider ? root.sel.collider.ry : 0
+                    onEdited: (v) => root.saveCollider({ ry: v })
+                }
+                NumberRow {
+                    label: tr("Rotation Z"); suffix: "°"; decimals: 1; step: 5
+                    enabled: root.sel.collider ? root.sel.collider.shape !== "Sphere" : false
+                    value: root.sel.collider ? root.sel.collider.rz : 0
+                    onEdited: (v) => root.saveCollider({ rz: v })
+                }
+                NumberRow {
+                    visible: root.sel.collider ? root.sel.collider.shape !== "Box" : false
+                    label: tr("Diameter"); suffix: root.lengthName
+                    decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.25 : 0.5; from: 0.1
+                    value: (root.sel.collider ? root.sel.collider.sx : 0) * 100 / root.cmUnit
+                    onEdited: (v) => {
+                        const metres = v * root.cmUnit / 100
+                        if (root.sel.collider.shape === "Sphere")
+                            root.saveCollider({ sx: metres, sy: metres, sz: metres })
+                        else
+                            root.saveCollider({ sx: metres })
+                    }
+                }
+                NumberRow {
+                    visible: root.sel.collider ? root.sel.collider.shape !== "Sphere" : false
+                    label: tr("collision|Height"); suffix: root.lengthName
+                    decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.25 : 0.5; from: 0.1
+                    value: (root.sel.collider ? root.sel.collider.sy : 0) * 100 / root.cmUnit
+                    onEdited: (v) => root.saveCollider({ sy: v * root.cmUnit / 100 })
+                }
+                NumberRow {
+                    visible: root.sel.collider ? root.sel.collider.shape === "Box" : false
+                    label: tr("Width"); suffix: root.lengthName
+                    decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.25 : 0.5; from: 0.1
+                    value: (root.sel.collider ? root.sel.collider.sx : 0) * 100 / root.cmUnit
+                    onEdited: (v) => root.saveCollider({ sx: v * root.cmUnit / 100 })
+                }
+                NumberRow {
+                    visible: root.sel.collider ? root.sel.collider.shape === "Box" : false
+                    label: tr("Depth"); suffix: root.lengthName
+                    decimals: root.imperial ? 2 : 1; step: root.imperial ? 0.25 : 0.5; from: 0.1
+                    value: (root.sel.collider ? root.sel.collider.sz : 0) * 100 / root.cmUnit
+                    onEdited: (v) => root.saveCollider({ sz: v * root.cmUnit / 100 })
+                }
+                CheckBox {
+                    Layout.fillWidth: true
+                    text: tr("Visible")
+                    checked: root.sel.collider ? root.sel.collider.visible : false
+                    onToggled: root.saveCollider({ visible: checked })
+                }
+                CheckBox {
+                    Layout.fillWidth: true
+                    text: tr("Collides")
+                    checked: root.sel.collider ? root.sel.collider.collides : false
+                    onToggled: root.saveCollider({ collides: checked })
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: tr("Affects"); Layout.preferredWidth: 118; opacity: 0.85 }
+                    ComboBox {
+                        Layout.fillWidth: true
+                        implicitHeight: 26
+                        model: root.garmentOptions
+                        textRole: "name"
+                        currentIndex: root.sel.collider
+                            ? Math.max(0, root.garmentOptions.findIndex(g => g.id === root.sel.collider.garmentId))
+                            : 0
+                        onActivated: (index) => root.saveCollider({ garmentId: root.garmentOptions[index].id })
+                    }
+                }
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.55
+                    font.pixelSize: 11
+                    text: tr("The form pushes the cloth out where it overlaps. Hidden forms still collide; turn Collides off to stop them. Forms are not exported.")
+                }
+                Button {
+                    Layout.fillWidth: true
+                    text: tr("Fit to Active Garment")
+                    onClicked: App.fitCollisionForm(root.sel.collider.id)
+                }
+                Button {
+                    Layout.fillWidth: true
+                    text: tr("Delete Form")
+                    onClicked: App.deleteCollisionForm(root.sel.collider.id)
+                }
+            }
+
             // ---- Topology ------------------------------------------------------------
             Section {
                 title: tr("Topology")
-                visible: !!root.sel.garment && root.sel.kind !== "reference"
+                visible: !!root.sel.garment && root.sel.kind !== "reference" && root.sel.kind !== "collider"
                 SliderRow {
                     label: tr("Particle distance")
                     from: root.imperial ? 0.2 : 0.5; to: root.imperial ? 2.4 : 6
@@ -304,7 +442,7 @@ Pane {
             // ---- Garment thickness ---------------------------------------------------
             Section {
                 title: tr("Garment Thickness")
-                visible: !!root.sel.garment && root.sel.kind !== "reference"
+                visible: !!root.sel.garment && root.sel.kind !== "reference" && root.sel.kind !== "collider"
                 CheckBox {
                     Layout.fillWidth: true
                     text: tr("Enable Thickness? (Apply per Garment)")
@@ -537,7 +675,7 @@ Pane {
             // ---- Simulation ----------------------------------------------------------
             Section {
                 title: tr("Simulation")
-                visible: root.sel.kind !== "reference"
+                visible: root.sel.kind !== "reference" && root.sel.kind !== "collider"
                 open: root.sel.kind !== "pieces"
                 CheckBox {
                     visible: !!root.sel.garment

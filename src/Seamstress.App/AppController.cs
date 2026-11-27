@@ -1029,6 +1029,24 @@ public partial class AppController : INotifyPropertyChanged
 
     public string TemplateNames() => string.Join("|", Templates.Names);
 
+    public void AddCollisionForm(string shape)
+    {
+        if (Enum.TryParse<CollisionShape>(shape, true, out var kind))
+            _workspace.AddCollisionForm(kind);
+    }
+
+    public void SelectCollider(string id) => _workspace.SelectCollider(id);
+
+    public void UpdateCollisionForm(string id, string name, double x, double y, double z,
+        double rx, double ry, double rz, double sx, double sy, double sz, string garmentId, bool visible, bool collides)
+        => _workspace.UpdateCollisionForm(id, name, new Vector3((float)x, (float)y, (float)z),
+            new Vector3((float)rx, (float)ry, (float)rz), new Vector3((float)sx, (float)sy, (float)sz),
+            string.IsNullOrEmpty(garmentId) ? null : garmentId, visible, collides);
+
+    public void FitCollisionForm(string id) => _workspace.FitCollisionForm(id);
+
+    public void DeleteCollisionForm(string id) => _workspace.DeleteCollisionForm(id);
+
     public void AddGroup() => _workspace.AddGroup();
     public void GroupSelection()
     {

@@ -78,6 +78,7 @@ Item {
     }
 
     ListModel { id: pieceModel }
+    ListModel { id: colliderModel }
 
     function refresh() {
         const data = JSON.parse(App.viewportModels())
@@ -89,6 +90,12 @@ Item {
         hasGizmo = data.gizmo !== undefined
         if (hasGizmo)
             gizmoOrigin = Qt.vector3d(data.gizmo[0], data.gizmo[1], data.gizmo[2])
+        colliderModel.clear()
+        for (const c of (data.colliders || []))
+            colliderModel.append({ cid: c.id, shape: c.shape, ghostVisible: c.visible, selected: c.selected,
+                                   px: c.x, py: c.y, pz: c.z,
+                                   qw: c.qw, qx: c.qx, qy: c.qy, qz: c.qz,
+                                   sx: c.sx, sy: c.sy, sz: c.sz })
         const wanted = data.models
         // Update rows in place so unchanged pieces keep their GPU buffers.
         for (let i = pieceModel.count - 1; i >= 0; i--) {
@@ -357,6 +364,71 @@ Item {
                     tilingModeVertical: Texture.Repeat
                     generateMipmaps: true
                     mipFilter: Texture.Linear
+                }
+            }
+        }
+
+        Repeater3D {
+            model: colliderModel
+            delegate: Node {
+                required property string cid
+                required property string shape
+                required property bool ghostVisible
+                required property bool selected
+                required property real px
+                required property real py
+                required property real pz
+                required property real qw
+                required property real qx
+                required property real qy
+                required property real qz
+                required property real sx
+                required property real sy
+                required property real sz
+                position: Qt.vector3d(px, py, pz)
+                rotation: Qt.quaternion(qw, qx, qy, qz)
+                visible: ghostVisible
+                readonly property real capsuleLength: Math.max(0, sy - sx)
+                PrincipledMaterial {
+                    id: ghostMaterial
+                    baseColor: selected ? "#ffd166" : "#4cc9f0"
+                    opacity: selected ? 0.32 : 0.2
+                    alphaMode: PrincipledMaterial.Blend
+                    cullMode: Material.NoCulling
+                    lighting: PrincipledMaterial.NoLighting
+                    emissiveFactor: selected ? Qt.vector3d(0.35, 0.25, 0.05) : Qt.vector3d(0.02, 0.08, 0.1)
+                }
+                Model {
+                    visible: shape === "Sphere"
+                    source: "#Sphere"
+                    scale: Qt.vector3d(sx / 100, sx / 100, sx / 100)
+                    materials: ghostMaterial
+                }
+                Model {
+                    visible: shape === "Box"
+                    source: "#Cube"
+                    scale: Qt.vector3d(sx / 100, sy / 100, sz / 100)
+                    materials: ghostMaterial
+                }
+                Node {
+                    visible: shape === "Capsule"
+                    Model {
+                        source: "#Cylinder"
+                        scale: Qt.vector3d(sx / 100, capsuleLength / 100, sx / 100)
+                        materials: ghostMaterial
+                    }
+                    Model {
+                        source: "#Sphere"
+                        y: capsuleLength / 2
+                        scale: Qt.vector3d(sx / 100, sx / 100, sx / 100)
+                        materials: ghostMaterial
+                    }
+                    Model {
+                        source: "#Sphere"
+                        y: -capsuleLength / 2
+                        scale: Qt.vector3d(sx / 100, sx / 100, sx / 100)
+                        materials: ghostMaterial
+                    }
                 }
             }
         }

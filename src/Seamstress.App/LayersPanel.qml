@@ -8,6 +8,8 @@ Pane {
     padding: 0
 
     property var rows: []
+    property var collisionForms: []
+    readonly property var selectedForm: collisionForms.find(c => c.selected) || null
     function tr(text) { App.languageRevision; return App.tr(text) }
     property string editingId: ""
     property string menuId: ""
@@ -23,6 +25,7 @@ Pane {
         }
         refreshPending = false
         rows = JSON.parse(App.layers())
+        collisionForms = JSON.parse(App.collisionForms())
     }
     onEditingIdChanged: if (editingId === "" && refreshPending) Qt.callLater(refresh)
     Component.onCompleted: refresh()
@@ -357,14 +360,100 @@ Pane {
             }
         }
 
+        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: palette.mid }
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.margins: 4
+            spacing: 4
+            Label { text: tr("Collision Forms"); font.bold: true; Layout.fillWidth: true }
+            Button {
+                id: addColliderButton
+                text: tr("+ Collision Form")
+                onClicked: collisionMenu.popup(addColliderButton, 0, addColliderButton.height)
+            }
+        }
+        ListView {
+            id: colliderList
+            Layout.fillWidth: true
+            Layout.preferredHeight: root.collisionForms.length === 0 ? 0 : Math.min(132, root.collisionForms.length * 26 + 4)
+            visible: root.collisionForms.length > 0
+            clip: true
+            model: root.collisionForms
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.vertical: ScrollBar {}
+            delegate: Rectangle {
+                id: formRow
+                required property var modelData
+                width: colliderList.width
+                height: 26
+                color: formRow.modelData.selected ? Qt.alpha(palette.highlight, 0.45) : "transparent"
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton
+                    onClicked: App.selectCollider(formRow.modelData.id)
+                }
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 6
+                    anchors.rightMargin: 4
+                    spacing: 4
+                    Label {
+                        text: formRow.modelData.shape === "Sphere" ? "●" : formRow.modelData.shape === "Capsule" ? "▮" : "■"
+                        opacity: 0.8
+                        font.pixelSize: 11
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
+                        text: formRow.modelData.name
+                        opacity: formRow.modelData.visible ? 1 : 0.45
+                    }
+                    ToolButton {
+                        implicitWidth: 22; implicitHeight: 22
+                        padding: 0
+                        text: formRow.modelData.visible ? "◉" : "○"
+                        font.pixelSize: 12
+                        opacity: formRow.modelData.visible ? 0.9 : 0.4
+                        onClicked: App.updateCollisionForm(formRow.modelData.id, formRow.modelData.name, formRow.modelData.x, formRow.modelData.y, formRow.modelData.z,
+                                                           formRow.modelData.rx, formRow.modelData.ry, formRow.modelData.rz, formRow.modelData.sx, formRow.modelData.sy, formRow.modelData.sz,
+                                                           formRow.modelData.garmentId, !formRow.modelData.visible, formRow.modelData.collides)
+                        ToolTip.visible: hovered
+                        ToolTip.delay: 400
+                        ToolTip.text: formRow.modelData.visible ? tr("Hide") : tr("Show")
+                    }
+                    ToolButton {
+                        implicitWidth: 22; implicitHeight: 22
+                        padding: 0
+                        text: "✕"
+                        font.pixelSize: 11
+                        onClicked: App.deleteCollisionForm(formRow.modelData.id)
+                        ToolTip.visible: hovered
+                        ToolTip.delay: 400
+                        ToolTip.text: tr("Delete")
+                    }
+                }
+            }
+        }
         RowLayout {
             Layout.fillWidth: true
             Layout.margins: 4
             spacing: 4
             Button { text: tr("+ Garment"); Layout.fillWidth: true; onClicked: App.addGarment() }
             Button { text: tr("+ Group"); Layout.fillWidth: true; onClicked: App.addGroup(); enabled: root.rows.length > 0 }
-            Button { text: tr("Delete"); Layout.fillWidth: true; onClicked: App.deleteSelection(); enabled: root.rows.some(r => r.selected) }
+            Button {
+                text: tr("Delete")
+                Layout.fillWidth: true
+                enabled: root.rows.some(r => r.selected) || root.selectedForm !== null
+                onClicked: root.selectedForm !== null ? App.deleteCollisionForm(root.selectedForm.id) : App.deleteSelection()
+            }
         }
+    }
+
+    Menu {
+        id: collisionMenu
+        MenuItem { text: tr("Sphere"); onTriggered: App.addCollisionForm("Sphere") }
+        MenuItem { text: tr("Capsule"); onTriggered: App.addCollisionForm("Capsule") }
+        MenuItem { text: tr("Box"); onTriggered: App.addCollisionForm("Box") }
     }
 
     Menu {
