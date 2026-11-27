@@ -740,6 +740,23 @@ public class DocumentTests
     }
 
     [Fact]
+    public void SettingsKeepThePinchRadius()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "seamstress-pinch-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            Assert.Equal(5, new AppSettings().PinchRadiusCm);
+            new AppSettings { PinchRadiusCm = 12.5 }.Save(path);
+            Assert.Equal(12.5, AppSettings.Load(path).PinchRadiusCm);
+            Assert.Equal(5, AppSettings.Load(Path.Combine(Path.GetTempPath(), "seamstress-missing-" + Guid.NewGuid().ToString("N") + ".json")).PinchRadiusCm);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void TransformPointsMovesAndRotatesASelectionOfPoints()
     {
         var ws = new Workspace();

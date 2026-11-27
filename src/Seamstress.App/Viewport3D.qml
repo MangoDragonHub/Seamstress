@@ -21,10 +21,14 @@ Item {
     // Distance of the scale boxes from the handle centre, in handle units (an arrow is 1 long).
     readonly property real scaleReach: App.gizmoMode === "Full" ? 1.2 : 0.85
     property bool pinchMode: false
+    readonly property real pinchRadiusCm: App.pinchRadiusCm
     onPinchModeChanged: {
         if (pinchMode) {
             if (App.pinBrush) App.pinBrush = false
             ripMode = false
+        } else {
+            mouse.pinchRingVisible = false
+            pinchCanvas.requestPaint()
         }
     }
     property bool ripMode: false
@@ -513,6 +517,48 @@ Item {
         }
     }
 
+    Canvas {
+        id: pinchCanvas
+        anchors.fill: parent
+        visible: root.pinchMode && mouse.pinchRingVisible
+        renderStrategy: Canvas.Cooperative
+        readonly property var ringState: [root.pinchRadiusCm, root.yaw, root.pitch, root.distance, root.target,
+                                          root.orthographic, width, height, mouse.pinchRingCentre, App.imperial]
+        onRingStateChanged: Qt.callLater(requestPaint)
+        onVisibleChanged: if (visible) requestPaint()
+        onPaint: {
+            const ctx = getContext("2d")
+            ctx.reset()
+            if (!root.pinchMode || !mouse.pinchRingVisible)
+                return
+            const centre = mouse.pinchRingCentre
+            const p = view.mapFrom3DScene(centre)
+            const cam = root.activeCamera
+            const depth = Math.max(1e-4, centre.minus(cam.scenePosition).dotProduct(cam.forward))
+            const metresPerPixel = root.orthographic
+                ? 1 / root.magnification
+                : 2 * depth * Math.tan(root.fieldOfView * Math.PI / 360) / Math.max(1, view.height)
+            const radius = Math.max(2, (root.pinchRadiusCm / 100) / metresPerPixel)
+            ctx.fillStyle = Qt.rgba(1, 1, 1, 0.06)
+            ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fill()
+            ctx.strokeStyle = App.themeAnnotation
+            ctx.lineWidth = 1.5
+            ctx.setLineDash([5, 4])
+            ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.stroke()
+            ctx.setLineDash([])
+            const text = App.imperial ? (root.pinchRadiusCm / 2.54).toFixed(2) + " in" : root.pinchRadiusCm.toFixed(1) + " cm"
+            ctx.font = "bold 11px sans-serif"
+            ctx.textAlign = "center"
+            const w = ctx.measureText(text).width + 12
+            const labelY = p.y - radius - 8
+            ctx.fillStyle = Qt.rgba(0.07, 0.07, 0.09, 0.88)
+            ctx.strokeStyle = App.themeAnnotation
+            ctx.beginPath(); ctx.roundedRect(Math.round(p.x - w / 2) + 0.5, Math.round(labelY - 9) + 0.5, w, 18, 4, 4); ctx.fill(); ctx.stroke()
+            ctx.fillStyle = App.themeAnnotationFill
+            ctx.fillText(text, p.x, labelY + 4)
+        }
+    }
+
     // The box dragged with the pin brush, over the scene.
     Rectangle {
         id: pinBox
@@ -534,9 +580,11 @@ Item {
         property real lastY: 0
         property real travelled: 0
         property int mode: 0   // 1 orbit, 2 pan, 3 dragging a handle, 4 pinching cloth, 5 placing a ruler end, 6 pin box, 7 ripping
-        hoverEnabled: root.rulerOpen
+        hoverEnabled: root.rulerOpen || root.pinchMode
         property vector3d pinchStart: Qt.vector3d(0, 0, 0)
         property real pinchScale: 0
+        property vector3d pinchRingCentre: Qt.vector3d(0, 0, 0)
+        property bool pinchRingVisible: false
         property string ripPieceId: ""
         property var ripPoints: []
         property bool ripPulling: false
@@ -660,6 +708,9 @@ Item {
                 if (hit.objectHit && hit.objectHit.pid
                         && App.pinchBegin(hit.objectHit.pid, hit.scenePosition.x, hit.scenePosition.y, hit.scenePosition.z)) {
                     pinchStart = hit.scenePosition
+                    pinchRingCentre = hit.scenePosition
+                    pinchRingVisible = true
+                    pinchCanvas.requestPaint()
                     // Metres per pixel at the depth of the grabbed point, so the cloth stays under the cursor.
                     const depth = hit.scenePosition.minus(camera.scenePosition).dotProduct(camera.forward)
                     pinchScale = root.orthographic ? 1 / root.magnification : 2 * depth * Math.tan(camera.fieldOfView * Math.PI / 360) / view.height
@@ -703,7 +754,13 @@ Item {
             } else if (mode === 4) {
                 const mx = (e.x - pressX) * pinchScale, my = (pressY - e.y) * pinchScale
                 const r = root.activeCamera.right, u = root.activeCamera.up
-                App.pinchMove(pinchStart.x + r.x * mx + u.x * my, pinchStart.y + r.y * mx + u.y * my, pinchStart.z + r.z * mx + u.z * my)
+                const target = Qt.vector3d(pinchStart.x + r.x * mx + u.x * my,
+                                           pinchStart.y + r.y * mx + u.y * my,
+                                           pinchStart.z + r.z * mx + u.z * my)
+                App.pinchMove(target.x, target.y, target.z)
+                pinchRingCentre = target
+                pinchRingVisible = true
+                pinchCanvas.requestPaint()
             } else if (mode === 7) {
                 // Sample across the whole pointer movement, so a fast stroke over the cloth is not missed and a
                 // stroke that starts or ends in empty space still picks up the cloth it crosses.
@@ -740,6 +797,13 @@ Item {
                 root.target = Qt.vector3d(root.target.x - (r.x * dx - u.x * dy) * k,
                                           root.target.y - (r.y * dx - u.y * dy) * k,
                                           root.target.z - (r.z * dx - u.z * dy) * k)
+            } else if (mode === 0 && root.pinchMode) {
+                const hit = view.pick(e.x, e.y)
+                const onCloth = hit.objectHit && hit.objectHit.pid
+                pinchRingVisible = !!onCloth
+                if (onCloth)
+                    pinchRingCentre = hit.scenePosition
+                pinchCanvas.requestPaint()
             }
         }
         onReleased: (e) => {
@@ -761,6 +825,12 @@ Item {
                 }
             } else if (mode === 4) {
                 App.pinchEnd()
+                const hit = view.pick(e.x, e.y)
+                const onCloth = hit.objectHit && hit.objectHit.pid
+                pinchRingVisible = root.pinchMode && !!onCloth
+                if (onCloth)
+                    pinchRingCentre = hit.scenePosition
+                pinchCanvas.requestPaint()
             } else if (mode === 7) {
                 if (ripPulling)
                     App.ripPullEnd()
@@ -807,7 +877,11 @@ Item {
         }
         onCanceled: {
             if (mode === 3) App.gizmoEnd()
-            if (mode === 4) App.pinchEnd()
+            if (mode === 4) {
+                App.pinchEnd()
+                pinchRingVisible = false
+                pinchCanvas.requestPaint()
+            }
             if (mode === 7) {
                 if (ripPulling)
                     App.ripPullEnd()
@@ -822,6 +896,12 @@ Item {
             pinAdditive = false
             activePart = ""
             mode = 0
+        }
+        onExited: {
+            if (mode === 0) {
+                pinchRingVisible = false
+                pinchCanvas.requestPaint()
+            }
         }
         onWheel: (e) => { root.distance = Math.max(0.25, Math.min(25, root.distance * Math.pow(0.999, e.angleDelta.y))) }
     }

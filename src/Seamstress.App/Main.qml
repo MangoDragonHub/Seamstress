@@ -201,6 +201,8 @@ ApplicationWindow {
         "edit.invertNormals": () => App.invertNormals(),
         "edit.cutHole": () => App.cutHole(),
         "view.pinch": () => viewport.pinchMode = !viewport.pinchMode,
+        "view.pinchSmaller": () => App.stepPinchRadius(-1),
+        "view.pinchLarger": () => App.stepPinchRadius(1),
         "view.rip": () => viewport.ripMode = !viewport.ripMode,
         "view.pinBrush": () => App.pinBrush = !App.pinBrush,
         "view.handles": () => viewport.showGizmo = !viewport.showGizmo,

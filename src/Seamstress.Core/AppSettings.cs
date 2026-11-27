@@ -50,6 +50,10 @@ public sealed class AppSettings
     /// <summary>The range the Preferences dialog lets the mouse sensitivity be set to, as a multiplier.</summary>
     public const double MinMouseSensitivity = 0.25, MaxMouseSensitivity = 3;
 
+    public double PinchRadiusCm { get; set; } = DefaultPinchRadiusCm;
+
+    public const double DefaultPinchRadiusCm = 5, MinPinchRadiusCm = 0.5, MaxPinchRadiusCm = 20;
+
     /// <summary>Keyboard shortcuts the user changed, by command id (see <see cref="KeyBindings"/>); the rest keep their defaults.</summary>
     public Dictionary<string, string[]> Shortcuts { get; set; } = new();
 

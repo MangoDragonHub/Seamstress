@@ -619,4 +619,29 @@ public class SimulationTests : IClassFixture<AvatarFixture>
         Assert.True(released[hem].Y < start.Y + 0.03f, "the released cloth drops back");
         Assert.Equal("Simulate " + garment.Name, ws.History.UndoName);
     }
+
+    [Fact]
+    public void PinchRadiusSetsTheHeldArea()
+    {
+        var (ws, sim) = Setup("Skirt");
+        sim.Start(false);
+        sim.RunFrames(240);
+        var garment = ws.Document.Garments[0];
+        var mesh = ws.MeshFor(garment).Pieces[0];
+        sim.Pump(true);
+        int hem = mesh.EdgeChains[0][mesh.EdgeChains[0].Length / 2];
+        var point = Mesher.CurrentPositions(garment.Pieces[0], mesh)[hem];
+        sim.BeginPinch(point, 0.08f);
+        sim.RunFrames(1);
+        int broad = sim.PinchedParticleCount;
+        sim.SetPinchRadius(0.01f);
+        sim.RunFrames(1);
+        int fine = sim.PinchedParticleCount;
+        sim.EndPinch();
+        sim.Stop();
+        _output.WriteLine($"held particles: {broad} broad, {fine} fine");
+        Assert.True(broad > 1, "a broad pinch holds several particles");
+        Assert.True(fine >= 1, "the nearest particle is always held");
+        Assert.True(fine < broad, "shrinking the radius releases cloth at the rim");
+    }
 }

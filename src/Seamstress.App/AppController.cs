@@ -828,7 +828,7 @@ public partial class AppController : INotifyPropertyChanged
         }
         _pinching = true;
         _pinchStopFrame = -1;
-        _simulation.BeginPinch(new Vector3((float)x, (float)y, (float)z));
+        _simulation.BeginPinch(new Vector3((float)x, (float)y, (float)z), (float)(PinchRadiusCm / 100));
         StatusText = Lang.T("Pinching — drag to pull the cloth, release to let it settle.");
         return true;
     }
@@ -1441,8 +1441,29 @@ public partial class AppController : INotifyPropertyChanged
     /// <summary>Multiplier on how fast the 3D camera follows the mouse (orbiting and panning); 1 is the usual speed.</summary>
     public double MouseSensitivity => _settings.MouseSensitivity;
 
+    public double PinchRadiusCm => Math.Clamp(_settings.PinchRadiusCm, AppSettings.MinPinchRadiusCm, AppSettings.MaxPinchRadiusCm);
+
+    public double MinPinchRadiusCm => AppSettings.MinPinchRadiusCm;
+
+    public double MaxPinchRadiusCm => AppSettings.MaxPinchRadiusCm;
+
+    public void StepPinchRadius(int direction)
+    {
+        double step = Imperial ? 0.25 * 2.54 : 0.5;
+        double value = Math.Clamp(PinchRadiusCm + Math.Sign(direction) * step,
+            AppSettings.MinPinchRadiusCm, AppSettings.MaxPinchRadiusCm);
+        if (Math.Abs(value - PinchRadiusCm) < 1e-9)
+            return;
+        _settings.PinchRadiusCm = value;
+        _simulation.SetPinchRadius((float)(value / 100));
+        TrySaveSettings();
+        Notify(nameof(PinchRadiusCm));
+        string size = Imperial ? (value / 2.54).ToString("0.00") + " in" : value.ToString("0.0") + " cm";
+        StatusText = Lang.F("Pinch size: {0}", size);
+    }
+
     public void SavePreferences(string userFolder, string baseMesh, string command, string renderer, int textureResolution, string author, string license,
-        string units, double gridSizeCm, double snapStepCm, string language, double mouseSensitivity)
+        string units, double gridSizeCm, double snapStepCm, double pinchRadiusCm, string language, double mouseSensitivity)
     {
         bool baseChanged = _settings.MakeHumanBaseMesh != LocalPath(baseMesh.Trim());
         _settings.MakeHumanUserFolder = LocalPath(userFolder.Trim());
@@ -1458,6 +1479,8 @@ public partial class AppController : INotifyPropertyChanged
         double Chosen(double cm) => !(cm > 0) || Math.Abs(cm - standard) < 0.01 ? 0 : Math.Clamp(cm, 0.1, 1000);
         _settings.GridSize = Chosen(gridSizeCm);
         _settings.SnapStep = Chosen(snapStepCm);
+        _settings.PinchRadiusCm = Math.Clamp(pinchRadiusCm, AppSettings.MinPinchRadiusCm, AppSettings.MaxPinchRadiusCm);
+        _simulation.SetPinchRadius((float)(_settings.PinchRadiusCm / 100));
         _settings.MouseSensitivity = Math.Clamp(mouseSensitivity, AppSettings.MinMouseSensitivity, AppSettings.MaxMouseSensitivity);
         Startup.Units = null;
         _settings.Language = Lang.Languages.Any(l => l.Code == language) ? language : Lang.English;
@@ -1500,6 +1523,7 @@ public partial class AppController : INotifyPropertyChanged
         Notify(nameof(GridSizeCm));
         Notify(nameof(SnapStepCm));
         Notify(nameof(MouseSensitivity));
+        Notify(nameof(PinchRadiusCm));
         Notify(nameof(MakeHumanLinked));
     }
 

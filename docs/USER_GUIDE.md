@@ -543,7 +543,10 @@ body.
   down against the body, but not drag it through.
 - While Pinch is on, Ctrl+drag orbits the camera, Shift+drag pans, and the move/rotate handles are hidden. Turn
   Pinch off to get them back.
-- About 5 cm of cloth around the cursor is held; cloth further away is moved only by the fabric pulling on it.
+- About 5 cm of cloth around the cursor is held by default; cloth further away is moved only by the fabric pulling on it.
+- The ring under the cursor shows the area Pinch will hold. Change its size in **Preferences ▸ Viewport**, or hover over
+  the cloth and press **[** or **]** to make it smaller or larger. A smaller area is easier to use for lining up seam
+  edges without dragging the surrounding cloth; a larger one smooths a broader area.
 - Only garments that are being simulated can be pinched. If another garment is the active one and a simulation
   is already running, stop it first or tick **All garments**.
 
@@ -951,6 +954,7 @@ MakeHuman's body.
 | Viewport | **Grid size** | The size of one square of the ground grid in the 3D view. 10 cm by default, 4 in with imperial units. |
 | Viewport | **Snap step** | The step a piece snaps to when you hold Shift while dragging a move arrow in the 3D view. Starts the same as the grid size; set it smaller for finer steps. |
 | Viewport | **Mouse Sensitivity** | How fast the 3D camera follows the mouse when you drag to orbit or pan. 100% is the usual speed; lower it for finer control, raise it to cover more ground per swipe. |
+| Viewport | **Pinch size** | How much cloth around the cursor Pinch holds, 5 cm by default. Smaller holds less cloth for finer control, for example when lining up seam edges; larger smooths a broad area. The ring under the cursor shows the size, and **[** / **]** change it from the 3D view. |
 | MakeHuman | **User data folder** | MakeHuman's own data folder, the one containing `data/clothes` (for example `~/makehuman/v1py3`). |
 | MakeHuman | **Base mesh** | MakeHuman's `base.obj`, found in its `data/3dobjs` folder. |
 | MakeHuman | **Launch command** | Optional. If set, MakeHuman is started after *Send to MakeHuman* when it is not already running. |
@@ -1074,6 +1078,7 @@ These are the defaults. All of them can be changed under [Preferences ▸ Keyboa
 | 1 / 3 / Ctrl+1 | 3D view from the front / side / back (number row or keypad) |
 | 5 | Orthographic 3D view on or off (number row or keypad) |
 | G | Turn Pinch on or off in the 3D view |
+| [ / ] | Make the Pinch area smaller / larger in the 3D view |
 | X | Turn Rip on or off in the 3D view |
 | Space | Start or stop simulation |
 | Enter | Finish the polygon being drawn; cut the bands previewed with Inset Band; sew the edges chosen with a box |

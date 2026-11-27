@@ -91,6 +91,10 @@ public sealed class SimulationController : IDisposable
     /// <summary>Takes hold of the simulated cloth nearest to a point in the 3D view (metres). Needs a running simulation.</summary>
     public void BeginPinch(System.Numerics.Vector3 point, float radius = 0.05f) => _runner?.Solver.BeginPinch(point, radius);
 
+    public void SetPinchRadius(float radius) => _runner?.Solver.SetPinchRadius(radius);
+
+    public int PinchedParticleCount => _runner?.Solver.PinchedParticleCount ?? 0;
+
     /// <summary>Moves the held cloth towards a new position.</summary>
     public void MovePinch(System.Numerics.Vector3 target) => _runner?.Solver.MovePinch(target);
 

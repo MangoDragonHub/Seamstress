@@ -53,6 +53,7 @@ AppDialog {
         shownImperial = units.currentIndex === 1
         showLength(gridSize, App.gridSizeCm)
         showLength(snapStep, App.snapStepCm)
+        showLength(pinchRadius, App.pinchRadiusCm)
         themeChoice = App.themeChoice
         syncTheme()
         keyboard.load()
@@ -73,9 +74,11 @@ AppDialog {
             return wasDefault ? (imperial ? 10.16 : 10) : cm
         }
         const grid = convert(gridSize), snap = convert(snapStep)
+        const pinch = typedCm(pinchRadius)
         shownImperial = imperial
         showLength(gridSize, grid)
         showLength(snapStep, snap)
+        showLength(pinchRadius, pinch)
     }
 
     onAboutToShow: load()
@@ -85,7 +88,7 @@ AppDialog {
         App.savePreferences(userFolder.text, baseMesh.text, command.text,
                             ["auto", "gpu", "cpu"][renderer.currentIndex], resolution.model[resolution.currentIndex], author.text,
                             license.editText, units.currentIndex === 1 ? "imperial" : "metric", typedCm(gridSize), typedCm(snapStep),
-                            languages[language.currentIndex].code, sensitivity.value / 100)
+                            typedCm(pinchRadius), languages[language.currentIndex].code, sensitivity.value / 100)
         App.saveKeyBindings(JSON.stringify(keyboard.chosen()))
         App.saveTheme(themeChoice)
     }
@@ -325,6 +328,22 @@ AppDialog {
                         Note {
                             Layout.columnSpan: 2
                             text: tr("How fast the camera follows the mouse in the 3D view when you drag to orbit or pan. 100% is the usual speed.")
+                        }
+                        Label { text: tr("Pinch size") }
+                        RowLayout {
+                            NumberField {
+                                id: pinchRadius
+                                implicitWidth: 90
+                                from: App.minPinchRadiusCm / root.unitCm
+                                to: App.maxPinchRadiusCm / root.unitCm
+                                decimals: root.shownImperial ? 2 : 1
+                                step: root.shownImperial ? 0.25 : 0.5
+                            }
+                            Label { text: root.shownImperial ? "in" : "cm"; opacity: 0.7 }
+                        }
+                        Note {
+                            Layout.columnSpan: 2
+                            text: tr("How much cloth around the cursor Pinch holds. Smaller holds less cloth for finer control; larger holds more to smooth a broad area.")
                         }
                         Note {
                             Layout.columnSpan: 2

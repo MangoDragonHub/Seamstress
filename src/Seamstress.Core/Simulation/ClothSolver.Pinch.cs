@@ -15,6 +15,8 @@ public sealed partial class ClothSolver
     private float _pinchRadius;
     private Vector3 _pinchTarget;
     private bool _pinchRelease;
+    private bool _pinchRecapture;
+    private int _pinchGarment = -1;
 
     private int[] _pinched = Array.Empty<int>();
     private float[] _pinchStrength = Array.Empty<float>();
@@ -24,15 +26,26 @@ public sealed partial class ClothSolver
     /// <summary>True while a patch of cloth is being held.</summary>
     public bool IsPinching => _pinched.Length > 0 || _pinchRequest != null;
 
+    public int PinchedParticleCount => _pinched.Length;
+
     /// <summary>Takes hold of the simulated cloth nearest to <paramref name="point"/>. Safe to call from any thread.</summary>
     public void BeginPinch(Vector3 point, float radius = 0.05f)
     {
         lock (_pinchGate)
         {
             _pinchRequest = point;
-            _pinchRadius = Math.Clamp(radius, 0.01f, 0.5f);
+            _pinchRadius = Math.Clamp(radius, 0.005f, 0.2f);
             _pinchTarget = point;
             _pinchRelease = false;
+        }
+    }
+
+    public void SetPinchRadius(float radius)
+    {
+        lock (_pinchGate)
+        {
+            _pinchRadius = Math.Clamp(radius, 0.005f, 0.2f);
+            _pinchRecapture = true;
         }
     }
 
@@ -57,26 +70,42 @@ public sealed partial class ClothSolver
     {
         Vector3? request;
         float radius;
+        bool recapture;
         lock (_pinchGate)
         {
             if (_pinchRelease)
             {
                 _pinched = Array.Empty<int>();
                 _pinchRelease = false;
+                _pinchRecapture = false;
+                _pinchGarment = -1;
             }
             request = _pinchRequest;
             radius = _pinchRadius;
+            recapture = _pinchRecapture;
             _pinchRequest = null;
+            _pinchRecapture = false;
         }
-        if (request is not { } point)
+        if (request is { } point)
+        {
+            CapturePinch(point, radius, snapToCloth: true);
             return;
+        }
+        if (recapture && _pinched.Length > 0)
+            CapturePinch(_pinchHand, radius, snapToCloth: false);
+    }
 
+    private void CapturePinch(Vector3 point, float radius, bool snapToCloth)
+    {
         var x = Positions;
+        int garment = snapToCloth ? -1 : _pinchGarment;
         int nearest = -1;
         float best = PinchPickDistance * PinchPickDistance;
         for (int i = 0; i < x.Length; i++)
         {
             if (_invMass[i] == 0)
+                continue;
+            if (garment >= 0 && _garmentOfPiece[_pieceOf[i]] != garment)
                 continue;
             float d = Vector3.DistanceSquared(x[i], point);
             if (d < best)
@@ -87,10 +116,11 @@ public sealed partial class ClothSolver
         }
         if (nearest < 0)
             return;
+        if (garment < 0)
+            garment = _pinchGarment = _garmentOfPiece[_pieceOf[nearest]];
 
         // Everything within the radius comes along, fading out towards the rim so the cloth is not creased there.
-        var centre = x[nearest];
-        int garment = _garmentOfPiece[_pieceOf[nearest]];
+        var centre = snapToCloth ? x[nearest] : _pinchHand;
         var particles = new List<int>();
         var strength = new List<float>();
         var offsets = new List<Vector3>();
@@ -101,15 +131,16 @@ public sealed partial class ClothSolver
             float d = Vector3.Distance(x[i], centre);
             if (d >= radius && i != nearest)
                 continue;
-            float falloff = 1f - d / radius;
+            float falloff = MathF.Max(0f, 1f - d / radius);
             particles.Add(i);
             strength.Add(i == nearest ? 1f : falloff * falloff);
             offsets.Add(x[i] - centre);
         }
+        if (snapToCloth)
+            _pinchHand = centre;
         _pinched = particles.ToArray();
         _pinchStrength = strength.ToArray();
         _pinchOffset = offsets.ToArray();
-        _pinchHand = centre;
     }
 
     /// <summary>Every substep: draw the held particles towards the hand.</summary>

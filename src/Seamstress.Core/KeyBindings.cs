@@ -64,6 +64,8 @@ public static class KeyBindings
         new("view.wireframe", "View", "3D: Wireframe", Array.Empty<string>()),
         new("view.normals", "View", "3D: Normal Direction", Array.Empty<string>()),
         new("view.pinch", "View", "3D: Pinch Cloth", new[] { "G" }),
+        new("view.pinchSmaller", "View", "3D: Smaller Pinch Area", new[] { "[" }),
+        new("view.pinchLarger", "View", "3D: Larger Pinch Area", new[] { "]" }),
         new("view.rip", "View", "3D: Rip Cloth", new[] { "X" }),
         new("view.pinBrush", "View", "3D: Pin Vertices", Array.Empty<string>()),
         new("view.handles", "View", "3D: Show Handles", Array.Empty<string>()),
