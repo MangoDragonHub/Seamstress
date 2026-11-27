@@ -1,3 +1,5 @@
+using System.Formats.Tar;
+using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using Seamstress.Core;
@@ -234,6 +236,127 @@ public class EngineExportTests : IDisposable
                 properties.Add(name + "." + property.GetProperty("name").GetString());
         }
         return (version, properties);
+    }
+
+    [Fact]
+    public void UnityPackageContainsReadyGarmentAssets()
+    {
+        _ws.Document.Materials[1].Opacity = 0.5f;
+        var result = EngineExport.Export(_ws.Document, _ws.MeshFor, EngineTarget.Unity, _folder,
+            new EngineExportOptions { BundleName = "Summer Outfit" });
+
+        Assert.Equal(EngineTarget.Unity, result.Target);
+        Assert.Equal(Path.Combine(_folder, "Summer_Outfit.unitypackage"), result.OutputPath);
+        Assert.True(File.Exists(result.OutputPath));
+
+        var package = ReadUnityPackage(result.OutputPath);
+        const string fbx = "Assets/Seamstress/Summer_Outfit/Summer_Outfit.fbx";
+        const string texture = "Assets/Seamstress/Summer_Outfit/Textures/checker.png";
+        const string shirt = "Assets/Seamstress/Summer_Outfit/Materials/Shirt_fabric.mat";
+        const string skirt = "Assets/Seamstress/Summer_Outfit/Materials/Skirt_fabric.mat";
+        const string manifest = "Assets/Seamstress/Summer_Outfit/seamstress-garment.json";
+        const string readme = "Assets/Seamstress/Summer_Outfit/README.md";
+        const string opaqueShader = "Assets/Seamstress/Shaders/SeamstressCloth.shader";
+        const string transparentShader = "Assets/Seamstress/Shaders/SeamstressClothTransparent.shader";
+        const string helper = "Assets/Seamstress/Editor/SeamstressGarmentImport.cs";
+
+        foreach (string path in new[] { fbx, texture, shirt, skirt, manifest, readme, opaqueShader, transparentShader, helper })
+            Assert.True(package.ContainsKey(path), "missing " + path);
+
+        foreach (var item in package.Values)
+        {
+            Assert.Matches("^[a-f0-9]{32}$", item.Guid);
+            Assert.Contains("guid: " + item.Guid, item.Meta);
+        }
+
+        string fbxText = Encoding.UTF8.GetString(package[fbx].Asset!);
+        Assert.Contains("Textures/checker.png", fbxText);
+        Assert.DoesNotContain(_folder, fbxText);
+        Assert.Contains("TextureImporter:", package[texture].Meta);
+        Assert.Contains("textureShape: 1", package[texture].Meta);
+
+        string shirtText = Encoding.UTF8.GetString(package[shirt].Asset!);
+        Assert.Contains("m_Shader: {fileID: 4800000, guid: " + package[opaqueShader].Guid + ", type: 3}", shirtText);
+        Assert.Contains("m_Texture: {fileID: 2800000, guid: " + package[texture].Guid + ", type: 3}", shirtText);
+        Assert.Contains("_Glossiness: 0.2", shirtText);
+        Assert.Contains("_Metallic: 0", shirtText);
+        Assert.Contains("r: 0.309804", shirtText);
+
+        string skirtText = Encoding.UTF8.GetString(package[skirt].Asset!);
+        Assert.Contains("m_Shader: {fileID: 4800000, guid: " + package[transparentShader].Guid + ", type: 3}", skirtText);
+        Assert.Contains("a: 0.5", skirtText);
+        Assert.Contains("m_TexEnvs: []", skirtText);
+
+        Assert.Contains("Cull Off", Encoding.UTF8.GetString(package[opaqueShader].Asset!));
+        Assert.Contains("Cull Off", Encoding.UTF8.GetString(package[transparentShader].Asset!));
+        Assert.Contains("alpha:fade", Encoding.UTF8.GetString(package[transparentShader].Asset!));
+        Assert.Contains("AddRemap", Encoding.UTF8.GetString(package[helper].Asset!));
+        using var manifestJson = JsonDocument.Parse(Encoding.UTF8.GetString(package[manifest].Asset!));
+        var manifestMaterials = manifestJson.RootElement.GetProperty("materials");
+        Assert.Equal(2, manifestMaterials.GetArrayLength());
+        var shirtEntry = manifestMaterials.EnumerateArray().First(m => m.GetProperty("name").GetString() == "Shirt_fabric");
+        Assert.Equal("Textures/checker.png", shirtEntry.GetProperty("texture").GetString());
+        Assert.Equal(2, shirtEntry.GetProperty("repeat").GetSingle());
+        var skirtEntry = manifestMaterials.EnumerateArray().First(m => m.GetProperty("name").GetString() == "Skirt_fabric");
+        Assert.Equal("", skirtEntry.GetProperty("texture").GetString());
+        Assert.Equal(0.5, skirtEntry.GetProperty("opacity").GetDouble(), 3);
+
+        Assert.Contains("Unity 2020.1+", Encoding.UTF8.GetString(package[readme].Asset!));
+    }
+
+    [Fact]
+    public void UnityPackageUsesStableGuids()
+    {
+        var options = new EngineExportOptions { BundleName = "Summer Outfit" };
+        var scene = Scene();
+        var first = EngineExport.Export(scene, EngineTarget.Unity, Path.Combine(_folder, "first.unitypackage"), options);
+        var second = EngineExport.Export(scene, EngineTarget.Unity, Path.Combine(_folder, "second.unitypackage"), options);
+        var a = ReadUnityPackage(first.OutputPath);
+        var b = ReadUnityPackage(second.OutputPath);
+
+        Assert.Equal(a.Count, b.Count);
+        foreach (var pair in a)
+        {
+            Assert.True(b.TryGetValue(pair.Key, out var other), "missing " + pair.Key);
+            Assert.Equal(pair.Value.Guid, other.Guid);
+            Assert.Equal(pair.Value.Meta, other.Meta);
+            if (!pair.Key.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase))
+                Assert.Equal(pair.Value.Asset, other.Asset);
+        }
+    }
+
+    private static Dictionary<string, (string Guid, string Meta, byte[]? Asset)> ReadUnityPackage(string path)
+    {
+        var entries = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        using (var file = File.OpenRead(path))
+        using (var gzip = new GZipStream(file, CompressionMode.Decompress))
+        using (var tar = new TarReader(gzip))
+        {
+            while (tar.GetNextEntry() is { } entry)
+            {
+                if (entry.DataStream == null)
+                    continue;
+                using var data = new MemoryStream();
+                entry.DataStream.CopyTo(data);
+                entries[entry.Name] = data.ToArray();
+            }
+        }
+
+        var result = new Dictionary<string, (string Guid, string Meta, byte[]? Asset)>(StringComparer.Ordinal);
+        foreach (var pair in entries)
+        {
+            if (!pair.Key.EndsWith("/pathname", StringComparison.Ordinal))
+                continue;
+            int slash = pair.Key.IndexOf('/');
+            string guid = pair.Key.Substring(0, slash);
+            string assetPath = Encoding.UTF8.GetString(pair.Value).TrimEnd('\n');
+            byte[]? asset = entries.TryGetValue(guid + "/asset", out var bytes) ? bytes : null;
+            string meta = entries.TryGetValue(guid + "/asset.meta", out var metaBytes)
+                ? Encoding.UTF8.GetString(metaBytes)
+                : "";
+            result[assetPath] = (guid, meta, asset);
+        }
+        return result;
     }
 
     [Fact]

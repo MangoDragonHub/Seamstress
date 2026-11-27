@@ -24,12 +24,20 @@ public static class EngineExport
     {
         if (scene.Meshes.Count == 0)
             throw new InvalidOperationException("The engine export scene has no meshes.");
-        if (target is not (EngineTarget.Godot or EngineTarget.O3de))
+        if (target is not (EngineTarget.Godot or EngineTarget.O3de or EngineTarget.Unity))
             throw new NotSupportedException($"The {target} exporter is not available yet.");
 
-        string root = Path.GetFullPath(outputFolder);
+        string fullPath = Path.GetFullPath(outputFolder);
         string bundleName = EngineBundle.BundleName(options.BundleName);
-        string bundleFolder = Path.Combine(root, bundleName);
+        if (target == EngineTarget.Unity)
+        {
+            string packagePath = fullPath.EndsWith(".unitypackage", StringComparison.OrdinalIgnoreCase)
+                ? fullPath
+                : Path.Combine(fullPath, bundleName + ".unitypackage");
+            return UnityExporter.Export(scene, packagePath, bundleName);
+        }
+
+        string bundleFolder = Path.Combine(fullPath, bundleName);
         Directory.CreateDirectory(bundleFolder);
         return target switch
         {

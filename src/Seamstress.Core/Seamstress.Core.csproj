@@ -13,4 +13,10 @@
     <EmbeddedResource Include="..\..\Themes\*.*" LogicalName="Themes/%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Shaders and the Editor importer written into Unity packages. -->
+    <EmbeddedResource Include="IO\Engines\Templates\Unity\*"
+      LogicalName="Seamstress.Core.IO.Engines.Templates.Unity.%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>
