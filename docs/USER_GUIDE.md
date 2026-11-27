@@ -649,6 +649,11 @@ The form is a rigid mould, not soft stuffing: the ball will not squash unless yo
 The garment must be closed enough around it; an open stuffing hole may let the form show through in the 3D
 view.
 
+For a soft, squishy ball without a mould, use the selected garment's **Inflation** slider under
+**Simulation** in Properties. It pressurises a closed garment like a balloon once its seams have closed.
+0% turns it off; higher values make a firmer puff. The faces should point outward—use **View ▸ 3D: Normal
+Direction** to check them, and **Invert Normals** in Properties if needed.
+
 ### Simulation settings
 
 At the bottom of the Properties panel, under **Simulation**:
@@ -661,6 +666,7 @@ At the bottom of the Properties panel, under **Simulation**:
 | **Speed** | Slow motion or fast forward. |
 | **Cloth-to-cloth collision** | Keeps cloth from passing through itself and other garments. Turning it off roughly halves simulation time. |
 | **Ground plane** | Whether cloth stops at the floor. |
+| **Inflation** | Soft air pressure inside the selected garment, 0–100%. It starts after its seams close and needs an outward-facing closed shape. |
 
 ### Good to know
 

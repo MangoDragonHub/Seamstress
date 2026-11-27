@@ -660,5 +660,8 @@
   "Sphere": "球体",
   "The form pushes the cloth out where it overlaps. Hidden forms still collide; turn Collides off to stop them. Forms are not exported.": "形体在与其重叠的位置把布料向外推。隐藏的形体仍会参与碰撞；关闭“参与碰撞”可停止碰撞。形体不会被导出。",
   "Visible": "可见",
-  "collision|Height": "高度"
+  "collision|Height": "高度",
+  "Inflation": "充气",
+  "Change inflation": "更改充气",
+  "Inflates a closed garment like a soft balloon; 0% turns it off. Use Normal Direction to check that the faces point outward.": "将封闭的服装像软气球一样充气；0% 关闭。使用法线方向检查面是否朝外。"
 }

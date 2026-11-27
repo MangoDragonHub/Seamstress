@@ -123,6 +123,8 @@ public sealed class Garment
     /// <summary>Target edge length of the simulation mesh in centimetres. Smaller means more faces.</summary>
     public float ParticleDistance { get; set; } = 2.0f;
 
+    public float Inflation { get; set; }
+
     /// <summary>
     /// Garment-wide collision thickness in millimetres, or null to use each piece's <see cref="FabricPhysics.Thickness"/>.
     /// The Properties panel edits this in centimetres.
@@ -159,6 +161,7 @@ public sealed class Garment
         Expanded = Expanded,
         SimulateWithOthers = SimulateWithOthers,
         ParticleDistance = ParticleDistance,
+        Inflation = Inflation,
         Thickness = Thickness,
         Topology = Topology,
         MakeHumanZDepth = MakeHumanZDepth,

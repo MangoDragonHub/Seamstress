@@ -2383,6 +2383,20 @@ public sealed class Workspace
         }, "garment-pd:" + garmentId);
     }
 
+    public void SetGarmentInflation(string garmentId, float value)
+    {
+        if (float.IsNaN(value) || float.IsInfinity(value))
+            return;
+        float inflation = Math.Clamp(value, 0, 100);
+        if (Document.FindGarment(garmentId) is not { } garment || MathF.Abs(garment.Inflation - inflation) < 1e-4f)
+            return;
+        History.Execute(Lang.T("Change inflation"), doc =>
+        {
+            if (doc.FindGarment(garmentId) is { } changed)
+                changed.Inflation = inflation;
+        }, "garment-inflation:" + garmentId);
+    }
+
     /// <summary>Turns the garment-wide thickness override on (seeded from its pieces) or off.</summary>
     public void SetGarmentThicknessEnabled(string garmentId, bool enabled)
     {

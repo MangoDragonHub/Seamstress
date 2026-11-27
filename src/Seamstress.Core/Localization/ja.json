@@ -660,5 +660,8 @@
   "Sphere": "球",
   "The form pushes the cloth out where it overlaps. Hidden forms still collide; turn Collides off to stop them. Forms are not exported.": "形状と重なる部分で布を外側に押し出します。非表示の形状も衝突します。衝突を止めるには「衝突する」をオフにしてください。形状は書き出されません。",
   "Visible": "表示",
-  "collision|Height": "高さ"
+  "collision|Height": "高さ",
+  "Inflation": "膨らみ",
+  "Change inflation": "膨らみを変更",
+  "Inflates a closed garment like a soft balloon; 0% turns it off. Use Normal Direction to check that the faces point outward.": "閉じた衣服を柔らかい風船のように膨らませます。0% でオフ。法線方向で面が外側を向いているか確認してください。"
 }

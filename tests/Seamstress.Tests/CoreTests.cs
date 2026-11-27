@@ -816,6 +816,25 @@ public class DocumentTests
     }
 
     [Fact]
+    public void GarmentInflationSurvivesSaveAndLoadAndUndo()
+    {
+        var document = new Document { Name = "Inflatable" };
+        var garment = new Garment { Name = "Ball", Inflation = 60 };
+        document.Garments.Add(garment);
+        var loaded = GarmentFile.Deserialize(GarmentFile.Serialize(document));
+        Assert.Equal(60, Assert.Single(loaded.Garments).Inflation);
+
+        var ws = new Workspace();
+        var edited = ws.AddGarment("Ball");
+        ws.SetGarmentInflation(edited.Id, 50);
+        Assert.Equal(50, edited.Inflation);
+        ws.History.Undo();
+        Assert.Equal(0, ws.Document.FindGarment(edited.Id)!.Inflation);
+        ws.History.Redo();
+        Assert.Equal(50, ws.Document.FindGarment(edited.Id)!.Inflation);
+    }
+
+    [Fact]
     public void CollisionFormFitsTheActiveGarment()
     {
         var ws = new Workspace();

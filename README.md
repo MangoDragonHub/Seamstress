@@ -24,9 +24,9 @@ Marvelous Designer.
   simulation, to tug bunched-up areas into place; the ring under the cursor shows the held area, whose size can
   be changed in Preferences or with **[** / **]**. **Collision forms** are saved, ghosted spheres, capsules and
   boxes that push the cloth; use one as a rigid mould to wrap a garment around, such as a stuffing sphere for
-  a puff ball. **Rip** tears a piece by dragging across its surface (Shift
-  for a straight tear, and the stroke may start or end outside the garment); when the tear separates the
-  cloth, the new pieces appear in the 2D view. **Pin** freezes chosen vertices so the
+  a puff ball. **Inflation** pressurises a closed garment like a soft balloon. **Rip** tears a piece by dragging
+  across its surface (Shift for a straight tear, and the stroke may start or end outside the garment); when the
+  tear separates the cloth, the new pieces appear in the 2D view. **Pin** freezes chosen vertices so the
   rest of the cloth settles around them; **Unpin All** (Simulation menu) releases them again. **Ortho** switches to an
   orthographic camera. **View ▸ 3D: Normal Direction** colours the front and back of every face, and **Invert
   Normals** (Properties) turns a piece that faces the wrong way.

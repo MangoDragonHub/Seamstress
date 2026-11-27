@@ -51,6 +51,8 @@ public sealed partial class ClothSolver
     private int[] _pieceStitches = Array.Empty<int>();
     private int[] _garmentOfPiece = Array.Empty<int>();
     private float[] _sewing = Array.Empty<float>();   // per garment: 1 while its seams are far apart, 0 once sewn
+    private float[] _inflation = Array.Empty<float>();
+    private bool _hasInflation;
     private float[] _gap = Array.Empty<float>();
     private float[] _bestGap = Array.Empty<float>();
     private int[] _stalled = Array.Empty<int>();
@@ -293,6 +295,15 @@ public sealed partial class ClothSolver
 
         solver._garmentOfPiece = pieces.Select(p => p.Garment).ToArray();
         solver.SetCollisionForms(colliders, garmentIds);
+        var inflation = new float[garmentCount];
+        int inflationIndex = 0;
+        foreach (var g in simulated)
+            inflation[inflationIndex++] = Math.Clamp(g.Garment.Inflation, 0, 100);
+        foreach (var g in obstacles)
+            if (inflationIndex < inflation.Length)
+                inflation[inflationIndex++] = 0;
+        solver._inflation = inflation;
+        solver._hasInflation = inflation.Any(v => v > 0);
         solver._sewing = new float[garmentCount];
         solver._gap = new float[garmentCount];
         solver._bestGap = Enumerable.Repeat(float.MaxValue, garmentCount).ToArray();
@@ -368,6 +379,7 @@ public sealed partial class ClothSolver
         {
             if (Settings.SelfCollision && step % searchEvery == 0)
                 FindContacts();
+            ApplyInflation(h);
             for (int i = 0; i < n; i++)
             {
                 if (_invMass[i] == 0)

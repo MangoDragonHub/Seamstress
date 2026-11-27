@@ -673,6 +673,52 @@ public class SimulationTests : IClassFixture<AvatarFixture>
         return MathF.Abs(local.X) < halfSize.X && MathF.Abs(local.Y) < halfSize.Y && MathF.Abs(local.Z) < halfSize.Z;
     }
 
+    private static (Workspace Workspace, Garment Garment, ClothSolver Solver) InflatablePillow(float inflation)
+    {
+        var ws = new Workspace();
+        var garment = ws.AddGarment("Pillow");
+        var outline = new[]
+        {
+            new Vector2(0, 0), new Vector2(40, 0), new Vector2(40, 40), new Vector2(0, 40),
+        };
+        var front = ws.AddPiece(outline, "Rectangle")!;
+        var back = ws.AddPiece(outline, "Rectangle")!;
+        front.Placement.Position = new Vector3(0, 1.1f, 0.35f);
+        back.Placement.Position = new Vector3(0, 1.1f, 0.25f);
+        garment.Inflation = inflation;
+        ws.AddSeams(Enumerable.Range(0, 4)
+            .Select(e => (new EdgeRef(front.Id, e), new EdgeRef(back.Id, e), true))
+            .ToList());
+        var mesh = ws.MeshFor(garment);
+        var settings = new SimulationSettings { Gravity = 0, Substeps = 12, SelfCollision = false, GroundPlane = false };
+        var solver = ClothSolver.Create(new[] { mesh }, Array.Empty<GarmentMesh>(), null, settings);
+        return (ws, garment, solver);
+    }
+
+    [Fact]
+    public void InflationPuffsAClosedGarment()
+    {
+        static float Thickness(float inflation)
+        {
+            var (_, _, solver) = InflatablePillow(inflation);
+            for (int i = 0; i < 240; i++)
+                solver.Step();
+            float min = float.MaxValue, max = float.MinValue;
+            foreach (var p in solver.Positions)
+            {
+                min = MathF.Min(min, p.Z);
+                max = MathF.Max(max, p.Z);
+            }
+            return max - min;
+        }
+
+        float flat = Thickness(0);
+        float inflated = Thickness(100);
+        _output.WriteLine($"pillow depth: {flat * 100:0.0} cm without inflation, {inflated * 100:0.0} cm at 100%");
+        Assert.True(flat < 0.15f, $"the closed pillow should stay near its arranged depth ({flat * 100:0.0} cm)");
+        Assert.True(inflated > flat + 0.05f, $"inflation should deepen the pillow ({inflated * 100:0.0} cm)");
+    }
+
     [Theory]
     [InlineData(CollisionShape.Sphere)]
     [InlineData(CollisionShape.Capsule)]

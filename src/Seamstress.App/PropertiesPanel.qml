@@ -693,6 +693,21 @@ Pane {
                     checked: root.sel.garment ? root.sel.garment.simulateWithOthers : false
                     onToggled: App.setSimulateWithOthers(root.sel.garment.id, checked)
                 }
+                SliderRow {
+                    visible: !!root.sel.garment && (root.sel.kind === "garment" || root.sel.kind === "pieces")
+                    label: tr("Inflation")
+                    from: 0; to: 100; stepSize: 1; suffix: "%"
+                    value: root.sel.garment ? root.sel.garment.inflation : 0
+                    onEdited: (v) => App.setGarmentInflation(v)
+                }
+                Label {
+                    visible: !!root.sel.garment && (root.sel.kind === "garment" || root.sel.kind === "pieces")
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.55
+                    font.pixelSize: 11
+                    text: tr("Inflates a closed garment like a soft balloon; 0% turns it off. Use Normal Direction to check that the faces point outward.")
+                }
                 SliderRow { label: tr("Gravity"); from: -20; to: 0; stepSize: 0.1; decimals: 1; suffix: " m/s²"; value: root.sel.simulation.gravity !== undefined ? root.sel.simulation.gravity : -9.8; onEdited: (v) => App.setSimulationValue("gravity", v) }
                 SliderRow { label: tr("Substeps"); from: 4; to: 40; stepSize: 1; value: root.sel.simulation.substeps !== undefined ? root.sel.simulation.substeps : 12; onEdited: (v) => App.setSimulationValue("substeps", v) }
                 SliderRow { label: tr("Speed"); from: 0.1; to: 2; stepSize: 0.1; decimals: 1; suffix: "×"; value: root.sel.simulation.timeScale !== undefined ? root.sel.simulation.timeScale : 1; onEdited: (v) => App.setSimulationValue("timeScale", v) }

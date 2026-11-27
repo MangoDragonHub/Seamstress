@@ -1098,6 +1098,11 @@ public partial class AppController : INotifyPropertyChanged
     }
 
     public void SetSimulateWithOthers(string garmentId, bool value) => _workspace.SetSimulateWithOthers(garmentId, value);
+    public void SetGarmentInflation(double value)
+    {
+        if (_workspace.ActiveGarment is { } garment)
+            _workspace.SetGarmentInflation(garment.Id, (float)value);
+    }
     public void SetGarmentThicknessEnabled(string garmentId, bool enabled) => _workspace.SetGarmentThicknessEnabled(garmentId, enabled);
     public void SetGarmentThickness(string garmentId, double millimetres) => _workspace.SetGarmentThickness(garmentId, (float)millimetres);
 

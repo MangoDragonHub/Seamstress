@@ -660,5 +660,8 @@
   "Sphere": "Sphère",
   "The form pushes the cloth out where it overlaps. Hidden forms still collide; turn Collides off to stop them. Forms are not exported.": "La forme repousse le tissu là où elle le recoupe. Les formes masquées entrent toujours en collision ; désactivez « Entre en collision » pour les arrêter. Les formes ne sont pas exportées.",
   "Visible": "Visible",
-  "collision|Height": "Hauteur"
+  "collision|Height": "Hauteur",
+  "Inflation": "Gonflement",
+  "Change inflation": "Modifier le gonflement",
+  "Inflates a closed garment like a soft balloon; 0% turns it off. Use Normal Direction to check that the faces point outward.": "Gonfle un vêtement fermé comme un ballon souple ; 0 % le désactive. Utilisez Direction des normales pour vérifier que les faces pointent vers l’extérieur."
 }

@@ -13,7 +13,7 @@ namespace Seamstress.Core.IO;
 public static class GarmentFile
 {
     public const string FormatName = "seamstress-garment";
-    public const int FormatVersion = 2;
+    public const int FormatVersion = 3;
     public const string Extension = ".garment.json";
 
     public static void Save(Document document, string path)
@@ -136,6 +136,8 @@ public static class GarmentFile
                 w.WriteBoolean("visible", g.Visible);
                 w.WriteBoolean("simulateWithOthers", g.SimulateWithOthers);
                 w.WriteNumber("particleDistance", g.ParticleDistance);
+                if (g.Inflation > 0)
+                    w.WriteNumber("inflation", g.Inflation);
                 if (g.Thickness is { } thickness)
                     w.WriteNumber("thickness", thickness);
                 w.WriteString("topology", g.Topology == MeshTopology.Quads ? "quads" : "triangles");
@@ -354,6 +356,7 @@ public static class GarmentFile
             garment.Visible = Bool(g, "visible", true);
             garment.SimulateWithOthers = Bool(g, "simulateWithOthers", false);
             garment.ParticleDistance = Math.Clamp(Num(g, "particleDistance", garment.ParticleDistance), 0.3f, 20f);
+            garment.Inflation = Math.Clamp(Finite(Num(g, "inflation", garment.Inflation), garment.Inflation), 0, 100);
             if (g.TryGetProperty("thickness", out var thickness) && thickness.ValueKind == JsonValueKind.Number)
                 garment.Thickness = Math.Clamp(thickness.GetSingle(), 1f, 50f);
             garment.Topology = string.Equals(Str(g, "topology"), "quads", StringComparison.OrdinalIgnoreCase)

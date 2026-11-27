@@ -404,6 +404,10 @@ QtObject {
         check("collision form selected", JSON.parse(App.selection()).kind === "collider")
         App.deleteCollisionForm(formId)
         check("collision form deleted", JSON.parse(App.collisionForms()).length === 0)
+        App.setGarmentInflation(50)
+        check("garment inflation set", JSON.parse(App.selection()).garment.inflation === 50)
+        App.setGarmentInflation(0)
+        check("garment inflation cleared", JSON.parse(App.selection()).garment.inflation === 0)
         App.log(failures === 0 ? "smoke test passed" : "smoke test FAILED: " + failures)
     }
 }

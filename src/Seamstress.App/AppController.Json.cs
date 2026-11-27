@@ -154,6 +154,7 @@ public partial class AppController
             var mesh = garment.Pieces.Count > 0 ? _workspace.MeshFor(garment) : null;
             sb.Append(",\"garment\":{\"id\":").Append(Q(garment.Id)).Append(",\"name\":").Append(Q(garment.Name));
             sb.Append(",\"particleDistance\":").Append(N(garment.ParticleDistance));
+            sb.Append(",\"inflation\":").Append(N(garment.Inflation));
             if (garment.Thickness is { } thickness)
                 sb.Append(",\"thickness\":").Append(N(thickness));
             else
